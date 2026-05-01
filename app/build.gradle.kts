@@ -52,12 +52,12 @@ android {
         buildConfigField("String", "BUILD_GIT_REPO", "\"${project.buildGitRepo}\"")
         buildConfigField("String", "BUILD_VERSION_NAME", "\"${project.buildVersionName}\"")
 
-        // --- 新增：注入 APP_KEY ---
-        // 从文件中获取，如果文件或 Key 不存在，提供一个默认空字符串，防止编译报错
-        var appKey = project.findProperty("API_KEY") as String
-        buildConfigField("String", "API_KEY", appKey)
-        var appId = project.findProperty("API_ID") as String
-        buildConfigField("String", "API_ID", appId)
+        // --- 新增:注入 APP_KEY ---
+        // 从文件中获取,如果文件或 Key 不存在,提供一个默认空字符串,防止编译报错
+        val appKey = project.findProperty("API_KEY") as? String ?: ""
+        buildConfigField("String", "API_KEY", "\"${appKey}\"")
+        val appId = project.findProperty("API_ID") as? String ?: ""
+        buildConfigField("String", "API_ID", "\"${appId}\"")
         // -------------------------
     }
 
@@ -74,13 +74,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // 2. 引用它
-            signingConfig = signingConfigs.getByName("myCustomConfig")
+            // 2. 引用它(如果存在)
+            signingConfig = signingConfigs.findByName("myCustomConfig")
             resValue("string", "trime_app_name", "@string/app_name_release")
         }
         debug {
-            // 2. 引用它
-            signingConfig = signingConfigs.getByName("myCustomConfig")
+            signingConfig = signingConfigs.getByName("debug")
+            // 2. 引用它(如果存在)
             resValue("string", "trime_app_name", "@string/app_name_debug")
         }
         all {
