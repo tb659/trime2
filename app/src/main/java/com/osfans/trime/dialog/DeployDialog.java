@@ -23,6 +23,7 @@ import com.osfans.trime.Config;
 import com.osfans.trime.TrimeService;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.core.RimeMessage;
+import com.osfans.trime.util.CustomToast;
 import com.osfans.trime.data.opencc.OpenCCDictManager;
 import com.osfans.trime.theme.ThemeManager;
 
@@ -243,7 +244,7 @@ public class DeployDialog {
         try {
             mDig.show();
         } catch (Exception e) {
-            Toast.makeText(mDig.getContext(), "开始部署",Toast.LENGTH_SHORT).show();
+            CustomToast.show(mDig.getContext(), "开始部署",Toast.LENGTH_SHORT, true);
         }
         deploy();
     }
@@ -267,7 +268,7 @@ public class DeployDialog {
         try {
             mDig.show();
         } catch (Exception e) {
-            Toast.makeText(mDig.getContext(), "完成",Toast.LENGTH_SHORT).show();
+            CustomToast.show(mDig.getContext(), "完成",Toast.LENGTH_SHORT, true);
         }
     }
 

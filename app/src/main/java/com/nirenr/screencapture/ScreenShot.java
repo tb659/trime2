@@ -25,6 +25,7 @@ import android.widget.Toast;
 
 import com.androlua.LuaAccessibilityService;
 import com.androlua.LuaActivity;
+import com.osfans.trime.util.CustomToast;
 
 import java.nio.ByteBuffer;
 
@@ -74,7 +75,7 @@ public class ScreenShot {
     public static void setResultData(Intent mResultData) {
         if (mResultData == null) {
             if (sService != null)
-                Toast.makeText(sService, "未获得权限", Toast.LENGTH_SHORT).show(); // 显示错误提示
+                CustomToast.show(sService, "未获得权限", Toast.LENGTH_SHORT, true); // 显示错误提示
             if (sScreenCaptureListener != null)
                 sScreenCaptureListener.onScreenCaptureError("未获得权限"); // 回调错误
             return;

@@ -57,6 +57,7 @@ import com.osfans.trime.keyboard.ModifierState;
 import com.osfans.trime.theme.ThemeManager;
 import com.osfans.trime.util.Function;
 import com.osfans.trime.util.HttpUtil;
+import com.osfans.trime.util.CustomToast;
 
 import org.luaj.Globals;
 import org.luaj.LuaTable;
@@ -794,7 +795,7 @@ public class TrimeService extends InputMethodService {
                         // 特殊处理 GPT 相关命令，检查输入是否为空
                         if (("gpt".equals(command) || "gpt2".equals(command)) 
                                 && (TextUtils.isEmpty(arg) || (option.contains("%") && option.equals(arg)))) {
-                            Toast.makeText(this, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
+                            CustomToast.show(this, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
                             return;
                         }
                         
@@ -2298,7 +2299,7 @@ public class TrimeService extends InputMethodService {
     public void sendMsgAux(final String text) {
         Log.w(TAG, "sendMsgAux: " + text);
         //if(!isInputViewShown()&&PrefLauncher.getToken()==null){
-        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+        CustomToast.show(this, text, Toast.LENGTH_SHORT, true);
         //return;
         //}
        /*if (mDlg == null) {

@@ -11,6 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.androlua.LuaUtil;
+import com.osfans.trime.util.CustomToast;
 
 import java.util.ArrayList;
 
@@ -46,7 +47,7 @@ public class ScreenCaptureActivity extends Activity {
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
             //5.0 之后才允许使用屏幕截图
-            Toast.makeText(this, "仅支持安卓5以上系统", Toast.LENGTH_SHORT).show(); // 显示不支持提示
+            CustomToast.show(this, "仅支持安卓5以上系统", Toast.LENGTH_SHORT, false); // 显示不支持提示
             //TalkManAccessibilityService.getInstance().toBack();
             return;
         }

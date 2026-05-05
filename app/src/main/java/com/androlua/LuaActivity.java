@@ -53,6 +53,7 @@ import org.luaj.LuaTable;
 import org.luaj.LuaValue;
 import com.osfans.trime.BuildConfig;
 import com.osfans.trime.R;
+import com.osfans.trime.util.CustomToast;
 import org.luaj.android.call;
 import org.luaj.android.file;
 import org.luaj.android.http;
@@ -90,9 +91,6 @@ public class LuaActivity extends Activity implements ResourceFinder, LuaContext,
     public final static String NAME = "name";
 
     private Globals globals;
-    private final StringBuilder toastbuilder = new StringBuilder();
-    private Toast toast;
-    private long lastShow;
     public static ArrayList<String> logs = new ArrayList<>();
     private ArrayListAdapter<String> adapter;
     private String mExtDir;
@@ -611,23 +609,10 @@ public class LuaActivity extends Activity implements ResourceFinder, LuaContext,
     }
 
     //显示toast
-    @SuppressLint("ShowToast")
     public void showToast(String text) {
         if (!debug)
             return;
-        long now = System.currentTimeMillis();
-        if (toast == null || now - lastShow > 1000) {
-            toastbuilder.setLength(0);
-            toast = Toast.makeText(this, text, Toast.LENGTH_LONG);
-            toastbuilder.append(text);
-            toast.show();
-        } else {
-            toastbuilder.append("\n");
-            toastbuilder.append(text);
-            toast.setText(toastbuilder.toString());
-            toast.setDuration(Toast.LENGTH_LONG);
-        }
-        lastShow = now;
+        CustomToast.show(this, text, android.widget.Toast.LENGTH_LONG, false);
     }
 
     @Override
@@ -1337,10 +1322,10 @@ public class LuaActivity extends Activity implements ResourceFinder, LuaContext,
                     .build();
             try {
                 scm.requestPinShortcut(si, null);
-                Toast.makeText(this, "添加成功", Toast.LENGTH_SHORT).show();
+                CustomToast.show(this, "添加成功", Toast.LENGTH_SHORT, false);
             } catch (Exception e) {
                 e.printStackTrace();
-                Toast.makeText(this, "添加快捷方式出错", Toast.LENGTH_SHORT).show();
+                CustomToast.show(this, "添加快捷方式出错", Toast.LENGTH_SHORT, false);
             }
         } else {
             Intent addShortcut = new Intent("com.android.launcher.action.INSTALL_SHORTCUT");
@@ -1351,7 +1336,7 @@ public class LuaActivity extends Activity implements ResourceFinder, LuaContext,
             addShortcut.putExtra("duplicate", 0);
             addShortcut.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE, icon);
             sendBroadcast(addShortcut);
-            Toast.makeText(this, "添加成功", Toast.LENGTH_SHORT).show();
+            CustomToast.show(this, "添加成功", Toast.LENGTH_SHORT, false);
         }
 
     }

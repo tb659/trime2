@@ -41,6 +41,7 @@ import com.osfans.trime.dialog.SchemaDialog; // 输入方案管理对话框
 import com.osfans.trime.dialog.SchemaGroupDialog; // 方案组管理对话框
 import com.osfans.trime.dialog.StyleDialog; // 样式选择对话框
 import com.osfans.trime.dialog.ThemeDialog; // 主题选择对话框
+import com.osfans.trime.util.CustomToast;
 
 /**
  * 偏好设置启动器活动类。
@@ -171,7 +172,7 @@ public class PrefLauncher extends Activity implements AdapterView.OnItemClickLis
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         // 检查输入法服务是否已启动
         if (TrimeService.getInstance() == null) {
-            Toast.makeText(this, "请先启用输入法", Toast.LENGTH_SHORT).show();
+            CustomToast.show(this, "请先启用输入法", Toast.LENGTH_SHORT, true);
             return super.onOptionsItemSelected(item);
         }
         // 如果点击的是“部署”按钮（ID 为 1）

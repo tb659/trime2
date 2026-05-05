@@ -17,6 +17,7 @@ import android.widget.Toast;
 import com.osfans.trime.theme.ThemeManager;
 import com.osfans.trime.util.Function;
 import com.osfans.trime.TrimeService;
+import com.osfans.trime.util.CustomToast;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.core.SchemaItem;
 
@@ -48,7 +49,7 @@ public class OptionsDialog {
      */
     public OptionsDialog(Context context) {
         if (TrimeService.getInstance() == null) {
-            Toast.makeText(context, "请先启用输入法", Toast.LENGTH_SHORT).show();
+            CustomToast.show(context, "请先启用输入法", Toast.LENGTH_SHORT, true);
             return;
         }
 
@@ -77,7 +78,7 @@ public class OptionsDialog {
         // 获取所有可用的方案列表
         SchemaItem[] availableSchemas = Rime.getRimeSchemaList();
         if (availableSchemas == null) {
-            Toast.makeText(context, "请先启用输入法", Toast.LENGTH_SHORT).show();
+            CustomToast.show(context, "请先启用输入法", Toast.LENGTH_SHORT, true);
             return;
         }
         Arrays.sort(availableSchemas, new SortByName());

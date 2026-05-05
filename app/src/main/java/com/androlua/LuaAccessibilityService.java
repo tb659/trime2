@@ -50,6 +50,7 @@ import org.luaj.Globals;
 import org.luaj.LuaTable;
 import org.luaj.LuaValue;
 import com.osfans.trime.BuildConfig;
+import com.osfans.trime.util.CustomToast;
 import org.luaj.android.file;
 import org.luaj.android.http;
 import org.luaj.android.json;
@@ -713,9 +714,6 @@ public class LuaAccessibilityService extends AccessibilityService implements Res
     private final static String NAME = "name";
 
     private Globals globals;
-    private final StringBuilder toastbuilder = new StringBuilder();
-    private Toast toast;
-    private long lastShow;
     private ArrayListAdapter<String> adapter;
     private String mExtDir;
     private int mWidth;
@@ -905,23 +903,10 @@ public class LuaAccessibilityService extends AccessibilityService implements Res
     }
 
     //显示toast
-    @SuppressLint("ShowToast")
     public void showToast(String text) {
         if (!debug)
             return;
-        long now = System.currentTimeMillis();
-        if (toast == null || now - lastShow > 1000) {
-            toastbuilder.setLength(0);
-            toast = Toast.makeText(this, text, Toast.LENGTH_LONG);
-            toastbuilder.append(text);
-            toast.show();
-        } else {
-            toastbuilder.append("\n");
-            toastbuilder.append(text);
-            toast.setText(toastbuilder.toString());
-            toast.setDuration(Toast.LENGTH_LONG);
-        }
-        lastShow = now;
+        CustomToast.show(this, text, android.widget.Toast.LENGTH_LONG, false);
     }
 
     @Override

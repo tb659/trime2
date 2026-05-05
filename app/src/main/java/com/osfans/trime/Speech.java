@@ -42,6 +42,7 @@ import com.osfans.trime.speech.RecognizerListener;
 import com.osfans.trime.speech.VivoRecognizer;
 import com.osfans.trime.theme.ThemeManager;
 import com.osfans.trime.util.Function;
+import com.osfans.trime.util.CustomToast;
 import com.osfans.trime.core.Rime;
 
 import java.io.File;
@@ -207,7 +208,7 @@ class Speech implements RecognitionListener, RecognizerListener {
      * @param text 提示文本
      */
     private void alert(String text) {
-        Toast.makeText(context, text, Toast.LENGTH_SHORT).show();
+        CustomToast.show(context, text, Toast.LENGTH_SHORT, true);
     }
 
     /**

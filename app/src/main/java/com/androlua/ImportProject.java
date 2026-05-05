@@ -11,6 +11,7 @@ import android.util.Log;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.osfans.trime.util.CustomToast;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -98,10 +99,10 @@ public class ImportProject extends Activity {
                     public void onClick(DialogInterface dialog, int which) {
                         try {
                             LuaUtil.unZip(path, new File(dir, edit.getText().toString()).getAbsolutePath());
-                            Toast.makeText(ImportProject.this, "导入完成", Toast.LENGTH_SHORT).show();
+                            CustomToast.show(ImportProject.this, "导入完成", Toast.LENGTH_SHORT, false);
                         } catch (IOException e) {
                             e.printStackTrace();
-                            Toast.makeText(ImportProject.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                            CustomToast.show(ImportProject.this, e.getMessage(), Toast.LENGTH_SHORT, false);
                         }
                     }
                 })

@@ -18,6 +18,7 @@ import com.osfans.trime.core.DataManager;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.core.SchemaItem;
 import com.osfans.trime.theme.ThemeManager;
+import com.osfans.trime.util.CustomToast;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,7 +43,7 @@ public class SchemaDialog {
     public SchemaDialog(Context context) {
         DataManager.sync();
         if (TrimeService.getInstance() == null) {
-            Toast.makeText(context, "请先启用输入法", Toast.LENGTH_SHORT).show();
+            CustomToast.show(context, "请先启用输入法", Toast.LENGTH_SHORT, true);
             return;
         }
 

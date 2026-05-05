@@ -36,6 +36,7 @@ import com.myopicmobile.textwarrior.common.Lexer;
 import com.myopicmobile.textwarrior.common.LinearSearchStrategy;
 
 import com.osfans.trime.BuildConfig;
+import com.osfans.trime.util.CustomToast;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -433,7 +434,7 @@ public class LuaEditor extends FreeScrollingTextField {
                 idx = finder.find(getText(), kw, idx, getText().length(), false, false);
                 if (idx == -1) {
                     selectText(false);
-                    Toast.makeText(mContext, "未找到", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(mContext, "未找到", Toast.LENGTH_SHORT, false);
                     idx = 0;
                     return;
                 }
@@ -602,7 +603,7 @@ public class LuaEditor extends FreeScrollingTextField {
         idx = finder.find(getText(), kw, idx, getText().length(), false, false);
         if (idx == -1) {
             selectText(false);
-            Toast.makeText(mContext, "未找到", Toast.LENGTH_SHORT).show();
+            CustomToast.show(mContext, "未找到", Toast.LENGTH_SHORT, false);
             idx = 0;
             return false;
         }
@@ -631,7 +632,7 @@ public class LuaEditor extends FreeScrollingTextField {
         idx = finder.findBackwards(getText(), kw, idx - keyword.length() - 1, 0, false, false);
         if (idx == -1) {
             selectText(false);
-            Toast.makeText(mContext, "未找到", Toast.LENGTH_SHORT).show();
+            CustomToast.show(mContext, "未找到", Toast.LENGTH_SHORT, false);
             idx = getLength();
             return false;
         }

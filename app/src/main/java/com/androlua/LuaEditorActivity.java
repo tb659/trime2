@@ -56,6 +56,7 @@ import org.luaj.LuaTable;
 import org.luaj.LuaValue;
 import org.luaj.Varargs;
 import com.osfans.trime.BuildConfig;
+import com.osfans.trime.util.CustomToast;
 import org.luaj.android.file;
 import org.luaj.android.http;
 import org.luaj.android.json;
@@ -733,7 +734,7 @@ public class LuaEditorActivity extends Activity implements ResourceFinder {
             loadLibs();
             mTitle.setText(path.replace(Environment.getExternalStorageDirectory().getAbsolutePath(), ".."));
         } catch (IOException e) {
-            Toast.makeText(this, "打开出错：" + e.toString(), Toast.LENGTH_SHORT).show();
+            CustomToast.show(this, "打开出错：" + e.toString(), Toast.LENGTH_SHORT, false);
             if (BuildConfig.DEBUG)
                 e.printStackTrace();
         }
@@ -772,7 +773,7 @@ public class LuaEditorActivity extends Activity implements ResourceFinder {
             mTitle.setText(path.replace(Environment.getExternalStorageDirectory().getAbsolutePath(), ".."));
             save();
         } catch (IOException e) {
-            Toast.makeText(this, "打开出错：" + e.toString(), Toast.LENGTH_SHORT).show();
+            CustomToast.show(this, "打开出错：" + e.toString(), Toast.LENGTH_SHORT, false);
             if (BuildConfig.DEBUG)
                 e.printStackTrace();
         }
@@ -846,7 +847,7 @@ public class LuaEditorActivity extends Activity implements ResourceFinder {
                     edit.save();
                     startActivity(new Intent(this, LuaActivity.class).setData(Uri.fromFile(mProjDir)));
                 } catch (IOException e) {
-                    Toast.makeText(this, "保存出错：" + e.toString(), Toast.LENGTH_SHORT).show();
+                    CustomToast.show(this, "保存出错：" + e.toString(), Toast.LENGTH_SHORT, false);
                     if (BuildConfig.DEBUG)
                         e.printStackTrace();
                 }
@@ -880,9 +881,9 @@ public class LuaEditorActivity extends Activity implements ResourceFinder {
             case 6:
                 try {
                     edit.save();
-                    Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(this, "已保存", Toast.LENGTH_SHORT, false);
                 } catch (IOException e) {
-                    Toast.makeText(this, "保存出错：" + e.toString(), Toast.LENGTH_SHORT).show();
+                    CustomToast.show(this, "保存出错：" + e.toString(), Toast.LENGTH_SHORT, false);
                     if (BuildConfig.DEBUG)
                         e.printStackTrace();
                 }
@@ -951,7 +952,7 @@ public class LuaEditorActivity extends Activity implements ResourceFinder {
                             return;
                         File d = new File(mProjectsDir, text);
                         if (!d.exists() && !d.mkdirs()) {
-                            Toast.makeText(LuaEditorActivity.this, "创建出错", Toast.LENGTH_SHORT).show();
+                            CustomToast.show(LuaEditorActivity.this, "创建出错", Toast.LENGTH_SHORT, false);
                             return;
                         }
                         mDir = d;
@@ -1039,10 +1040,10 @@ public class LuaEditorActivity extends Activity implements ResourceFinder {
                 LuaApplication app = LuaApplication.getInstance();
                 String name = LuaUtil.getFileName(mProjDir.getName(), ".zip");
                 if (LuaUtil.zip(mProjDir.getAbsolutePath(), app.getLuaExtDir("backup"), name)) {
-                    Toast.makeText(this, "备份完成" + app.getLuaExtPath("backup", name), Toast.LENGTH_SHORT).show();
+                    CustomToast.show(this, "备份完成" + app.getLuaExtPath("backup", name), Toast.LENGTH_SHORT, false);
                     shareFile(app.getLuaExtPath("backup", name));
                 } else {
-                    Toast.makeText(this, "备份失败", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(this, "备份失败", Toast.LENGTH_SHORT, false);
                 }
                 break;
             case 18:
@@ -1187,7 +1188,7 @@ public class LuaEditorActivity extends Activity implements ResourceFinder {
                 @Override
                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                     copy(list2.get(position));
-                    Toast.makeText(LuaEditorActivity.this, "已复制", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(LuaEditorActivity.this, "已复制", Toast.LENGTH_SHORT, false);
                 }
             });
             dlg.show();

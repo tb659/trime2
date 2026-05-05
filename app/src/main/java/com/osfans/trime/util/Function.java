@@ -6,6 +6,7 @@
 package com.osfans.trime.util;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+import com.osfans.trime.util.CustomToast;
 import static android.content.res.Configuration.UI_MODE_NIGHT_MASK;
 import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
 
@@ -391,10 +392,10 @@ public class Function {
              // ==================== GPT AI 文本生成(交互式) ====================
              case "gpt": {
                 if (TextUtils.isEmpty(option)) {
-                    Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
                     return null;
                 }
-                Toast.makeText(context, "正在生成，请稍后...", Toast.LENGTH_SHORT).show();
+                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
                  // 获取当前服务所在的屏幕或默认屏幕
                  DisplayManager displayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
                  Display defaultDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
@@ -447,9 +448,9 @@ public class Function {
                 break;
             }
             // ==================== GPT AI 文本生成(带进度对话框) ====================
-            case "gpt1": {
+             case "gpt1": {
                 if (TextUtils.isEmpty(option)) {
-                    Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
                     return null;
                 }
                 final ProgressDialog mProgressDialog = new ProgressDialog(context);
@@ -462,7 +463,7 @@ public class Function {
                     }
                 });
                 TrimeService.getInstance().showWidthDialog(mProgressDialog);
-                Toast.makeText(context, "正在生成，请稍后...", Toast.LENGTH_SHORT).show();
+                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
 
                 VivoGpt.gpt1(option, new HttpUtil.HttpCallback() {
                     @Override
@@ -513,7 +514,7 @@ public class Function {
             // ==================== GPT AI 文本生成(直接提交) ====================
             case "gpt2": {
                 if (TextUtils.isEmpty(option)) {
-                    Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
                     return null;
                 }
                 final ProgressDialog mProgressDialog = new ProgressDialog(context);
@@ -526,7 +527,7 @@ public class Function {
                     }
                 });
                 TrimeService.getInstance().showWidthDialog(mProgressDialog);
-                Toast.makeText(context, "正在生成，请稍后...", Toast.LENGTH_SHORT).show();
+                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
                 VivoGpt.gpt1(option, new HttpUtil.HttpCallback() {
                     @Override
                     public void onDone(HttpUtil.HttpResult result) {
@@ -574,10 +575,10 @@ public class Function {
             // ==================== GPT AI 文本生成(后台直接提交) ====================
             case "gpt3": {
                 if (TextUtils.isEmpty(option)) {
-                    Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
+                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
                     return null;
                 }
-                Toast.makeText(context, "正在生成，请稍后...", Toast.LENGTH_SHORT).show();
+                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
                 VivoGpt.gpt(option, new HttpUtil.HttpCallback() {
                     @Override
                     public void onDone(HttpUtil.HttpResult result) {
@@ -585,7 +586,7 @@ public class Function {
                             @Override
                             public void run() {
                                 if (result == null) {
-                                    Toast.makeText(context, "生成完成。", Toast.LENGTH_SHORT).show();
+                                    CustomToast.show(context, "生成完成。", Toast.LENGTH_SHORT, true);
                                     return;
                                 }
                                 if (!context.isInputViewShown())
@@ -609,7 +610,7 @@ public class Function {
                     }catch (Exception e){
                         Log.w(TAG, "handle: "+option );
                         e.printStackTrace();
-                        Toast.makeText(context,e.toString(),Toast.LENGTH_SHORT).show();
+                        CustomToast.show(context,e.toString(),Toast.LENGTH_SHORT, true);
                     }
                     break;
                 }
@@ -629,7 +630,7 @@ public class Function {
             // ==================== 添加短语 ====================
             case "add_phrase":
                 TrimeService.getInstance().addPhrase(option); // 新建短语
-                Toast.makeText(context,"已添加到短语 "+option,Toast.LENGTH_SHORT).show();
+                CustomToast.show(context,"已添加到短语 "+option,Toast.LENGTH_SHORT, true);
                 break;
             // ==================== 直接提交文本 ====================
             case "commit":

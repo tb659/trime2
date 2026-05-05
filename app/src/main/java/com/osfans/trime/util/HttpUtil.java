@@ -407,8 +407,7 @@ public class HttpUtil {
         protected void onProgressUpdate(String... values) {
             super.onProgressUpdate(values);
             // 通知监听器进度更新
-            if(mUpdateListener!=null)
-            mUpdateListener.onUpdate(values);
+            if(mUpdateListener!=null) mUpdateListener.onUpdate(values);
         }
 
         @Override
