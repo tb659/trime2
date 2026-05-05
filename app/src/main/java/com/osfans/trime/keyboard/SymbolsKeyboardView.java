@@ -39,14 +39,31 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 
+/**
+ * 符号键盘视图类。
+ * 显示符号候选词列表,支持分页、Tab 切换、返回、删除等操作。
+ * 实现 ResourceFinder 接口,用于 Lua 脚本加载资源文件。
+ */
 public class SymbolsKeyboardView extends LinearLayout implements ResourceFinder {
+    // ==================== 成员变量 ====================
+    /** Lua 按键映射表 */
     private final LuaTable mKeyMap;
+    /** 按键样式 */
     private final KeyStyle mKeyStyle;
+    /** TrimeService 实例 */
     private final TrimeService mTrime;
+    /** 符号样式 */
     private final Style mSymbolStyle;
+    /** ViewPager2 组件 */
     private ViewPager2 viewPager;
+    /** 列表分页适配器 */
     private ListPagerAdapter mAdapter;
 
+    /**
+     * 构造函数(从 symbols.lua 加载配置)。
+     *
+     * @param context 上下文。
+     */
     public SymbolsKeyboardView(@NonNull Context context) {
         super(context);
         long time=System.currentTimeMillis();
@@ -61,6 +78,13 @@ public class SymbolsKeyboardView extends LinearLayout implements ResourceFinder 
         initView();
         Log.w("SymbolsKeyboardView", "init time: "+(System.currentTimeMillis()-time) );
     }
+
+    /**
+     * 构造函数(使用已有的 Lua 全局环境)。
+     *
+     * @param context 上下文。
+     * @param globals Lua 全局环境。
+     */
     public SymbolsKeyboardView(@NonNull Context context,Globals globals) {
         super(context);
         long time=System.currentTimeMillis();
@@ -183,15 +207,34 @@ public class SymbolsKeyboardView extends LinearLayout implements ResourceFinder 
         }
         //addView(mButtonBar, new LinearLayout.LayoutParams(ThemeManager.getCandidateHeight(), ViewGroup.LayoutParams.MATCH_PARENT));
     }
+    /**
+     * 向下翻页。
+     *
+     * @return true 表示操作成功。
+     */
     public boolean pageDown() {
         getListView(viewPager,mAdapter).smoothScrollBy(0,ThemeManager.getContentHeight());
         return true;
     }
 
+    /**
+     * 向上翻页。
+     *
+     * @return true 表示操作成功。
+     */
     public boolean pageUp() {
         getListView(viewPager,mAdapter).smoothScrollBy(0,-ThemeManager.getContentHeight());
         return true;
     }
+
+    /**
+     * 获取当前页的 RecyclerView。
+     * 从 ViewPager2 中查找当前页对应的 ViewHolder,并返回其内部的 RecyclerView。
+     *
+     * @param viewPager2 ViewPager2 组件。
+     * @param mAdapter 列表分页适配器。
+     * @return 当前页的 RecyclerView 实例。
+     */
     private RecyclerView getListView(ViewPager2 viewPager2, ListPagerAdapter mAdapter){
         // 1. 获取当前页码
         int currentPos = viewPager2.getCurrentItem();
@@ -210,8 +253,13 @@ public class SymbolsKeyboardView extends LinearLayout implements ResourceFinder 
         return mAdapter.getListView();
     }
 
-
-
+    /**
+     * 查找资源文件(实现 ResourceFinder 接口)。
+     * 按优先级查找:绝对路径 -> 键盘目录 -> assets/themes/default/keyboards/ -> symbols.lua。
+     *
+     * @param name 资源文件名。
+     * @return 输入流,未找到则返回 null。
+     */
     @Override
     public InputStream findResource(String name) {
         try {
@@ -239,6 +287,13 @@ public class SymbolsKeyboardView extends LinearLayout implements ResourceFinder 
         return null;
     }
 
+    /**
+     * 查找文件路径(实现 ResourceFinder 接口)。
+     * 如果是绝对路径则直接返回,否则返回键盘目录下的完整路径。
+     *
+     * @param filename 文件名。
+     * @return 文件的绝对路径。
+     */
     @Override
     public String findFile(String filename) {
         if (filename.startsWith("/"))

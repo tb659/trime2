@@ -23,32 +23,59 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Created by Administrator on 2018/07/19 0019.
+ * 分割编辑视图类。
+ * 支持按全文、段落、行、句、字等不同模式分割和编辑文本。
  */
 
 public class SplitEditView extends LinearLayout implements View.OnClickListener, AdapterView.OnItemClickListener {
+    /** 全文模式 */
     private static final int ALL = 0;
+    /** 段落模式 */
     private static final int CHUNK = 1;
+    /** 行模式 */
     private static final int LINE = 2;
+    /** 句模式 */
     private static final int ROW = 3;
+    /** 字模式 */
     private static final int CHAR = 4;
+    /** 保存按钮索引 */
     private static final int SAVE = 5;
+    /** Android 上下文 */
     private final Context mContext;
+    /** 根布局 */
     private LinearLayout mRoot;
+    /** 列表视图(GridView) */
     private GridView mListView;
+    /** 编辑器视图 */
     private LuaEditor mEditView;
+    /** 当前分割模式 */
     private int mSplitMode=ALL;
+    /** 原始文本 */
     private String mText = "";
+    /** 分割后的文本数组 */
     private String[] mList=new String[]{""};
+    /** 保存监听器 */
     private OnSaveListener mOnSaveListener;
+    /** 按钮栏 */
     private LinearLayout mButtonBar;
 
+    /**
+     * 构造函数。
+     *
+     * @param context Android 上下文。
+     */
     public SplitEditView(Context context) {
         super(context);
-        initView(context);
+        initView(context); // 初始化视图
         mContext = context;
     }
 
+    /**
+     * 初始化视图结构。
+     * 创建 GridView、编辑器和按钮栏。
+     *
+     * @param context Android 上下文。
+     */
     private void initView(Context context) {
         mRoot = this;
         mRoot.setOrientation(LinearLayout.VERTICAL);
@@ -61,14 +88,14 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         mRoot.addView(mListView, lp);
         mRoot.addView(mEditView, lp);
         mButtonBar = new LinearLayout(context);
-        String[] bts = new String[]{"全文", "按段", "按行", "按句", "按字", "确定"};
+        String[] bts = new String[]{"全文", "按段", "按行", "按句", "按字", "确定"}; // 按钮文本
 
         for (int i = 0; i < bts.length; i++) {
             String b = bts[i];
             Button btn = new Button(context);
-            btn.setText(b);
-            btn.setId(i);
-            btn.setOnClickListener(this);
+            btn.setText(b); // 设置按钮文本
+            btn.setId(i); // 设置 ID 作为模式标识
+            btn.setOnClickListener(this); // 设置点击监听
             mButtonBar.addView(btn, lp2);
         }
 
@@ -79,14 +106,25 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         setOnSaveListener(null);
     }
 
+    /**
+     * 设置文本内容。
+     *
+     * @param text 要设置的文本。
+     */
     public void setText(String text) {
         mText = text;
         if (mText == null)
-            mText = "";
-        mEditView.setText(mText);
-        initText();
+            mText = ""; // null 转为空字符串
+        mEditView.setText(mText); // 设置编辑器文本
+        initText(); // 初始化分割
     }
 
+    /**
+     * 获取当前文本内容。
+     * 如果在编辑模式则返回编辑器内容,否则拼接分割后的数组。
+     *
+     * @return 当前文本内容。
+     */
     public String getText() {
         if(isShowEdit())
             return mEditView.getText().toString();
@@ -101,6 +139,10 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         return buf.toString();
     }
 
+    /**
+     * 初始化文本分割。
+     * 根据当前分割模式对文本进行分割并显示。
+     */
     private void initText() {
         mList = new String[]{mText};
         switch (mSplitMode) {
@@ -121,6 +163,11 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         }
     }
 
+    /**
+     * 设置是否显示编辑模式。
+     *
+     * @param show true 显示编辑器,false 显示分割列表。
+     */
     private void setShowEdit(boolean show) {
         if (isShowEdit() == show)
             return;
@@ -136,10 +183,21 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         }
     }
 
+    /**
+     * 检查是否显示编辑模式。
+     *
+     * @return true 表示编辑器可见。
+     */
     public boolean isShowEdit() {
         return mEditView.getVisibility() == View.VISIBLE;
     }
 
+    /**
+     * 点击事件处理。
+     * 根据按钮 ID 切换分割模式或执行保存操作。
+     *
+     * @param v 被点击的视图。
+     */
     @Override
     public void onClick(View v) {
         Button b = (Button) v;
@@ -171,6 +229,14 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         }
     }
 
+    /**
+     * 通用分割方法。
+     * 使用正则表达式分割文本,支持不同的分割模式。
+     *
+     * @param text 要分割的文本。
+     * @param reg 正则表达式。
+     * @return 分割后的字符串数组。
+     */
     private String[] split(String text, String reg) {
         ArrayList<String> list = new ArrayList<>();
         Pattern pattern = Pattern.compile(reg);
@@ -179,11 +245,11 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         while (matcher.find()) {
             int end = matcher.end();
             if(mSplitMode==CHUNK)
-                end=matcher.start();
+                end=matcher.start(); // 段落模式不包含分隔符
             list.add(text.substring(start, end));
             start = end;
             if(mSplitMode==CHUNK)
-                start = matcher.end();
+                start = matcher.end(); // 跳过段落分隔符
         }
         if (start != text.length())
             list.add(text.substring(start));
@@ -192,6 +258,10 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         return ret;
     }
 
+    /**
+     * 按字分割。
+     * 将文本拆分为单个字符,每行显示8个。
+     */
     private void splitChar() {
         //mDlg.setTitle(mService.getString(R.string.split_edit_title) + " 按字");
         mText=getText();
@@ -205,6 +275,10 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         mListView.setAdapter(new ArrayListAdapter<>(mContext, android.R.layout.simple_list_item_1, mList));
     }
 
+    /**
+     * 按行分割。
+     * 以换行符为分隔符拆分文本。
+     */
     private void splitLine() {
         //mDlg.setTitle(mService.getString(R.string.split_edit_title) + " 按段");
         mText=getText();
@@ -216,6 +290,10 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         mListView.setAdapter(new ArrayListAdapter<>(mContext, android.R.layout.simple_list_item_1, mList));
     }
 
+    /**
+     * 按句分割。
+     * 以标点符号(。？！，等)为分隔符拆分文本。
+     */
     private void splitRow() {
         //mDlg.setTitle(mService.getString(R.string.split_edit_title) + " 按句");
         mText=getText();
@@ -228,6 +306,10 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         mListView.setAdapter(new ArrayListAdapter<>(mContext, android.R.layout.simple_list_item_1, mList));
     }
 
+    /**
+     * 按段落分割。
+     * 以两个或更多换行符为分隔符拆分文本。
+     */
     private void splitChunk() {
         //mDlg.setTitle(mService.getString(R.string.split_edit_title) + " 按句");
         mText=getText();
@@ -240,6 +322,10 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         mListView.setAdapter(new ArrayListAdapter<>(mContext, android.R.layout.simple_list_item_1, mList));
     }
 
+    /**
+     * 更新分割显示。
+     * 根据当前模式重新分割并刷新列表。
+     */
     private void updateSplit() {
         switch (mSplitMode) {
             case CHUNK:
@@ -257,11 +343,25 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         }
     }
 
+    /**
+     * 列表项点击事件。
+     * 弹出编辑对话框修改选中项的内容。
+     *
+     * @param parent 父视图。
+     * @param view 被点击的视图。
+     * @param position 位置索引。
+     * @param id 项 ID。
+     */
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        new EditDialog(position).show();
+        new EditDialog(position).show(); // 显示编辑对话框
     }
 
+    /**
+     * 设置保存监听器。
+     *
+     * @param listener 保存回调监听器。
+     */
     public void setOnSaveListener(OnSaveListener listener){
         mOnSaveListener=listener;
         if(listener==null)
@@ -269,10 +369,22 @@ public class SplitEditView extends LinearLayout implements View.OnClickListener,
         else
             mButtonBar.getChildAt(SAVE).setVisibility(VISIBLE);
     }
+    /**
+     * 保存监听器接口。
+     */
     public static interface OnSaveListener{
+        /**
+         * 保存回调方法。
+         *
+         * @param text 要保存的文本内容。
+         */
         public void onSave(String text);
     }
 
+    /**
+     * 编辑对话框内部类。
+     * 用于编辑分割后的单个文本项。
+     */
     private class EditDialog implements DialogInterface.OnClickListener {
         private final int mIdx;
         private final EditText mEdit;

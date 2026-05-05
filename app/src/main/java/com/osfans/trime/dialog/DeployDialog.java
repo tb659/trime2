@@ -33,12 +33,26 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
+/**
+ * 部署对话框。
+ * 用于执行 Rime 输入法方案的部署操作,显示部署进度和结果日志。
+ */
 public class DeployDialog {
 
+    // ==================== 成员变量 ====================
+    /** 对话框实例 */
     private final AlertDialog mDig;
+    /** Handler 用于主线程回调 */
     private final Handler mHandler = new Handler();
+    /** 窗口 Token(用于依附于输入法窗口) */
     private IBinder mToken;
 
+    /**
+     * 构造函数。
+     * 创建部署进度对话框,显示“正在部署”提示。
+     *
+     * @param context 上下文。
+     */
     public DeployDialog(Context context) {
         mDig = new AlertDialog.Builder(context, ThemeManager.getDialogTheme())
                 .setTitle("正在部署")
@@ -46,6 +60,9 @@ public class DeployDialog {
                 .create();
     }
 
+    /**
+     * 显示对话框并开始部署(无 Token)。
+     */
     public void show() {
         try {
             mDig.show();
@@ -55,6 +72,10 @@ public class DeployDialog {
         deploy();
     }
 
+    /**
+     * 执行部署操作。
+     * 清空日志,启动部署流程,并注册消息处理器监听部署完成事件。
+     */
     private void deploy() {
         try {
             Runtime.getRuntime().exec("logcat logcat -c");
@@ -88,6 +109,10 @@ public class DeployDialog {
         });
     }
 
+    /**
+     * 部署完成后的处理。
+     * 在后台线程中获取部署日志,然后在主线程显示结果对话框。
+     */
     @SuppressLint("StaticFieldLeak")
     private void deployDone(){
         new AsyncTask<String, String, String>() {
@@ -125,6 +150,13 @@ public class DeployDialog {
         }.execute();
     }
 
+    /**
+     * 执行命令并获取错误日志。
+     * 解析 logcat 输出,提取包含 "E/" 的错误信息,并保存到 deploy.log 文件。
+     *
+     * @param cmd 要执行的命令。
+     * @return 错误日志字符串。
+     */
     public String execCmd(String cmd) {
         StringBuilder result = new StringBuilder();
         BufferedReader dis = null;
@@ -189,6 +221,11 @@ public class DeployDialog {
     }
 
 
+    /**
+     * 显示对话框并开始部署(带 Token,依附于输入法窗口)。
+     *
+     * @param token 窗口 Token。
+     */
     public void show(IBinder token) {
         if(mDig==null)
             return;
@@ -211,6 +248,11 @@ public class DeployDialog {
         deploy();
     }
 
+    /**
+     * 显示结果对话框(带 Token,依附于输入法窗口)。
+     *
+     * @param mDig 要显示的对话框。
+     */
     private void showDialog(Dialog mDig){
         if(mToken==null){
             mDig.show();

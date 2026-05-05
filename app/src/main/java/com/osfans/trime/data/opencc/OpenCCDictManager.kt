@@ -16,24 +16,52 @@ import java.io.File
 import java.io.InputStream
 import kotlin.system.measureTimeMillis
 
+/**
+ * OpenCC 词典管理器。
+ * 管理共享和用户目录下的 OpenCC 词典,支持导入、转换和单行文本转换功能。
+ */
 object OpenCCDictManager {
     init {
         System.loadLibrary("rime_jni")
     }
 
+    /** 共享词典目录 */
     private val sharedDir = File(DataManager.getSharedDataDir(), "opencc").also { it.mkdirs() }
+    /** 用户词典目录 */
     private val userDir get() = File(DataManager.getUserDataDir(), "opencc").also { it.mkdirs() }
 
+    /**
+     * 获取共享词典列表。
+     *
+     * @return 共享目录下的所有词典。
+     */
     fun sharedDictionaries(): List<Dictionary> = sharedDir
         .listFiles()
         ?.mapNotNull { Dictionary.new(it) } ?: listOf()
 
+    /**
+     * 获取用户词典列表。
+     *
+     * @return 用户目录下的所有词典。
+     */
     fun userDictionaries(): List<Dictionary> = userDir
         .listFiles()
         ?.mapNotNull { Dictionary.new(it) } ?: listOf()
 
+    /**
+     * 获取所有词典(共享 + 用户)。
+     *
+     * @return 所有词典列表。
+     */
     fun getAllDictionaries(): List<Dictionary> = sharedDictionaries() + userDictionaries()
 
+    /**
+     * 从文件导入词典。
+     * 将文本或二进制格式的词典转换为 OpenCC 格式(.ocd2)并保存到用户目录。
+     *
+     * @param file 源词典文件。
+     * @return 导入后的 OpenCC 词典实例。
+     */
     fun importFromFile(file: File): OpenCCDictionary {
         val raw =
             Dictionary.new(file)
@@ -52,7 +80,8 @@ object OpenCCDictManager {
     }
 
     /**
-     * Convert internal text dict to opencc format
+     * 构建 OpenCC 词典。
+     * 遍历所有词典,将文本格式的词典转换为二进制格式(.ocd2)。
      */
     @JvmStatic
     fun buildOpenCCDict() {
@@ -73,6 +102,14 @@ object OpenCCDictManager {
         }
     }
 
+    /**
+     * 从输入流导入词典。
+     * 先将流内容写入临时文件,然后调用 importFromFile 导入,最后删除临时文件。
+     *
+     * @param stream 输入流。
+     * @param name 文件名。
+     * @return 导入后的 OpenCC 词典实例。
+     */
     fun importFromInputStream(
         stream: InputStream,
         name: String,
@@ -86,6 +123,15 @@ object OpenCCDictManager {
         return new
     }
 
+    /**
+     * 转换单行文本。
+     * 根据指定的配置文件进行简繁转换或其他文本转换。
+     * 优先查找用户目录,其次查找共享目录。
+     *
+     * @param input 输入文本。
+     * @param configFileName 配置文件名。
+     * @return 转换后的文本,如果配置文件不存在则返回原文本。
+     */
     @JvmStatic
     fun convertLine(
         input: String,
@@ -102,6 +148,13 @@ object OpenCCDictManager {
         return input
     }
 
+    /**
+     * 转换词典文件格式(本地方法)。
+     *
+     * @param src 源文件路径。
+     * @param dest 目标文件路径。
+     * @param mode 转换模式(true: 二进制到文本, false: 文本到二进制)。
+     */
     @JvmStatic
     external fun openCCDictConv(
         src: String,
@@ -109,12 +162,21 @@ object OpenCCDictManager {
         mode: Boolean,
     )
 
+    /**
+     * 转换单行文本(本地方法)。
+     *
+     * @param input 输入文本。
+     * @param configFileName 配置文件名。
+     * @return 转换后的文本。
+     */
     @JvmStatic
     external fun openCCLineConv(
         input: String,
         configFileName: String,
     ): String
 
-    const val MODE_BIN_TO_TXT = true // OCD(2) to TXT
-    const val MODE_TXT_TO_BIN = false // TXT to OCD2
+    /** 二进制到文本的转换模式(OCD/OCD2 -> TXT) */
+    const val MODE_BIN_TO_TXT = true
+    /** 文本到二进制的转换模式(TXT -> OCD2) */
+    const val MODE_TXT_TO_BIN = false
 }

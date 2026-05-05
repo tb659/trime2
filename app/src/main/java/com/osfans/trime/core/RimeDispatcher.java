@@ -14,21 +14,30 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import timber.log.Timber;
 
 /**
- * RimeDispatcher is a wrapper of a single-threaded executor that runs RimeController.
- * It provides a method for dispatching jobs to the executor's internal queue.
- * It also provides a stop() method to gracefully stop the executor and return the remaining jobs.
+ * RimeDispatcher 是单线程执行器的包装类,用于运行 RimeController。
+ * 它提供向执行器内部队列分发任务的方法。
+ * 还提供 stop() 方法以优雅地停止执行器并返回剩余任务。
  *
- * Adapted from [fcitx5-android/FcitxDispatcher.kt].
+ * 改编自 [fcitx5-android/FcitxDispatcher.kt]。
  */
 public final class RimeDispatcher {
 
-    // --- Static Constants (from Companion Object) ---
+    // --- 静态常量(来自伴生对象) ---
 
+    /** 任务等待限制(毫秒) */
     private static final long JOB_WAITING_LIMIT = 2000L; // ms
 
     // 使用固定大小的线程池
+    /** 执行器(单线程) */
     private final ExecutorService executor = Executors.newFixedThreadPool(1);
 
+    /**
+     * 提交任务并等待结果(最多2秒)。
+     *
+     * @param block 要执行的任务。
+     * @param <T> 返回类型。
+     * @return 任务结果,如果异常则返回 null。
+     */
     public <T> T submit(Callable<T> block) {
         try {
             //return block.call();
@@ -39,42 +48,76 @@ public final class RimeDispatcher {
         }
     }
 
-    // --- Interfaces ---
+    // --- 接口 ---
 
+    /**
+     * Rime 控制器接口。
+     * 定义原生启动和 finalize 方法。
+     */
     public interface RimeController {
+        /** 原生启动 */
         void nativeStartup();
+        /** 原生清理 */
         void nativeFinalize();
     }
 
-    // --- WrappedRunnable Class ---
+    // --- WrappedRunnable 类 ---
 
     /**
-     * Wraps a standard Runnable to track execution time and provide a debug name.
+     * 包装标准 Runnable 以跟踪执行时间并提供调试名称。
      */
     public static final class WrappedRunnable implements Runnable {
+        /** 底层 Runnable */
         private final Runnable runnable;
+        /** 任务名称 */
         private final String name;
+        /** 创建时间 */
         private final long time;
+        /** 是否已开始执行 */
         private boolean started = false;
 
+        /**
+         * 构造函数(带名称)。
+         *
+         * @param runnable 底层 Runnable。
+         * @param name 任务名称。
+         */
         public WrappedRunnable(Runnable runnable, String name) {
             this.runnable = runnable;
             this.name = name;
             this.time = System.currentTimeMillis();
         }
 
+        /**
+         * 构造函数(不带名称)。
+         *
+         * @param runnable 底层 Runnable。
+         */
         public WrappedRunnable(Runnable runnable) {
             this(runnable, null);
         }
 
+        /**
+         * 检查是否已开始执行。
+         *
+         * @return true 表示已开始。
+         */
         public boolean isStarted() {
             return started;
         }
 
+        /**
+         * 获取从创建到现在的时间差(毫秒)。
+         *
+         * @return 时间差。
+         */
         private long getDelta() {
             return System.currentTimeMillis() - time;
         }
 
+        /**
+         * 执行任务,如果等待时间超过限制则记录警告。
+         */
         @Override
         public void run() {
             long delta = getDelta();
@@ -85,29 +128,49 @@ public final class RimeDispatcher {
             runnable.run();
         }
 
+        /**
+         * 返回字符串表示。
+         *
+         * @return WrappedRunnable 的字符串表示。
+         */
         @Override
         public String toString() {
             return "WrappedRunnable[" + (name != null ? name : String.valueOf(hashCode())) + "]";
         }
 
+        /** 空任务常量 */
         public static final WrappedRunnable EMPTY = new WrappedRunnable(() -> {}, "Empty");
 
-        // Simple Getter for the underlying Runnable (useful for 'stop()' return value)
+        /**
+         * 获取底层 Runnable(用于 stop() 返回值)。
+         *
+         * @return 底层 Runnable。
+         */
         public Runnable getUnderlyingRunnable() {
             return runnable;
         }
     }
 
-    // --- RimeDispatcher Fields ---
+    // --- RimeDispatcher 成员变量 ---
 
+    /** Rime 控制器 */
     private final RimeController controller;
+    /** 内部执行器 */
     private final ExecutorService internalExecutor;
+    /** 任务队列 */
     private final LinkedBlockingQueue<WrappedRunnable> queue = new LinkedBlockingQueue<>();
+    /** 是否正在运行(原子布尔值) */
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    /** 生命周期锁(替换 Kotlin 的 Mutex) */
     private final Object lifecycleLock = new Object(); // Replaces Kotlin's Mutex
 
-    // --- Constructor ---
+    // --- 构造函数 ---
 
+    /**
+     * 构造函数。
+     *
+     * @param controller Rime 控制器。
+     */
     public RimeDispatcher(RimeController controller) {
         this.controller = controller;
         // Simulates the Executors.newSingleThreadExecutor { Thread(it, "rime-main") } setup
@@ -118,17 +181,16 @@ public final class RimeDispatcher {
         });
     }
 
-    // --- Public Methods ---
+    // --- 公共方法 ---
 
     /**
-     * Start the dispatcher.
-     * This function immediately executes the native startup process on the single thread
-     * and begins processing the job queue.
+     * 启动调度器。
+     * 此函数立即在单线程上执行原生启动过程,并开始处理任务队列。
      */
     public void start() {
         Timber.d("RimeDispatcher start()");
 
-        // Launch the main loop on the single thread
+        // 在单线程上启动主循环
         internalExecutor.execute(() -> {
             synchronized (lifecycleLock) {
                 if (isRunning.compareAndSet(false, true)) {
@@ -136,23 +198,23 @@ public final class RimeDispatcher {
                         Timber.d("nativeStartup()");
                         controller.nativeStartup();
 
-                        // Main message loop: runs until 'isRunning' is set to false
+                        // 主消息循环:运行直到 'isRunning' 设置为 false
                         while (isRunning.get() && !Thread.currentThread().isInterrupted()) {
-                            // Blocks until a job is available (similar to Kotlin's queue.take())
+                            // 阻塞直到有可用任务(类似于 Kotlin 的 queue.take())
                             WrappedRunnable block = queue.take();
 
-                            // The 'EMPTY' sentinel is used to break the loop on stop()
+                            // 'EMPTY' 哨兵用于在 stop() 时中断循环
                             if (block == WrappedRunnable.EMPTY) {
                                 break;
                             }
                             block.run();
                         }
                     } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt(); // Restore interrupt status
+                        Thread.currentThread().interrupt(); // 恢复中断状态
                     } finally {
                         Timber.i("nativeFinalize()");
                         controller.nativeFinalize();
-                        // Executor is not shut down here, just the loop breaks.
+                        // 执行器在此处不关闭,只是循环中断。
                     }
                 }
             }
@@ -160,27 +222,27 @@ public final class RimeDispatcher {
     }
 
     /**
-     * Stop the dispatcher gracefully.
-     * This function blocks until the dispatcher's main loop and native finalize are complete.
+     * 优雅地停止调度器。
+     * 此函数阻塞直到调度器的主循环和原生 finalize 完成。
      *
-     * @return A list of the underlying Runnables that were not executed (remaining jobs).
+     * @return 未执行的底层 Runnable 列表(剩余任务)。
      */
     public List<Runnable> stop() {
         Timber.i("RimeDispatcher stop()");
         if (isRunning.compareAndSet(true, false)) {
-            // 1. Offer the sentinel to break the blocking 'queue.take()' in the main loop
+            // 1. 提供哨兵以中断主循环中的阻塞 'queue.take()'
             queue.offer(WrappedRunnable.EMPTY);
 
-            // 2. Block until the main loop finishes its synchronized section (nativeFinalize done)
-            //    We submit a blocking task and wait for its completion.
+            // 2. 阻塞直到主循环完成其同步部分(nativeFinalize 完成)
+            //    我们提交一个阻塞任务并等待其完成。
             Future<List<Runnable>> future = internalExecutor.submit((Callable<List<Runnable>>) () -> {
-                // This code runs *after* the main loop finishes its lifecycleLock section.
+                // 此代码在主循环完成其 lifecycleLock 部分后运行。
                 synchronized (lifecycleLock) {
                     List<WrappedRunnable> rest = new ArrayList<>();
-                    // 3. Drain any remaining jobs from the queue (including the sentinel if not consumed)
+                    // 3. 排空队列中的所有剩余任务(包括哨兵,如果未被消费)
                     queue.drainTo(rest);
 
-                    // Convert WrappedRunnable list to Runnable list for return
+                    // 将 WrappedRunnable 列表转换为 Runnable 列表以返回
                     List<Runnable> result = new ArrayList<>(rest.size());
                     for (WrappedRunnable wrapped : rest) {
                         if (wrapped != WrappedRunnable.EMPTY) {
@@ -191,17 +253,17 @@ public final class RimeDispatcher {
                 }
             });
 
-            // Block and wait for the final task to complete (i.e., the loop has stopped and queue is drained)
+            // 阻塞并等待最终任务完成(即循环已停止且队列已排空)
             try {
-                // Shut down the executor after the main loop has finished its work
+                // 主循环完成工作后关闭执行器
                 internalExecutor.shutdown();
-                // We use future.get() to block until the shutdown-cleanup task is done.
+                // 我们使用 future.get() 阻塞直到关闭清理任务完成。
                 return future.get();
             } catch (InterruptedException | ExecutionException e) {
                 Timber.e(e, "Error during RimeDispatcher stop()");
-                // Attempt a forced shutdown if waiting failed
+                // 如果等待失败,尝试强制关闭
                 internalExecutor.shutdownNow();
-                // Return what we can, likely an empty list due to the exception
+                // 返回我们能得到的,由于异常可能为空列表
                 return new ArrayList<>();
             }
         } else {
@@ -210,11 +272,11 @@ public final class RimeDispatcher {
     }
 
     /**
-     * Dispatches a Runnable block to the Rime processing queue.
+     * 将 Runnable 任务分发到 Rime 处理队列。
      *
-     * @param block The Runnable job to execute.
+     * @param block 要执行的 Runnable 任务。
      */
-    // Replaces the CoroutineDispatcher's dispatch method
+    // 替换 CoroutineDispatcher 的 dispatch 方法
     public void dispatch(Runnable block) {
         if (!isRunning.get()) {
             throw new IllegalStateException("Dispatcher is not in running state!");

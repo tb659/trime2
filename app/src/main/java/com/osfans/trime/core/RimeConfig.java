@@ -8,37 +8,43 @@ import java.util.Optional;
 import timber.log.Timber;
 
 /**
- * Rime Configuration Access Class.
- *
- * This class provides methods to read and write configuration values
- * from Rime configuration files via JNI, simulating the original Kotlin structure.
+ * Rime 配置访问类。
+ * 提供通过 JNI 读写 Rime 配置文件的方法,模拟原始 Kotlin 结构。
  */
 public final class RimeConfig implements AutoCloseable {
 
+    // ==================== 成员变量 ====================
+    /** JNI 对等指针 */
     private final long peer;
 
-    // --- Functional Interface for getConfigList ---
+    // --- getConfigList 的功能接口 ---
 
     /**
-     * Functional interface to define the action for retrieving an item from the RimeConfig list.
-     * Replaces the Kotlin extension function lambda (RimeConfig.(String) -> E?).
+     * 功能接口,定义从 RimeConfig 列表检索项的操作。
+     * 替换 Kotlin 扩展函数 lambda (RimeConfig.(String) -> E?)。
      *
-     * @param <E> The expected type of the configuration item.
+     * @param <E> 配置项的预期类型。
      */
     @FunctionalInterface
     public interface RimeConfigAction<E> {
         /**
-         * Action to be performed on a RimeConfig instance to get a value.
+         * 在 RimeConfig 实例上执行操作以获取值。
          *
-         * @param config The RimeConfig instance.
-         * @param path The path/key to the configuration item.
-         * @return The retrieved value, or null if retrieval failed.
+         * @param config RimeConfig 实例。
+         * @param path 配置项的路径/键。
+         * @return 检索到的值,如果检索失败则返回 null。
          */
         E get(RimeConfig config, String path);
     }
 
-    // --- Constructor ---
+    // --- 构造函数 ---
 
+    /**
+     * 私有构造函数。
+     *
+     * @param peer JNI 对等指针,不能为0。
+     * @throws IllegalArgumentException 如果 peer 为0。
+     */
     private RimeConfig(long peer) {
         if (peer == 0) {
             throw new IllegalArgumentException("RimeConfig peer must not be 0.");
@@ -46,22 +52,24 @@ public final class RimeConfig implements AutoCloseable {
         this.peer = peer;
     }
 
-    // --- Public Getters ---
+    // --- 公共 Getter 方法 ---
 
     /**
-     * Gets an integer value from the configuration.
-     * @param key The configuration key.
-     * @return The integer value, or null if the key is not found or not an integer.
+     * 从配置中获取整数值。
+     *
+     * @param key 配置键。
+     * @return 整数值,如果键未找到或不是整数则返回 null。
      */
     public Integer getInt(String key) {
-        // JNI function returns Integer (which is nullable), matching Kotlin's return type.
+        // JNI 函数返回 Integer(可空),匹配 Kotlin 的返回类型。
         return getRimeConfigInt(peer, key);
     }
 
     /**
-     * Gets a string value from the configuration.
-     * @param key The configuration key.
-     * @return The string value, or null if the key is not found or not a string.
+     * 从配置中获取字符串值。
+     *
+     * @param key 配置键。
+     * @return 字符串值,如果键未找到或不是字符串则返回 null。
      */
     public String getString(String key) {
         // JNI function returns String (which is nullable), matching Kotlin's return type.
@@ -69,12 +77,12 @@ public final class RimeConfig implements AutoCloseable {
     }
 
     /**
-     * Gets a list of configuration items by iterating over the list item paths.
+     * 通过遍历列表项路径获取配置项列表。
      *
-     * @param key The configuration key pointing to a list structure.
-     * @param getAction The action to retrieve the specific type {@code E} from the list path.
-     * @param <E> The expected type of the list element.
-     * @return A list of retrieved values of type {@code E}.
+     * @param key 指向列表结构的配置键。
+     * @param getAction 从列表路径检索特定类型 {@code E} 的操作。
+     * @param <E> 列表元素的预期类型。
+     * @return 检索到的 {@code E} 类型值列表。
      */
     public <E> List<E> getList(String key, RimeConfigAction<E> getAction) {
         // JNI returns Array<String>
@@ -98,34 +106,36 @@ public final class RimeConfig implements AutoCloseable {
         return values;
     }
 
-    // --- Public Setter ---
+    // --- 公共 Setter 方法 ---
 
     /**
-     * Sets a boolean value in the configuration.
-     * @param key The configuration key.
-     * @param value The boolean value to set.
+     * 在配置中设置布尔值。
+     *
+     * @param key 配置键。
+     * @param value 要设置的布尔值。
      */
     public void setBool(String key, boolean value) {
         setRimeConfigBool(peer, key, value);
     }
 
-    // --- AutoCloseable Implementation ---
+    // --- AutoCloseable 实现 ---
 
     /**
-     * Closes the underlying Rime configuration handle.
+     * 关闭底层的 Rime 配置句柄。
      */
     @Override
     public void close() {
         closeRimeConfig(peer);
     }
 
-    // --- Static Factory Methods ---
+    // --- 静态工厂方法 ---
 
     /**
-     * Opens a Rime configuration file for reading.
-     * @param configId The ID of the config file (e.g., "default").
-     * @return A new RimeConfig instance.
-     * @throws IllegalArgumentException if the config could not be opened.
+     * 打开 Rime 配置文件进行读取。
+     *
+     * @param configId 配置文件 ID(如 "default")。
+     * @return 新的 RimeConfig 实例。
+     * @throws IllegalArgumentException 如果无法打开配置。
      */
     public static RimeConfig openConfig(String configId) {
         long peer = openRimeConfig(configId);
@@ -136,10 +146,11 @@ public final class RimeConfig implements AutoCloseable {
     }
 
     /**
-     * Opens a Rime user configuration file.
-     * @param configId The ID of the user config file.
-     * @return A new RimeConfig instance.
-     * @throws IllegalArgumentException if the user config could not be opened.
+     * 打开 Rime 用户配置文件。
+     *
+     * @param configId 用户配置文件 ID。
+     * @return 新的 RimeConfig 实例。
+     * @throws IllegalArgumentException 如果无法打开用户配置。
      */
     public static RimeConfig openUserConfig(String configId) {
         long peer = openRimeUserConfig(configId);
@@ -150,10 +161,11 @@ public final class RimeConfig implements AutoCloseable {
     }
 
     /**
-     * Opens a Rime schema configuration file.
-     * @param schemaId The ID of the schema.
-     * @return A new RimeConfig instance.
-     * @throws IllegalArgumentException if the schema could not be opened.
+     * 打开 Rime 方案配置文件。
+     *
+     * @param schemaId 方案 ID。
+     * @return 新的 RimeConfig 实例。
+     * @throws IllegalArgumentException 如果无法打开方案。
      */
     public static RimeConfig openSchema(String schemaId) {
         long peer = openRimeSchema(schemaId);
@@ -163,23 +175,74 @@ public final class RimeConfig implements AutoCloseable {
         return new RimeConfig(peer);
     }
 
-    // --- JNI Declarations (Companion Object) ---
+    // --- JNI 声明(伴生对象) ---
 
-    // Note: These methods are static and private, mirroring the Kotlin companion object structure.
+    // 注意:这些方法是静态和私有的,镜像 Kotlin 伴生对象结构。
 
+    /**
+     * 打开 Rime 配置文件(JNI)。
+     *
+     * @param configId 配置文件 ID。
+     * @return JNI 对等指针,失败返回0。
+     */
     private static native long openRimeConfig(String configId);
 
+    /**
+     * 打开 Rime 用户配置文件(JNI)。
+     *
+     * @param configId 用户配置文件 ID。
+     * @return JNI 对等指针,失败返回0。
+     */
     private static native long openRimeUserConfig(String configId);
 
+    /**
+     * 打开 Rime 方案配置文件(JNI)。
+     *
+     * @param schemaId 方案 ID。
+     * @return JNI 对等指针,失败返回0。
+     */
     private static native long openRimeSchema(String schemaId);
 
+    /**
+     * 从配置中获取整数值(JNI)。
+     *
+     * @param peer JNI 对等指针。
+     * @param key 配置键。
+     * @return 整数值,失败返回 null。
+     */
     private static native Integer getRimeConfigInt(long peer, String key);
 
+    /**
+     * 从配置中获取字符串值(JNI)。
+     *
+     * @param peer JNI 对等指针。
+     * @param key 配置键。
+     * @return 字符串值,失败返回 null。
+     */
     private static native String getRimeConfigString(long peer, String key);
 
+    /**
+     * 获取配置列表项路径数组(JNI)。
+     *
+     * @param peer JNI 对等指针。
+     * @param key 配置键。
+     * @return 路径字符串数组。
+     */
     private static native String[] getRimeConfigListItemPath(long peer, String key);
 
+    /**
+     * 在配置中设置布尔值(JNI)。
+     *
+     * @param peer JNI 对等指针。
+     * @param key 配置键。
+     * @param value 布尔值。
+     */
     private static native void setRimeConfigBool(long peer, String key, boolean value);
 
+    /**
+     * 关闭 Rime 配置(JNI)。
+     *
+     * @param peer JNI 对等指针。
+     */
     private static native void closeRimeConfig(long peer);
 }

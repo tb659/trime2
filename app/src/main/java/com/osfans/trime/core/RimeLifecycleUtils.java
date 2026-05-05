@@ -7,29 +7,32 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Utility class containing static methods to replace Kotlin's suspend functions 
- * (whenAtState, whenReady) for state-dependent execution.
- * * NOTE: These methods are BLOCKING and should be executed on a background thread 
- * if they are called in a context that requires responsiveness.
+ * 工具类,包含静态方法以替换 Kotlin 的挂起函数
+ * (whenAtState, whenReady)用于状态依赖执行。
+ * 注意:这些方法是阻塞的,如果在需要响应性的上下文中调用,
+ * 应该在后台线程上执行。
  */
 public final class RimeLifecycleUtils {
 
+    /**
+     * 私有构造函数,防止实例化。
+     */
     private RimeLifecycleUtils() {
         // Utility class
     }
 
     /**
-     * Executes a task when the lifecycle reaches a specific state, blocking the calling thread until then.
-     * The task itself is executed on the RimeLifecycle's dedicated executor.
+     * 当生命周期达到特定状态时执行任务,阻塞调用线程直到那时。
+     * 任务本身在 RimeLifecycle 的专用执行器上执行。
      *
-     * @param lifecycle The RimeLifecycle instance.
-     * @param state The target state to wait for.
-     * @param block The task to execute.
-     * @param <T> The return type of the task.
-     * @return The result of the executed task.
-     * @throws InterruptedException if the waiting thread is interrupted.
-     * @throws ExecutionException if the executed task throws an exception.
-     * @throws Exception if the internal state waiting logic times out.
+     * @param lifecycle RimeLifecycle 实例。
+     * @param state 要等待的目标状态。
+     * @param block 要执行的任务。
+     * @param <T> 任务的返回类型。
+     * @return 执行任务的结果。
+     * @throws InterruptedException 如果等待线程被中断。
+     * @throws ExecutionException 如果执行的任务抛出异常。
+     * @throws Exception 如果内部状态等待逻辑超时。
      */
     public static <T> T whenAtState(
             RimeLifecycle lifecycle,
@@ -37,14 +40,14 @@ public final class RimeLifecycleUtils {
             Callable<T> block
     ) throws InterruptedException, ExecutionException, Exception {
 
-        // 1. If already at state, execute immediately on the executor
+        // 1. 如果已经处于目标状态,立即在执行器上执行
         if (lifecycle.getCurrentState() == state) {
             FutureTask<T> future = new FutureTask<>(block);
             lifecycle.getLifecycleExecutor().execute(future);
             return future.get();
         }
 
-        // 2. Wait for the state using standard Java concurrency
+        // 2. 使用标准 Java 并发等待状态
 
         final Object lock = new Object();
         final AtomicReference<State> currentStateRef = new AtomicReference<>(lifecycle.getCurrentState());
@@ -58,39 +61,39 @@ public final class RimeLifecycleUtils {
             }
         };
 
-        // Register observer
+        // 注册观察者
         lifecycle.addObserver(waiter);
         try {
             synchronized (lock) {
-                // Wait until the state matches the target
+                // 等待直到状态匹配目标
                 while (currentStateRef.get() != state) {
-                    // Set a timeout to prevent indefinite block in case of error
+                    // 设置超时以防止在错误情况下无限阻塞
                     lock.wait(5000);
                     if (currentStateRef.get() != state) {
-                        // Check again and throw if we timed out
+                        // 再次检查,如果超时则抛出异常
                         throw new Exception("Timeout waiting for RimeLifecycle state to reach " + state);
                     }
                 }
             }
 
-            // 3. State reached: execute the block on the designated executor
+            // 3. 状态已达到:在指定执行器上执行块
             FutureTask<T> future = new FutureTask<>(block);
             lifecycle.getLifecycleExecutor().execute(future);
             return future.get();
 
         } finally {
-            // 4. Clean up the observer
+            // 4. 清理观察者
             lifecycle.removeObserver(waiter);
         }
     }
 
     /**
-     * Executes a task when the Rime Lifecycle is in the READY state, blocking the calling thread until then.
+     * 当 Rime 生命周期处于 READY 状态时执行任务,阻塞调用线程直到那时。
      *
-     * @param lifecycle The RimeLifecycle instance.
-     * @param block The task to execute.
-     * @param <T> The return type of the task.
-     * @return The result of the executed task.
+     * @param lifecycle RimeLifecycle 实例。
+     * @param block 要执行的任务。
+     * @param <T> 任务的返回类型。
+     * @return 执行任务的结果。
      */
     public static <T> T whenReady(
             RimeLifecycle lifecycle,

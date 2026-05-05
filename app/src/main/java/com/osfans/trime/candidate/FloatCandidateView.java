@@ -33,24 +33,43 @@ import org.luaj.LuaValue;
 
 import java.util.ArrayList;
 
+/**
+ * 浮动候选词视图类。
+ * 用于显示浮动候选词窗口,包含预编辑文本和垂直候选词列表。
+ */
 public class FloatCandidateView extends LinearLayout implements View.OnClickListener {
 
+    // ==================== 成员变量 ====================
+    
+    /** Trime 服务实例 */
     private final TrimeService mTrime;
+    /** 候选词样式配置 */
     private final Style mCandidateStyle;
+    /** 候选词列表视图 */
     private RecyclerView mListView;
+    /** 隐藏/展开按钮 */
     private KeyView mHide;
+    /** 候选词适配器 */
     private FloatCandidateAdapter mAdapter;
+    /** 工具栏视图 */
     private ToolbarView mToolbarView;
+    /** 根布局容器 */
     private LinearLayout root;
+    /** 预编辑文本视图 */
     private TextView mPreedit;
 
+    /**
+     * 构造函数。
+     *
+     * @param context Android 上下文。
+     */
     public FloatCandidateView(@NonNull Context context) {
         super(context);
-        mTrime = TrimeService.getInstance();
-        mCandidateStyle = ThemeManager.getStyle().getStyle("candidate");
-        setClipChildren(false);
+        mTrime = TrimeService.getInstance(); // 获取服务实例
+        mCandidateStyle = ThemeManager.getStyle().getStyle("candidate"); // 获取候选词样式
+        setClipChildren(false); // 允许子视图超出边界
         setClipToPadding(false);
-        initView();
+        initView(); // 初始化视图
     }
 
     @Override
@@ -122,24 +141,43 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         mListView.setAdapter(mAdapter = new FloatCandidateAdapter(new ArrayList<>()));
     }
 
+    /**
+     * 向下翻页。
+     *
+     * @return true 表示翻页成功。
+     */
     public boolean pageDown() {
-        mListView.smoothScrollBy(mListView.getWidth(), 0);
+        mListView.smoothScrollBy(mListView.getWidth(), 0); // 平滑滚动
         return true;
     }
 
+    /**
+     * 向上翻页。
+     *
+     * @return true 表示翻页成功。
+     */
     public boolean pageUp() {
-        mListView.smoothScrollBy(mListView.getWidth(), 0);
+        mListView.smoothScrollBy(-mListView.getWidth(), 0); // 向上滚动
         return true;
     }
+    /**
+     * 点击事件处理。
+     *
+     * @param v 被点击的视图。
+     */
     @Override
     public void onClick(View v) {
         if (mAdapter.getItemCount()>0)
-            mTrime.showExtractedCandidatesView(true);
+            mTrime.showExtractedCandidatesView(true); // 显示展开候选词视图
         else
-            mTrime.requestHideSelf(0);
+            mTrime.requestHideSelf(0); // 隐藏输入法
     }
 
 
+    /**
+     * 更新候选词列表。
+     * 重置 CandidatesManager,加载新数据并动态调整宽度。
+     */
     public void update() {
         if (mListView.isComputingLayout()) {
             mListView.post(this::update);
@@ -154,15 +192,19 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
             @Override
             public void run() {
                 // 动态调整宽度
-                int maxWidth = mAdapter.getMaxItemWidth(getContext());
+                int maxWidth = mAdapter.getMaxItemWidth(getContext()); // 获取最大项宽度
                 ViewGroup.LayoutParams lp = mListView.getLayoutParams();
-                lp.width = maxWidth;
+                lp.width = maxWidth; // 设置新宽度
                 lp.height= ViewGroup.LayoutParams.WRAP_CONTENT;
-                mListView.setLayoutParams(lp);
+                mListView.setLayoutParams(lp); // 应用新布局参数
             }
         });
    }
 
+    /**
+     * 显示候选词列表。
+     * 如果有高亮候选词则定位到该位置,否则重新加载数据。
+     */
     public void show() {
         int mIdx = Rime.getHighlightRimeCandidate();
         if (mIdx > 0) {
@@ -197,18 +239,28 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         });
     }
 
+    /**
+     * 无障碍播报指定索引的候选词。
+     *
+     * @param index 候选词索引。
+     */
     private void announceCandidate(int index) {
         if (index < 0 || index >= mAdapter.getItemCount()) return;
 
         if(!isTouchExplorationEnabled())
-            return;
+            return; // 如果未启用触摸探索,不播报
         // 设置朗读文本
-        String text = mAdapter.getItem(index).getText();
-        root.setContentDescription(text);
+        String text = mAdapter.getItem(index).getText(); // 获取候选词文本
+        root.setContentDescription(text); // 设置无障碍描述
         // 发送事件
-        root.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
+        root.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED); // 发送选中事件
     }
 
+    /**
+     * 显示或隐藏工具栏视图。
+     *
+     * @param b true 显示工具栏,false 显示候选词列表。
+     */
     public void showToolbarView(boolean b) {
         if (mToolbarView == null) {
             mToolbarView = new ToolbarView(getContext());
@@ -218,16 +270,29 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         root.setVisibility(!b ? View.VISIBLE : View.GONE);
     }
 
+    /**
+     * 刷新所有按键视图。
+     */
     public void invalidateAllKeys() {
         if (mToolbarView != null) {
             mToolbarView.invalidateAllKeys();
         }
     }
 
+    /**
+     * 设置当前方案 ID。
+     *
+     * @param id 方案 ID。
+     */
     public void setSchema(String id) {
         mToolbarView.setSchema(id);
     }
 
+    /**
+     * 选中上一个候选词。
+     *
+     * @return true 表示成功移动。
+     */
     public boolean prevCandidate() {
         boolean ret = mAdapter.prevCandidate();
         if(ret)
@@ -235,6 +300,11 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         return ret;
     }
 
+    /**
+     * 选中下一个候选词。
+     *
+     * @return true 表示成功移动。
+     */
     public boolean nextCandidate() {
         boolean ret = mAdapter.nextCandidate();
         if(ret)
@@ -242,14 +312,29 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         return ret;
     }
 
+    /**
+     * 获取候选词数据列表。
+     *
+     * @return 候选词列表。
+     */
     public ArrayList<CandidateItem> getData() {
         return mAdapter.getData();
     }
 
+    /**
+     * 设置候选词数据列表。
+     *
+     * @param data 新的候选词列表。
+     */
     public void setData(ArrayList<CandidateItem> data) {
         mAdapter.setData(data);
     }
 
+    /**
+     * 获取当前完全可见的第一个候选词索引。
+     *
+     * @return 完全可见项的索引,如果未找到则返回0。
+     */
     public int getIdx() {
         // 1. 获取 LayoutManager 并转型
         RecyclerView.LayoutManager layoutManager = mListView.getLayoutManager();
@@ -268,6 +353,11 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         return 0;
     }
 
+    /**
+     * 设置选中索引并滚动到该位置。
+     *
+     * @param idx 目标索引。
+     */
     public void setIdx(int idx) {
         if(idx<0||idx>=mAdapter.getItemCount()-1)
             return;
@@ -279,20 +369,41 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         }
     }
 
+    /**
+     * 获取工具栏视图。
+     *
+     * @return ToolbarView 实例。
+     */
     public ToolbarView getToolbar() {
         return mToolbarView;
     }
 
+    /**
+     * 设置预编辑文本。
+     *
+     * @param text 预编辑文本内容。
+     */
     public void setText(String text){
-        mPreedit.setText(text);
+        mPreedit.setText(text); // 设置文本
         if(!TextUtils.isEmpty(text))
-            show();
+            show(); // 如果文本不为空,显示候选词
     }
 
+    /**
+     * 设置预编辑文本颜色。
+     *
+     * @param textColor 文本颜色。
+     */
     public void setTextColor(int textColor) {
         mPreedit.setTextColor(textColor);
     }
 
+    /**
+     * 设置预编辑文本大小。
+     *
+     * @param complexUnitDip 单位类型。
+     * @param textSize 文本大小。
+     */
     public void setTextSize(int complexUnitDip, float textSize) {
         mPreedit.setTextSize(complexUnitDip,textSize);
     }

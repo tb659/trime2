@@ -54,37 +54,67 @@ import com.osfans.trime.theme.ThemeManager;
 
 import java.util.List;
 
+/**
+ * 按键视图类。
+ * 表示键盘上的单个按键,支持单击、长按、滑动等多种事件类型。
+ * 包含主文本、提示文本、长按文本等显示元素,以及按下动画、预览窗口等视觉效果。
+ */
 public class KeyView extends FrameLayout implements View.OnClickListener {
 
     // --- 1. 静态常量 ---
+    /** 快速进出缓动插值器 */
     private static final Interpolator FAST_OUT_SLOW_IN = new FastOutSlowInInterpolator();
 
     // --- 2. 成员变量 ---
+    /** TrimeService 实例 */
     private final TrimeService mTrime;
+    /** 按键样式 */
     private final KeyStyle mKeyStyle;
+    /** 按下状态样式 */
     private final KeyStyle mPressedStyle;
+    /** ASCII 模式专用的按键对象 */
     private final Key mAsciiKey;
+    /** 默认按键对象 */
     private final Key mDefKey;
+    /** 当前按键对象(可能在 ASCII 模式和默认模式之间切换) */
     private Key mKey;
+    /** 主文本 TextView */
     private TextView mClick;
+    /** 提示文本 TextView */
     private TextView mHint;
+    /** 长按文本 TextView */
     private TextView mLongClick;
+    /** 按键根布局容器 */
     private FrameLayout keyRoot;
+    /** 点击文本内容 */
     private String mClickText;
+    /** 背景过渡动画(正常状态 -> 按下状态) */
     private TransitionDrawable transition;
+    /** 是否处于按下状态 */
     private boolean mPressed;
+    /** 命中矩形是否失效(需要重新计算) */
     private boolean mRectInvalidated;
+    /** 是否处于选中状态 */
     private boolean mSelected;
+    /** 预览窗口 TextView(长按或滑动时显示) */
     private TextView keyPreview;
+    /** 动画监听器(暂未使用) */
     private Animator.AnimatorListener mAnimatorListener;
     //private TextView mHintUp;
     //private TextView mHintDown;
     //private TextView mHintLeft;
     //private TextView mHintRight;
+    /** 8个方向的提示文本数组(上、下、左、右、长按等) */
     private TextView[] mHints = new TextView[8];
+    /** 是否隐藏按键提示 */
     private boolean _hide_key_hint;
 
     // --- 3. 构造函数 ---
+    /**
+     * 构造函数(无按键配置)。
+     *
+     * @param context 上下文。
+     */
     public KeyView(@NonNull Context context) {
         super(context);
         mDefKey = null;
@@ -95,6 +125,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         initView();
     }
 
+    /**
+     * 构造函数(带按键配置)。
+     *
+     * @param context 上下文。
+     * @param v 按键配置对象。
+     */
     public KeyView(@NonNull Context context, Key v) {
         super(context);
         mTrime = TrimeService.getInstance();
@@ -107,6 +143,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         initKey();
     }
 
+    /**
+     * 构造函数(带按键样式)。
+     *
+     * @param context 上下文。
+     * @param v 按键样式对象。
+     */
     public KeyView(@NonNull Context context, KeyStyle v) {
         super(context);
         mDefKey = null;
@@ -117,6 +159,13 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         initView();
     }
 
+    /**
+     * 构造函数(带按键配置和样式)。
+     *
+     * @param context 上下文。
+     * @param v 按键配置对象。
+     * @param s 按键样式对象。
+     */
     public KeyView(@NonNull Context context, Key v, KeyStyle s) {
         super(context);
         mTrime = TrimeService.getInstance();
@@ -131,6 +180,18 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
     // --- 4. 生命周期与重写方法 (Overrides) ---
 
+    /**
+     * 点击事件处理。
+     * 处理 Shift 键的单击逻辑(切换大小写、锁定等),或其他按键的事件分发。
+     *
+     * @param v 被点击的视图。
+     */
+    /**
+     * 点击事件处理。
+     * 处理 Shift 键的单击逻辑(切换大小写、锁定等),或其他按键的事件分发。
+     *
+     * @param v 被点击的视图。
+     */
     @Override
     public void onClick(View v) {
         if (mLongClicked) {
@@ -181,12 +242,24 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     //    keyRoot.setBackground(createButtonBackground(color, 24f));
     //}
 
+    /**
+     * 设置背景颜色(带圆角)。
+     *
+     * @param color 背景颜色。
+     * @param radius 圆角半径。
+     */
     public void setBackgroundColor(int color, float radius) {
         //super.setBackgroundColor(color);
         keyRoot.setBackground(createButtonBackground(color, radius));
     }
     // --- 4. 生命周期管理 (重点优化部分) ---
 
+    /**
+     * 设置按下状态。
+     * 处理长按检测、重复按键、预览显示和状态动画。
+     *
+     * @param pressed true 表示按下,false 表示释放。
+     */
     @Override
     public void setPressed(boolean pressed) {
         boolean changed = mPressed != pressed;
@@ -221,6 +294,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     }
 
+    /**
+     * 设置选中状态。
+     * 用于 Shift 键等需要保持选中状态的按键。
+     *
+     * @param selected true 表示选中,false 表示取消选中。
+     */
     @Override
     public void setSelected(boolean selected) {
         mSelected = selected;
@@ -231,6 +310,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             transition.resetTransition();
     }
 
+    /**
+     * 应用状态动画。
+     * 根据按下/释放状态,执行缩放、位移、背景过渡和阴影颜色变化动画。
+     *
+     * @param isPressed true 表示按下状态,false 表示释放状态。
+     */
     private void applyStateAnimation(boolean isPressed) {
 
         // 1. 缩放与位移动画 (ViewPropertyAnimator 自动管理)
@@ -303,6 +388,13 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     }
 
+    /**
+     * 显示/隐藏预览窗口。
+     * 在长按或滑动时显示预览,手指抬起时隐藏。
+     *
+     * @param isPressed true 表示显示预览,false 表示隐藏。
+     * @param text 预览文本内容。
+     */
     private void showPreview(boolean isPressed, CharSequence text) {
         if (mKey == null)
             return;
@@ -366,12 +458,24 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
                 .start();
     }
 
+    /**
+     * 更新文本颜色。
+     * 根据按下状态切换正常颜色和按下颜色。
+     *
+     * @param view TextView 视图。
+     * @param isPressed 是否处于按下状态。
+     * @param style 按键样式。
+     */
     private void updateTextColor(TextView view, boolean isPressed, KeyStyle style) {
         if (view == null)
             return;
         view.setTextColor(isPressed ? style.getPressedStyle().getTextColor() : style.getTextColor());
     }
 
+    /**
+     * 当视图附加到窗口时调用。
+     * 重置动画状态,确保视图重新显示时状态正确。
+     */
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
@@ -394,6 +498,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
 
+    /**
+     * 当视图从窗口分离时调用。
+     * 清理所有动画、回调和资源,防止内存泄漏。
+     */
     @Override
     protected void onDetachedFromWindow() {
         // 1. 停止并取消所有正在运行的属性动画，释放引用
@@ -427,6 +535,14 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         super.onDetachedFromWindow();
     }
 
+    /**
+     * 执行无障碍操作。
+     * 支持 ACTION_CLICK 操作,用于 TalkBack 等无障碍服务。
+     *
+     * @param action 操作类型。
+     * @param arguments 操作参数。
+     * @return true 表示操作已处理。
+     */
     @Override
     public boolean performAccessibilityAction(int action, Bundle arguments) {
         switch (action) {
@@ -440,6 +556,16 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     // 预先分配内存，整个生命周期只创建这一次
     private final Rect mHitRect = new Rect();
 
+    /**
+     * 当布局发生变化时调用。
+     * 标记命中矩形失效,延迟到需要时再重新计算。
+     *
+     * @param changed 布局是否改变。
+     * @param l 左边界。
+     * @param t 上边界。
+     * @param r 右边界。
+     * @param b 下边界。
+     */
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
@@ -448,6 +574,14 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             mRectInvalidated = true;
     }
 
+    /**
+     * 检查坐标是否在按键范围内。
+     * 使用懒加载方式计算绝对坐标,提高性能。
+     *
+     * @param x X 坐标。
+     * @param y Y 坐标。
+     * @return true 表示坐标在按键范围内。
+     */
     public boolean contains(int x, int y) {
         // 只有在真正需要判定点击时，才计算绝对坐标
         if (mRectInvalidated) {
@@ -457,6 +591,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         return mHitRect.contains(x, y);
     }
 
+    /**
+     * 更新命中矩形(计算绝对坐标)。
+     * 递归累加父容器的偏移量,直到找到 KeyboardView 根容器。
+     */
     private void updateHitRect() {
         int left = getLeft();
         int top = getTop();
@@ -478,6 +616,11 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
     // --- 5. 公开 API 方法 (Setters & Getters) ---
+    /**
+     * 设置文本内容(支持多行)。
+     *
+     * @param text 文本内容。
+     */
     public void setText(String text) {
         setVisibility(text != null ? VISIBLE : INVISIBLE);
         mClick.setText(mKeyStyle.getSpan(text));
@@ -487,6 +630,11 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         setContentDescription(text);
     }
 
+    /**
+     * 设置标签文本(单行显示)。
+     *
+     * @param text 标签文本。
+     */
     public void setLabel(String text) {
         if (TextUtils.isEmpty(text)) return;
         setVisibility(VISIBLE);
@@ -495,6 +643,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         setContentDescription(text);
     }
 
+    /**
+     * 设置点击文本。
+     * 用于没有 Key 配置的按键,直接设置文本和点击事件。
+     *
+     * @param text 点击文本。
+     */
     public void setClickText(String text) {
         mClickText = text;
         setVisibility(text != null ? VISIBLE : INVISIBLE);
@@ -506,6 +660,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
 
+    /**
+     * 设置长按文本。
+     * 动态创建长按提示 TextView,并设置样式和位置。
+     *
+     * @param text 长按文本。
+     */
     public void setLongClickText(String text) {
         if (mLongClick == null) {
             // 初始化 LongClick TextView
@@ -545,6 +705,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         //mLongClick.postInvalidate();
     }
 
+    /**
+     * 设置提示文本。
+     * 动态创建提示 TextView,并设置样式和位置。
+     *
+     * @param text 提示文本。
+     */
     public void setHintText(String text) {
         if (mHint == null) {
             // 初始化 Hint TextView
@@ -575,16 +741,33 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         //mHint.postInvalidate();
     }
 
+    /**
+     * 设置文本颜色(保留方法)。
+     *
+     * @param color 颜色值。
+     */
     @Keep
     public void setTextColor(int color) {
         mClick.setTextColor(color);
     }
 
 
+    /**
+     * 设置文本内边距。
+     *
+     * @param left 左边距。
+     * @param top 上边距。
+     * @param right 右边距。
+     * @param bottom 下边距。
+     */
     public void setTextPadding(int left, int top, int right, int bottom) {
         keyRoot.setPadding(left, top, right, bottom);
     }
 
+    /**
+     * 刷新按键显示。
+     * 根据 ASCII 模式切换按键配置,或更新提示文本的显示/隐藏状态。
+     */
     public void invalidateKey() {
         if (mKey != null) {
             if (mAsciiKey != null) {
@@ -621,15 +804,29 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     }
 
+    /**
+     * 检查是否为编码区按键。
+     *
+     * @return true 表示是编码区按键。
+     */
     public boolean isComposingKey() {
         return mKey != null && mKey.isComposingKey();
     }
 
+    /**
+     * 检查是否为 Shift 键。
+     *
+     * @return true 表示是 Shift 键。
+     */
     public boolean isShift() {
         return mKey != null && mKey.isShift();
     }
 
     // --- 6. 私有初始化与辅助方法 ---
+    /**
+     * 初始化视图结构。
+     * 创建 keyRoot 容器、mClick TextView、背景过渡动画、预览窗口等 UI 组件。
+     */
     private void initView() {
         //setBackgroundColor(0);
         setClipChildren(false);
@@ -750,6 +947,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         keyRoot.setClipToOutline(false); // 允许阴影溢出边界绘制
     }
 
+    /**
+     * 初始化按键内容。
+     * 设置主文本、长按文本、提示文本和滑动提示文本。
+     */
     private void initKey() {
         if (mKey == null) return;
         String click = mKey.getLabel();
@@ -817,6 +1018,15 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     }
 
+    /**
+     * 添加提示文本。
+     * 创建指定方向的提示 TextView,并设置样式和位置。
+     *
+     * @param label 提示文本。
+     * @param g 对齐方式(Gravity)。
+     * @param mHintStyle 提示样式。
+     * @return 创建的 TextView,如果不需要显示则返回 null。
+     */
     private TextView addHint(String label, int g, KeyStyle mHintStyle) {
         if (!mHintStyle.isShow())
             return null;
@@ -839,6 +1049,13 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         return hint;
     }
 
+    /**
+     * 创建按钮背景(带圆角和波纹效果)。
+     *
+     * @param color 背景颜色。
+     * @param radius 圆角半径。
+     * @return RippleDrawable 背景。
+     */
     private Drawable createButtonBackground(int color, float radius) {
         GradientDrawable content = new GradientDrawable();
         content.setShape(GradientDrawable.RECTANGLE);
@@ -848,6 +1065,12 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
 
+    /**
+     * 创建按钮背景(使用现有 Drawable)。
+     *
+     * @param content 内容 Drawable。
+     * @return RippleDrawable 背景。
+     */
     private Drawable createButtonBackground(Drawable content) {
         return new RippleDrawable(ColorStateList.valueOf(Color.parseColor("#40000000")), content, content);
     }
@@ -855,6 +1078,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     private boolean mLongClicked;
     private FloatKeyboard popupKeyboard;
     // --- 7. 内部类与 Runnables ---
+    /**
+     * 长按检测 Runnable。
+     * 在长按超时后触发,显示弹出键盘或执行长按事件。
+     */
     private final Runnable mLongClickRunnable = new Runnable() {
         @Override
         public void run() {
@@ -905,6 +1132,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     };
 
+    /**
+     * 显示弹出键盘。
+     * 计算弹出窗口的位置,确保不超出屏幕边界。
+     */
     private void showPopup() {
 ;       int[] point = new int[2];
         getLocationOnScreen(point);
@@ -922,6 +1153,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         popupKeyboard.setOffsetX(x - dx);
     }
 
+    /**
+     * 重复按键 Runnable。
+     * 在长按后持续触发点击事件,实现快速输入。
+     */
     private final Runnable mRepeatableRunnable = new Runnable() {
         @Override
         public void run() {
@@ -951,6 +1186,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     };
 
+    /**
+     * 滑动重复按键 Runnable。
+     * 在滑动到某个方向后持续触发该方向的事件。
+     */
     private final Runnable mSwipRepeatableRunnable = new Runnable() {
         @Override
         public void run() {
@@ -983,6 +1222,14 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     };
 
+    /**
+     * 设置点击文本内边距。
+     *
+     * @param left 左边距。
+     * @param top 上边距。
+     * @param right 右边距。
+     * @param bottom 下边距。
+     */
     public void setClickPadding(int left, int top, int right, int bottom) {
         mClick.setPadding(left, top, right, bottom);
     }
@@ -990,12 +1237,13 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
     private Bitmap maskBitmap;
     private int lastWidth, lastHeight;
-    private boolean isShapeDetectionEnabled = false; // 默认关闭，提升性能
+    /** 是否启用异形形状触摸检测(默认关闭,提升性能) */
+    private boolean isShapeDetectionEnabled = false;
 
     /**
-     * 设置是否开启异形形状触摸检测
+     * 设置是否开启异形形状触摸检测。
      *
-     * @param enabled true: 只有点在不透明区域才响应; false: 点击矩形区域均响应
+     * @param enabled true: 只有点在不透明区域才响应; false: 点击矩形区域均响应。
      */
     public void setShapeDetectionEnabled(boolean enabled) {
         this.isShapeDetectionEnabled = enabled;
@@ -1007,12 +1255,24 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
 
+    /**
+     * 设置最小宽度。
+     *
+     * @param minWidth 最小宽度(像素)。
+     */
     @Override
     public void setMinimumWidth(int minWidth) {
         super.setMinimumWidth(minWidth);
         keyRoot.setMinimumWidth(minWidth);
     }
 
+    /**
+     * 处理触摸事件。
+     * 支持异形按键检测、弹出键盘、滑动选择等功能。
+     *
+     * @param event 触摸事件。
+     * @return true 表示事件已处理。
+     */
     @Override
     public boolean onTouchEvent(MotionEvent event) {
 
@@ -1093,17 +1353,33 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
     // 1. 定义方向常量
+    /** 无滑动 */
     public static final int SWIPE_NONE = 0;
+    /** 提示文本索引 */
     public static final int HINT = KeyEventType.CLICK.ordinal();
+    /** 长按文本索引 */
     public static final int HINT_LONG = KeyEventType.LONG_CLICK.ordinal();
+    /** 上滑索引 */
     public static final int SWIPE_UP = KeyEventType.SWIPE_UP.ordinal();
+    /** 下滑索引 */
     public static final int SWIPE_DOWN = KeyEventType.SWIPE_DOWN.ordinal();
+    /** 左滑索引 */
     public static final int SWIPE_LEFT = KeyEventType.SWIPE_LEFT.ordinal();
+    /** 右滑索引 */
     public static final int SWIPE_RIGHT = KeyEventType.SWIPE_RIGHT.ordinal();
+    /** 当前滑动方向 */
     private int direction = 0;
+    /** 上一次滑动方向 */
     private int lastDirection = 0;
+    /** 8个方向的提示样式数组 */
     private final KeyStyle[] mHintStyles = new KeyStyle[8];
 
+    /**
+     * 处理滑动事件。
+     * 根据手指位置判断滑动方向,并触发对应的事件。
+     *
+     * @param event 触摸事件。
+     */
     private void handleSwipeEvent(MotionEvent event) {
         float x = event.getX();
         float y = event.getY();
@@ -1146,6 +1422,13 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
     }
 
+    /**
+     * 检查像素是否透明(异形按键检测)。
+     * 使用 ALPHA_8 格式的 Bitmap 缓存背景,检测触摸点的透明度。
+     *
+     * @param event 触摸事件。
+     * @return true 表示像素透明(不响应点击)。
+     */
     private boolean isPixelTransparent(MotionEvent event) {
         int x = (int) event.getX() - keyRoot.getLeft();
         int y = (int) event.getY() - keyRoot.getTop();
@@ -1187,19 +1470,43 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         return (maskBitmap.getPixel(x, y) >> 24 & 0xff) < 0x40;
     }
 
+    /**
+     * 设置文本大小。
+     *
+     * @param i 单位类型。
+     * @param size 大小值。
+     */
     public void setTextSize(int i, float size) {
         mClick.setTextSize(i, size);
     }
 
+    /**
+     * 获取文本内容。
+     *
+     * @return CharSequence 文本内容。
+     */
     public CharSequence getText() {
         return mClick.getText();
     }
 
+    /**
+     * 设置内边距。
+     *
+     * @param left 左边距。
+     * @param top 上边距。
+     * @param right 右边距。
+     * @param bottom 下边距。
+     */
     @Override
     public void setPadding(int left, int top, int right, int bottom) {
         keyRoot.setPadding(left, top, right, bottom);
     }
 
+    /**
+     * 设置是否单行显示。
+     *
+     * @param b true 表示单行显示。
+     */
     public void setSingleLine(boolean b) {
         mClick.setSingleLine(b);
     }

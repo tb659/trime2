@@ -55,9 +55,9 @@ android {
         // --- 新增:注入 APP_KEY ---
         // 从文件中获取,如果文件或 Key 不存在,提供一个默认空字符串,防止编译报错
         val appKey = project.findProperty("API_KEY") as? String ?: ""
-        buildConfigField("String", "API_KEY", "\"${appKey}\"")
+        buildConfigField("String", "API_KEY", "\"$appKey\"")
         val appId = project.findProperty("API_ID") as? String ?: ""
-        buildConfigField("String", "API_ID", "\"${appId}\"")
+        buildConfigField("String", "API_ID", "\"$appId\"")
         // -------------------------
     }
 

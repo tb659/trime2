@@ -29,28 +29,57 @@ import com.osfans.trime.theme.ThemeManager;
 
 import java.util.ArrayList;
 
+/**
+ * 候选词适配器类。
+ * 用于 RecyclerView 展示候选词列表,支持动态加载、高亮选中、触摸反馈等功能。
+ */
 public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.CandidateViewHolder> {
 
+    // ==================== 成员变量 ====================
+    
+    /** 候选词数据列表 */
     private final ArrayList<CandidateItem> mData;
+    /** 候选词文本样式 */
     private final KeyStyle mCandidateStyle;
+    /** 候选词注释样式 */
     private final KeyStyle mCommentStyle;
+    /** 候选词按下状态样式 */
     private final KeyStyle mCandidatePressedStyle;
+    /** 注释按下状态样式 */
     private final KeyStyle mCommentPressedStyle;
+    /** 是否正在加载下一页 */
     private boolean mIsLoading;
+    /** 当前选中的候选词索引 */
     private int mIdx;
+    /** 之前选中的候选词索引 */
     private int oldIdx;
+    /** 按下状态的背景 drawable */
     private final Drawable mCandidatePressedBackground;
+    /** Handler,用于延迟任务 */
     private final Handler mHandler=new Handler();
 
+    /**
+     * 构造函数。
+     *
+     * @param data 候选词数据列表。
+     */
     public CandidateAdapter(ArrayList<CandidateItem> data) {
         this.mData = data;
-        mCandidateStyle = ThemeManager.getStyle().getKeyStyle("candidate");
-        mCandidatePressedStyle = mCandidateStyle.getKeyStyle("pressed", mCandidateStyle);
-        mCommentStyle = mCandidateStyle.getKeyStyle("comment", mCandidateStyle);
-        mCommentPressedStyle = mCommentStyle.getKeyStyle("pressed", mCommentStyle);
-        mCandidatePressedBackground = mCandidatePressedStyle.getBackground();
+        mCandidateStyle = ThemeManager.getStyle().getKeyStyle("candidate"); // 获取候选词样式
+        mCandidatePressedStyle = mCandidateStyle.getKeyStyle("pressed", mCandidateStyle); // 获取按下状态样式
+        mCommentStyle = mCandidateStyle.getKeyStyle("comment", mCandidateStyle); // 获取注释样式
+        mCommentPressedStyle = mCommentStyle.getKeyStyle("pressed", mCommentStyle); // 获取注释按下状态样式
+        mCandidatePressedBackground = mCandidatePressedStyle.getBackground(); // 获取按下状态背景
     }
 
+    /**
+     * 创建 ViewHolder。
+     * 构建候选词项的视图结构:垂直布局包含注释文本和候选词文本。
+     *
+     * @param parent 父容器。
+     * @param viewType 视图类型。
+     * @return 新创建的 CandidateViewHolder。
+     */
     @NonNull
     @Override
     public CandidateAdapter.CandidateViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -116,26 +145,29 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         layout.addView(tvText, textLp);
 
         CandidateViewHolder holder = new CandidateViewHolder(layout, tvComment, tvText);
+        // 设置触摸监听,记录选中索引并滚动
         holder.itemView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    mIdx = holder.getBindingAdapterPosition();
+                    mIdx = holder.getBindingAdapterPosition(); // 记录当前触摸位置
                     //Rime.highlightRimeCandidate(mIdx);
-                    scrollToIdx();
+                    scrollToIdx(); // 滚动到选中位置
                 }
                 return false;
             }
         });
-        // 在这里只设置一次监听器
+        // 设置点击监听,处理候选词选择
         holder.itemView.setOnClickListener(v -> {
             int position = holder.getBindingAdapterPosition(); // 获取当前实时位置
             if (position != RecyclerView.NO_POSITION && mData != null) {
                 CandidateItem item = mData.get(position);
                 if (item.getIndex() == -1) {
+                    // index 为 -1 表示直接提交文本
                     TrimeService.getInstance().commitText(item.getText());
                     TrimeService.getInstance().setCandidates(null);
                 } else {
+                    // 正常候选词,通知 Rime 引擎选择
                     TrimeService.getInstance().selectCandidate(item.getIndex());
                 }
             }
@@ -144,6 +176,13 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         return holder;
     }
 
+    /**
+     * 绑定数据到 ViewHolder。
+     * 设置候选词文本、注释、样式,并处理自动加载下一页。
+     *
+     * @param holder ViewHolder 实例。
+     * @param position 数据位置索引。
+     */
     @Override
     public void onBindViewHolder(@NonNull CandidateAdapter.CandidateViewHolder holder, int position) {
         final CandidateItem data = mData.get(position);
@@ -179,108 +218,177 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
                 //holder.itemView.requestLayout();
             }
         });
-        // 检查是否滑到了最后三项（提前加载，体验更好）
+        // 检查是否滑到了最后三项(提前加载,体验更好)
         if (position >= getItemCount() - 3) {
             // 使用 post 避免在布局阶段刷新
-            holder.itemView.post(this::loadNextPage);
+            holder.itemView.post(this::loadNextPage); // 触发加载下一页
         }
     }
 
+    /**
+     * 加载下一页候选词。
+     * 从 CandidatesManager 获取下一页数据并追加到列表末尾。
+     */
     private void loadNextPage() {
-        if (mIsLoading) return;
+        if (mIsLoading) return; // 防止重复加载
         mIsLoading = true;
-        ArrayList<CandidateItem> cand = CandidatesManager.next();
+        ArrayList<CandidateItem> cand = CandidatesManager.next(); // 获取下一页数据
         if (cand != null && !cand.isEmpty()) {
-            int startPos = mData.size();
-            mData.addAll(cand);
-            // 不要 notifyDataSetChanged()，只通知新增的部分，性能更好
-            notifyItemRangeInserted(startPos, cand.size());
+            int startPos = mData.size(); // 记录起始位置
+            mData.addAll(cand); // 添加到数据列表
+            // 不要 notifyDataSetChanged(),只通知新增的部分,性能更好
+            notifyItemRangeInserted(startPos, cand.size()); // 通知插入新项
         }
-        mIsLoading = false;
+        mIsLoading = false; // 重置加载标志
     }
 
+    /**
+     * 获取数据项数量。
+     *
+     * @return 候选词列表大小。
+     */
     @Override
     public int getItemCount() {
         return mData == null ? 0 : mData.size();
     }
 
+    /**
+     * 设置新的候选词数据。
+     * 清空旧数据,加载新数据,并高亮第一个候选词。
+     *
+     * @param next 新的候选词列表。
+     */
     public void setData(ArrayList<CandidateItem> next) {
-        mIdx = 0;
+        mIdx = 0; // 重置选中索引
         oldIdx = 0;
-        mData.clear();
-        mData.addAll(next);
+        mData.clear(); // 清空旧数据
+        mData.addAll(next); // 添加新数据
         if(!next.isEmpty())
-            Rime.highlightRimeCandidate(next.get(0).getIndex());
-        notifyDataSetChanged();
+            Rime.highlightRimeCandidate(next.get(0).getIndex()); // 高亮第一个候选词
+        notifyDataSetChanged(); // 通知数据更新
     }
 
+    /** RecyclerView 引用 */
     private RecyclerView mRecyclerView;
 
+    /**
+     * 当适配器附加到 RecyclerView 时调用。
+     *
+     * @param recyclerView RecyclerView 实例。
+     */
     @Override
     public void onAttachedToRecyclerView(@NonNull RecyclerView recyclerView) {
         super.onAttachedToRecyclerView(recyclerView);
         this.mRecyclerView = recyclerView; // 获取列表控件引用
     }
 
+    /**
+     * 当适配器从 RecyclerView 分离时调用。
+     *
+     * @param recyclerView RecyclerView 实例。
+     */
     @Override
     public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
         super.onDetachedFromRecyclerView(recyclerView);
         this.mRecyclerView = null; // 防止内存泄漏
     }
 
+    /**
+     * 选中上一个候选词。
+     *
+     * @return true 表示成功移动,false 表示已在第一个位置。
+     */
     public boolean prevCandidate() {
-        if (mIdx <= 0) return false;
+        if (mIdx <= 0) return false; // 已在第一个,无法再向前
         mIdx--;
-        scrollToIdx();
+        scrollToIdx(); // 滚动到选中位置
         return true;
     }
 
+    /**
+     * 选中下一个候选词。
+     *
+     * @return true 表示成功移动或已在最后一个位置。
+     */
     public boolean nextCandidate() {
         if (mData.isEmpty())
-            return false;
-        if (mData.size() - 1 == mIdx) return true;
+            return false; // 数据为空,无法移动
+        if (mData.size() - 1 == mIdx) return true; // 已在最后一个
         mIdx++;
-        scrollToIdx();
+        scrollToIdx(); // 滚动到选中位置
         return true;
     }
 
+    /**
+     * 滚动到当前选中的候选词位置。
+     * 更新 UI 高亮状态并通知 Rime 引擎高亮对应候选词。
+     */
     private void scrollToIdx() {
         if (mRecyclerView != null) {
             // 自动滚动到 mIdx 所在位置
-            mRecyclerView.smoothScrollToPosition(mIdx);
+            mRecyclerView.smoothScrollToPosition(mIdx); // 平滑滚动
         }
-        notifyItemChanged(oldIdx);
-        oldIdx = mIdx;
-        notifyItemChanged(mIdx);
+        notifyItemChanged(oldIdx); // 刷新旧选中项(取消高亮)
+        oldIdx = mIdx; // 更新旧索引
+        notifyItemChanged(mIdx); // 刷新新选中项(设置高亮)
         /*mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 notifyItemChanged(mIdx);
             }
         },50);*/
-        Rime.highlightRimeCandidate(mData.get(mIdx).getIndex());
+        Rime.highlightRimeCandidate(mData.get(mIdx).getIndex()); // 通知 Rime 高亮
     }
 
+    /**
+     * 设置选中索引。
+     *
+     * @param idx 目标索引。
+     */
     public void setIdx(int idx) {
         if(idx<0||idx>=getItemCount()-1)
-            return;
+            return; // 索引越界,直接返回
         mIdx = idx;
-        scrollToIdx();
+        scrollToIdx(); // 滚动到指定位置
     }
 
+    /**
+     * 获取指定位置的候选词项。
+     *
+     * @param index 位置索引。
+     * @return 候选词对象。
+     */
     public CandidateItem getItem(int index) {
         return mData.get(index);
     }
 
+    /**
+     * 获取所有候选词数据。
+     *
+     * @return 候选词列表。
+     */
     public ArrayList<CandidateItem> getData() {
         return mData;
     }
 
+    /**
+     * 候选词 ViewHolder 类。
+     * 持有候选词项的视图引用,包括注释文本和候选词文本。
+     */
     public static class CandidateViewHolder extends RecyclerView.ViewHolder {
 
+        /** 注释文本视图 */
         public final TextView tvComment;
+        /** 候选词文本视图 */
         public final TextView tvText;
 
+        /**
+         * 构造函数。
+         *
+         * @param itemView 根视图。
+         * @param tvComment 注释文本视图。
+         * @param tvText 候选词文本视图。
+         */
         public CandidateViewHolder(@NonNull View itemView, TextView tvComment, TextView tvText) {
             super(itemView);
             this.tvComment = tvComment;

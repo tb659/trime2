@@ -27,11 +27,25 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
 
+/**
+ * 方案选择对话框。
+ * 用于切换 Rime 输入法方案,支持设置、管理方案和切换当前方案。
+ */
 public class OptionsDialog {
-    private AlertDialog mDialog; // 原 mDig
+    // ==================== 成员变量 ====================
+    /** 对话框实例 */
+    private AlertDialog mDialog;
+    /** 是否需要更新 Rime 选项 */
     private boolean mNeedUpdateRimeOption;
-    private IBinder mWindowToken; // 原 mToken
+    /** 窗口 Token(用于依附于输入法窗口) */
+    private IBinder mWindowToken;
 
+    /**
+     * 构造函数。
+     * 加载所有可用方案,显示单选对话框供用户选择,支持设置和管理方案。
+     *
+     * @param context 上下文。
+     */
     public OptionsDialog(Context context) {
         if (TrimeService.getInstance() == null) {
             Toast.makeText(context, "请先启用输入法", Toast.LENGTH_SHORT).show();
@@ -61,7 +75,7 @@ public class OptionsDialog {
             return;
         }
         // 获取所有可用的方案列表
-        SchemaItem[] availableSchemas = Rime.getRimeSchemaList(); // 原 as
+        SchemaItem[] availableSchemas = Rime.getRimeSchemaList();
         if (availableSchemas == null) {
             Toast.makeText(context, "请先启用输入法", Toast.LENGTH_SHORT).show();
             return;
@@ -69,8 +83,8 @@ public class OptionsDialog {
         Arrays.sort(availableSchemas, new SortByName());
 
         int schemaCount = availableSchemas.length;
-        String[] schemaNames = new String[schemaCount]; // 原 ss
-        int currentSelectedIndex = 0; // 原 idx
+        String[] schemaNames = new String[schemaCount];
+        int currentSelectedIndex = 0;
 
         for (int i = 0; i < schemaCount; i++) {
             schemaNames[i] = availableSchemas[i].getName();
@@ -107,11 +121,20 @@ public class OptionsDialog {
         mDialog = builder.create();
     }
 
+    /**
+     * 显示对话框(无 Token)。
+     */
     public void show() {
         if (mDialog == null) return;
         mDialog.show();
     }
 
+    /**
+     * 显示对话框(带 Token,依附于输入法窗口)。
+     * 设置对话框类型为 TYPE_APPLICATION_ATTACHED_DIALOG,使其能依附于输入法窗口显示。
+     *
+     * @param token 窗口 Token。
+     */
     public void show(IBinder token) {
         if (mDialog == null) return;
         mWindowToken = token;
@@ -122,7 +145,7 @@ public class OptionsDialog {
         }
 
         Window window = mDialog.getWindow();
-        WindowManager.LayoutParams layoutParams = window.getAttributes(); // 原 attr
+        WindowManager.LayoutParams layoutParams = window.getAttributes();
 
         // 设置为输入法附着的对话框类型，确保其能显示在输入法窗口之上
         layoutParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
@@ -134,10 +157,12 @@ public class OptionsDialog {
     }
 
     /**
-     * 按名称排序方案项
+     * 按名称排序方案项的比较器。
+     * 优先比较方案名称,名称为空则比较 ID,支持区域敏感的字符串比较。
      */
     public static class SortByName implements Comparator<SchemaItem> {
-        private final LocaleComparator localeComp = new LocaleComparator(); // 原 comp
+        /** 区域敏感的比较器 */
+        private final LocaleComparator localeComp = new LocaleComparator();
 
         @Override
         public int compare(SchemaItem item1, SchemaItem item2) {
@@ -156,9 +181,11 @@ public class OptionsDialog {
     }
 
     /**
-     * 区域敏感的字符串比较器
+     * 区域敏感的字符串比较器。
+     * 使用 Collator 实现符合当前语言环境的字符串比较。
      */
     public static class LocaleComparator implements Comparator<String> {
+        /** Collator 实例,用于区域敏感的比较 */
         private final Collator collator = Collator.getInstance(java.util.Locale.getDefault());
 
         @Override

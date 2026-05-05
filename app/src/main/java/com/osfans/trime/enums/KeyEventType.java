@@ -18,13 +18,27 @@
 
 package com.osfans.trime.enums;
 
-/** 按键事件枚举 */
+/**
+ * 按键事件类型枚举。
+ * 定义按键支持的各种交互事件:
+ * - CLICK: 单击事件
+ * - LONG_CLICK: 长按事件
+ * - SWIPE_LEFT/RIGHT/UP/DOWN: 四个方向的滑动事件
+ * - COMBO: 组合键事件
+ */
 public enum KeyEventType {
+  /** 单击事件 */
   CLICK,
+  /** 长按事件 */
   LONG_CLICK,
+  /** 左滑事件 */
   SWIPE_LEFT,
+  /** 右滑事件 */
   SWIPE_RIGHT,
+  /** 上滑事件 */
   SWIPE_UP,
+  /** 下滑事件 */
   SWIPE_DOWN,
+  /** 组合键事件 */
   COMBO
 }

@@ -29,24 +29,44 @@ import org.luaj.LuaValue;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 工具栏视图类。
+ * 显示方案切换开关和自定义功能按键,支持横向滚动。
+ */
 public class ToolbarView extends LinearLayout implements View.OnClickListener {
+    
+    // ==================== 成员变量 ====================
+    
+    /** Trime 服务实例 */
     private final TrimeService mTrime;
+    /** 工具栏样式配置 */
     private final Style mToolbarStyle;
+    /** 按键样式配置 */
     private final KeyStyle mKeyStyle;
+    /** 按键列表 */
     private ArrayList<KeyView> mKeys = new ArrayList<>();
+    /** 隐藏按钮 */
     private KeyView mHide;
-    ;
 
+    /**
+     * 构造函数。
+     *
+     * @param context Android 上下文。
+     */
     public ToolbarView(Context context) {
         super(context);
-        mTrime = TrimeService.getInstance();
-        mToolbarStyle = ThemeManager.getStyle().getStyle("toolbar");
-        mKeyStyle = mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key"));
-        setClipChildren(false);
+        mTrime = TrimeService.getInstance(); // 获取服务实例
+        mToolbarStyle = ThemeManager.getStyle().getStyle("toolbar"); // 获取工具栏样式
+        mKeyStyle = mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key")); // 获取按键样式
+        setClipChildren(false); // 允许子视图超出边界
         setClipToPadding(false);
-        initView();
+        initView(); // 初始化视图
     }
 
+    /**
+     * 初始化视图结构。
+     * 创建横向滚动视图、隐藏按钮和方案切换开关。
+     */
     private void initView() {
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(HORIZONTAL);
@@ -66,11 +86,12 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
         lp.setMargins(0, 0, 0, elevation);
         addView(root, lp);
 
+        // 创建 HorizontalScrollView 支持横向滚动
         HorizontalScrollView mListView = new HorizontalScrollView(getContext());
         mListView.setHorizontalScrollBarEnabled(false); // 禁止水平滚动条
-        mListView.setVerticalScrollBarEnabled(false);
+        mListView.setVerticalScrollBarEnabled(false); // 禁止垂直滚动条
         LinearLayout itemsLayout = new LinearLayout(getContext());
-        itemsLayout.setGravity(Gravity.CENTER);
+        itemsLayout.setGravity(Gravity.CENTER); // 居中对齐
         mListView.addView(itemsLayout, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         LuaValue hide = mToolbarStyle.get("hide");
          mHide = new KeyView(getContext(), hide.istable()?mToolbarStyle.getKeyStyle("hide", mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key"))):mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key")));
@@ -116,21 +137,24 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
             e.printStackTrace();
         }
 
+        // 根据配置添加工具栏按键
         LuaValue keys = mToolbarStyle.get("keys").opttable(new LuaTable());
         int len = keys.length();
         for (int i = 0; i < len; i++) {
             LuaValue o = keys.get(i + 1);
             if (o.istable()) {
+                // 表格类型,可以自定义样式
                 LuaValue s = o.get("style");
                 KeyStyle style=mKeyStyle;
                 if(s.isstring()){
-                    style=ThemeManager.getStyle().getKeyStyle(s.tojstring(),mKeyStyle);
+                    style=ThemeManager.getStyle().getKeyStyle(s.tojstring(),mKeyStyle); // 获取自定义样式
                 }
                 KeyView key = new KeyView(getContext(), o.get("click").isnil() ? new Key(new Event(o)) : new Key(o), style);
                 itemsLayout.addView(key, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 key.setMinimumWidth(height);
                 mKeys.add(key);
             } else if (o.isstring()) {
+                // 字符串类型,使用默认样式
                 KeyView key = new KeyView(getContext(), new Key(o.tojstring()), mKeyStyle);
                 itemsLayout.addView(key, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 key.setMinimumWidth(height);
@@ -139,22 +163,43 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
         }
     }
 
+    /**
+     * 点击事件处理。
+     * 点击隐藏按钮时隐藏输入法。
+     *
+     * @param v 被点击的视图。
+     */
     @Override
     public void onClick(View v) {
-        mTrime.requestHideSelf(0);
+        mTrime.requestHideSelf(0); // 隐藏输入法
     }
 
+    /**
+     * 刷新所有按键视图。
+     * 遍历按键列表,调用每个按键的 invalidateKey 方法。
+     */
     public void invalidateAllKeys() {
         for (KeyView key : mKeys) {
-            key.invalidateKey();
+            key.invalidateKey(); // 刷新按键
         }
     }
 
+    /**
+     * 设置当前方案 ID。
+     * 重新初始化视图以加载新方案的开关。
+     *
+     * @param id 方案 ID。
+     */
     public void setSchema(String id) {
-        removeAllViews();
-        initView();
+        removeAllViews(); // 移除所有视图
+        initView(); // 重新初始化
     }
 
+    /**
+     * 获取隐藏按钮。
+     *
+     * @return 隐藏按钮 KeyView 实例。
+     */
     public KeyView getHide() {
         return mHide;
     }

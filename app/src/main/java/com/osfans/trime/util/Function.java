@@ -61,24 +61,40 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 實現打開指定程序、打開 輸入法全局設置對話框等功能
+ * 功能工具类,提供应用启动、日期格式化、偏好设置管理、Lua 脚本执行等功能。
+ * 支持打开系统应用、执行 Intent、调用 Lua 脚本等高级功能。
  */
 public class Function {
     private static String TAG = Function.class.getSimpleName();
+    // 特殊按键码到应用类别的映射表
     private static SparseArray<String> sApplicationLaunchKeyCategories;
 
     static {
         sApplicationLaunchKeyCategories = new SparseArray<String>();
+        // 浏览器键 -> 浏览器应用
         sApplicationLaunchKeyCategories.append(
                 KeyEvent.KEYCODE_EXPLORER, "android.intent.category.APP_BROWSER");
+        // 邮件键 -> 邮件应用
         sApplicationLaunchKeyCategories.append(
                 KeyEvent.KEYCODE_ENVELOPE, "android.intent.category.APP_EMAIL");
+        // 联系人键(207) -> 联系人应用
         sApplicationLaunchKeyCategories.append(207, "android.intent.category.APP_CONTACTS");
+        // 日历键(208) -> 日历应用
         sApplicationLaunchKeyCategories.append(208, "android.intent.category.APP_CALENDAR");
+        // 邮件键2(209) -> 邮件应用
         sApplicationLaunchKeyCategories.append(209, "android.intent.category.APP_EMAIL");
+        // 计算器键(210) -> 计算器应用
         sApplicationLaunchKeyCategories.append(210, "android.intent.category.APP_CALCULATOR");
     }
 
+    /**
+     * 根据按键码打开对应的系统应用。
+     * 支持浏览器、邮件、联系人、日历、计算器等系统应用。
+     *
+     * @param context Android 上下文对象。
+     * @param keyCode 按键码。
+     * @return 是否成功打开应用。
+     */
     @TargetApi(VERSION_CODES.ICE_CREAM_SANDWICH_MR1)
     public static boolean openCategory(Context context, int keyCode) {
         String category = sApplicationLaunchKeyCategories.get(keyCode);
@@ -95,21 +111,26 @@ public class Function {
         return false;
     }
 
+    /**
+     * 根据参数启动 Intent。
+     * 支持 URI、组件名、包名三种格式。
+     *
+     * @param context Android 上下文对象。
+     * @param arg 启动参数(URI/组件名/包名)。
+     */
     private static void startIntent(Context context, String arg) {
         Intent intent;
         try {
             if (arg.indexOf(':') >= 0) {
-                // The argument is a URI.  Fully parse it, and use that result
-                // to fill in any data not specified so far.
+                // 参数是 URI,直接解析
                 intent = Intent.parseUri(arg, Intent.URI_INTENT_SCHEME);
             } else if (arg.indexOf('/') >= 0) {
-                // The argument is a component name.  Build an Intent to launch
-                // it.
+                // 参数是组件名,构建启动 Intent
                 intent = new Intent(Intent.ACTION_MAIN);
                 intent.addCategory(Intent.CATEGORY_LAUNCHER);
                 intent.setComponent(ComponentName.unflattenFromString(arg));
             } else {
-                // Assume the argument is a package name.
+                // 假设参数是包名
                 intent = context.getPackageManager().getLaunchIntentForPackage(arg);
             }
             intent.setFlags(FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_HISTORY);
@@ -119,6 +140,14 @@ public class Function {
         }
     }
 
+    /**
+     * 根据 Action 和参数启动 Intent。
+     * 支持搜索、分享等特殊 Action。
+     *
+     * @param context Android 上下文对象。
+     * @param action Intent Action。
+     * @param arg 参数字符串。
+     */
     private static void startIntent(Context context, String action, String arg) {
         action = "android.intent.action." + action.toUpperCase(Locale.getDefault());
         try {
@@ -126,13 +155,13 @@ public class Function {
             switch (action) {
                 case Intent.ACTION_WEB_SEARCH:
                 case Intent.ACTION_SEARCH:
-                    if (arg.startsWith("http")) { //web_search無法直接打開網址
+                    if (arg.startsWith("http")) { // web_search 无法直接打开网址
                         startIntent(context, arg);
                         return;
                     }
                     intent.putExtra(SearchManager.QUERY, arg);
                     break;
-                case Intent.ACTION_SEND: //分享文本
+                case Intent.ACTION_SEND: // 分享文本
                     intent.setType("text/plain");
                     intent.putExtra(Intent.EXTRA_TEXT, arg);
                     break;
@@ -148,6 +177,13 @@ public class Function {
     }
 
 
+    /**
+     * 格式化日期字符串。
+     * 支持 ICU 库( Android N+)和传统 SimpleDateFormat。
+     *
+     * @param option 日期格式字符串,可包含区域设置(如 "zh_CN@ yyyy-MM-dd")。
+     * @return 格式化后的日期字符串。
+     */
     public static String getDate(String option) {
         String s = "";
         String locale = "";
@@ -172,11 +208,18 @@ public class Function {
             }
             s = df.format(cc, new StringBuffer(256), new FieldPosition(0)).toString();
         } else {
-            s = new SimpleDateFormat(option, Locale.getDefault()).format(new Date()); //時間
+            s = new SimpleDateFormat(option, Locale.getDefault()).format(new Date()); // 时间
         }
         return s;
     }
 
+    /**
+     * 批量设置 SharedPreferences 的值。
+     *
+     * @param preferences SharedPreferences 对象。
+     * @param map 键值对映射。
+     * @return 是否成功提交。
+     */
     public static boolean setAll(SharedPreferences preferences, Map<String, Object> map) {
         Set<Map.Entry<String, Object>> sets = map.entrySet();
         SharedPreferences.Editor editor = preferences.edit();
@@ -199,6 +242,12 @@ public class Function {
         return editor.commit();
     }
 
+    /**
+     * 获取应用版本号。
+     *
+     * @param context Android 上下文对象。
+     * @return 版本号字符串,失败则返回 null。
+     */
     public static String getVersion(Context context) {
         try {
             return context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
@@ -207,6 +256,13 @@ public class Function {
         }
     }
 
+    /**
+     * 检查指定应用是否已安装。
+     *
+     * @param context Android 上下文对象。
+     * @param app 应用包名。
+     * @return 是否已安装。
+     */
     public static boolean isAppAvailable(Context context, String app) {
         final PackageManager packageManager = context.getPackageManager();
         List<PackageInfo> pinfo = packageManager.getInstalledPackages(0);
@@ -221,10 +277,22 @@ public class Function {
         return false;
     }
 
+    /**
+     * 获取默认 SharedPreferences 对象。
+     *
+     * @param context Android 上下文对象。
+     * @return SharedPreferences 对象。
+     */
     public static SharedPreferences getPref(Context context) {
         return PreferenceManager.getDefaultSharedPreferences(context);
     }
 
+    /**
+     * 检查应用版本是否发生变化。
+     *
+     * @param context Android 上下文对象。
+     * @return 版本是否变化。
+     */
     public static boolean isDiffVer(Context context) {
         String version = getVersion(context);
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(context);
@@ -238,6 +306,11 @@ public class Function {
         return isDiff;
     }
 
+    /**
+     * 打印堆栈跟踪信息(仅 Debug 模式)。
+     *
+     * @param text 提示信息。
+     */
     public static void printStackTrace(String text) {
         if (!BuildConfig.DEBUG)
             return;
@@ -248,20 +321,37 @@ public class Function {
         }
     }
 
+    /**
+     * 获取用户数据目录路径。
+     *
+     * @param context Android 上下文对象。
+     * @return 用户数据目录绝对路径。
+     */
     public static String getUserDataDir(Context context) {
         return DataManager.getUserDataDir().getAbsolutePath();
     }
 
+    /**
+     * 处理命令,支持 Lua 脚本和内置命令。
+     * 如果存在对应的 Lua 脚本文件,则执行脚本;否则执行内置命令。
+     *
+     * @param context TrimeService 实例。
+     * @param command 命令名称。
+     * @param option 命令参数(可变参数)。
+     * @return 命令执行结果字符串。
+     */
     public static String handle(TrimeService context, String command, Object... option) {
         String s = null;
         if (command == null)
             return s;
+        // 尝试查找 Lua 脚本文件
         String path = Config.getScriptsPath(command);
         Log.w(TAG, "handle: "+path );
         if (new File(path).exists()) {
             Object ret = context.doFile(path, option);
             if (ret == null)
                 return null;
+            // 如果返回 LuaTable,则设置为候选词列表
             if (ret instanceof LuaTable) {
                 context.setCandidates(new ArrayList<String>((Collection<? extends String>) ((LuaTable) ret).checktable().values()));
                 return null;
@@ -271,10 +361,20 @@ public class Function {
         return handle(context, command, "");
     }
 
+    /**
+     * 处理命令(字符串参数版本)。
+     * 支持 GPT AI 生成、日期格式化、应用启动、部署、广播等多种功能。
+     *
+     * @param context TrimeService 实例。
+     * @param command 命令名称。
+     * @param option 命令参数字符串。
+     * @return 命令执行结果字符串。
+     */
     public static String handle(TrimeService context, String command, String option) {
         String s = null;
         if (command == null)
             return s;
+        // 尝试查找 Lua 脚本文件
         String path = Config.getScriptsPath(command);
         Log.w(TAG, "handle: "+path );
         if (new File(path).exists()) {
@@ -282,12 +382,13 @@ public class Function {
             if (ret == null)
                 return null;
             if (ret instanceof LuaTable) {
-                //context.setCandidates(new ArrayList<String>(((LuaTable) ret).values()));
                 return null;
             }
             return ret.toString();
         }
+        // 执行内置命令
         switch (command) {
+             // ==================== GPT AI 文本生成(交互式) ====================
              case "gpt": {
                 if (TextUtils.isEmpty(option)) {
                     Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
@@ -306,6 +407,7 @@ public class Function {
                 } else {
                     tv.setTextColor(0xff000000);
                 }
+                // 显示对话框,用户可以在其中查看和编辑生成的文本
                 AlertDialog dlg = context.showWidthDialog(new AlertDialog.Builder(context, Config.getDialogTheme())
                         .setTitle(option)
                         .setView(tv)
@@ -326,6 +428,7 @@ public class Function {
                             }
                         }).create());
                 dlg.getButton(DialogInterface.BUTTON1).setEnabled(false);
+                // 调用 Vivo GPT API 生成文本
                 VivoGpt.gpt(option, new HttpUtil.HttpCallback() {
                     @Override
                     public void onDone(HttpUtil.HttpResult result) {
@@ -343,6 +446,7 @@ public class Function {
                 });
                 break;
             }
+            // ==================== GPT AI 文本生成(带进度对话框) ====================
             case "gpt1": {
                 if (TextUtils.isEmpty(option)) {
                     Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
@@ -357,12 +461,6 @@ public class Function {
                         dialog.dismiss();
                     }
                 });
-                /*Window window = mProgressDialog.getWindow();
-                WindowManager.LayoutParams lp = window.getAttributes();
-                lp.type = TrimeService.getDialogType();
-                window.setAttributes(lp);
-                window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-                mProgressDialog.show();*/
                 TrimeService.getInstance().showWidthDialog(mProgressDialog);
                 Toast.makeText(context, "正在生成，请稍后...", Toast.LENGTH_SHORT).show();
 
@@ -386,6 +484,7 @@ public class Function {
                                 }
                                 tv.setText(result.text);
                                 tv.setShowSoftInputOnFocus(false);
+                                // 显示编辑对话框
                                 context.showWidthDialog(new AlertDialog.Builder(context, Config.getDialogTheme())
                                         .setTitle(option)
                                         .setView(tv)
@@ -411,6 +510,7 @@ public class Function {
                 });
                 break;
             }
+            // ==================== GPT AI 文本生成(直接提交) ====================
             case "gpt2": {
                 if (TextUtils.isEmpty(option)) {
                     Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
@@ -425,17 +525,12 @@ public class Function {
                         dialog.dismiss();
                     }
                 });
-                /*Window window = mProgressDialog.getWindow();
-                WindowManager.LayoutParams lp = window.getAttributes();
-                lp.type = Trime.getDialogType();
-                window.setAttributes(lp);
-                window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-                mProgressDialog.show();*/
                 TrimeService.getInstance().showWidthDialog(mProgressDialog);
                 Toast.makeText(context, "正在生成，请稍后...", Toast.LENGTH_SHORT).show();
                 VivoGpt.gpt1(option, new HttpUtil.HttpCallback() {
                     @Override
                     public void onDone(HttpUtil.HttpResult result) {
+                        // 如果进度对话框仍在显示,则直接提交文本
                         if (mProgressDialog.isShowing()) {
                             mProgressDialog.dismiss();
                             context.commitText(result.text);
@@ -476,6 +571,7 @@ public class Function {
                 });
                 break;
             }
+            // ==================== GPT AI 文本生成(后台直接提交) ====================
             case "gpt3": {
                 if (TextUtils.isEmpty(option)) {
                     Toast.makeText(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT).show();
@@ -501,9 +597,11 @@ public class Function {
                 });
                 break;
             }
+            // ==================== 日期格式化 ====================
             case "date":
                 s = getDate(option);
                 break;
+            // ==================== 启动应用或打开网址 ====================
             case "run":
                 if (option.startsWith("http")) {
                     try {
@@ -515,46 +613,87 @@ public class Function {
                     }
                     break;
                 }
-                startIntent(context, option); //啓動程序
+                startIntent(context, option); // 启动程序
                 break;
+            // ==================== Rime 部署 ====================
             case "deploy":
                 new DeployDialog(context).show(context.getToken());
                 break;
+            // ==================== 发送广播 ====================
             case "broadcast":
                 if(option.equals("com.osfans.trime.action.DEPLOY"))
                     new DeployDialog(context).show(context.getToken());
                 else
-                    context.sendBroadcast(new Intent(option)); //廣播
+                    context.sendBroadcast(new Intent(option)); // 广播
                 break;
+            // ==================== 添加短语 ====================
             case "add_phrase":
-                TrimeService.getInstance().addPhrase(option); //新建短语
+                TrimeService.getInstance().addPhrase(option); // 新建短语
                 Toast.makeText(context,"已添加到短语 "+option,Toast.LENGTH_SHORT).show();
                 break;
+            // ==================== 直接提交文本 ====================
             case "commit":
                 s = option;
                 break;
+            // ==================== 其他 Intent ====================
             default:
-                startIntent(context, command, option); //其他intent
+                startIntent(context, command, option); // 其他intent
                 break;
         }
         return s;
     }
 
-    public static void showPrefDialog(Context trimeService) {
 
-    }
+    /**
+     * 显示偏好设置对话框(启动 PrefLauncher Activity)。
+     * 用于从输入法服务中打开设置界面。
+     *
+     * @param Context TimeService。
+     */
+    public static void showPrefDialog(Context TrimeService) {}
 
+    /**
+     * 保存字符串到 SharedPreferences。
+     *
+     * @param context Android 上下文对象。
+     * @param id 键名。
+     * @param s 字符串值。
+     */
     public static void saveString(Context context, String id, String s) {
         getPref(context).edit().putString(id,s).apply();
     }
 
+    /**
+     * 从 SharedPreferences 加载字符串。
+     *
+     * @param context Android 上下文对象。
+     * @param id 键名。
+     * @param def 默认值。
+     * @return 字符串值。
+     */
     public static String loadString(Context context, String id, String def) {
         return getPref(context).getString(id,def);
     }
 
+    /**
+     * 保存布尔值到 SharedPreferences。
+     *
+     * @param context Android 上下文对象。
+     * @param id 键名。
+     * @param s 布尔值。
+     */
     public static void saveBoolean(Context context, String id, boolean s) {
         getPref(context).edit().putBoolean(id,s).apply();
     }
+
+    /**
+     * 从 SharedPreferences 加载布尔值。
+     *
+     * @param context Android 上下文对象。
+     * @param id 键名。
+     * @param def 默认值。
+     * @return 布尔值。
+     */
     public static boolean loadBoolean(Context context, String id, boolean def) {
         return getPref(context).getBoolean(id,def);
     }

@@ -27,17 +27,35 @@ import com.osfans.trime.theme.ThemeManager;
 
 import org.luaj.LuaValue;
 
+/**
+ * 剪贴板键盘视图类。
+ * 显示剪贴板和常用语列表,支持切换、翻页、撤销等操作。
+ */
 public class ClipboardKeyboardView extends LinearLayout {
 
+    // ==================== 成员变量 ====================
+    /** TrimeService 实例 */
     private final TrimeService mTrime;
+    /** 按键样式 */
     private final KeyStyle mKeyStyle;
+    /** 剪贴板样式 */
     private final Style mClipboardStyle;
+    /** RecyclerView 列表 */
     private RecyclerView mListView;
+    /** 瀑布流适配器 */
     private WaterfallAdapter mAdapter;
+    /** 撤销按钮 */
     private KeyView mUndo;
+    /** 常用语标题按钮 */
     private KeyView phraseTitle;
+    /** 剪贴板标题按钮 */
     private KeyView clipboardTitle;
 
+    /**
+     * 构造函数。
+     *
+     * @param context 上下文。
+     */
     public ClipboardKeyboardView(@NonNull Context context) {
         super(context);
         mClipboardStyle = ThemeManager.getStyle().getStyle("clipboard");
@@ -200,16 +218,30 @@ public class ClipboardKeyboardView extends LinearLayout {
         }
     }
 
+    /**
+     * 向下翻页。
+     *
+     * @return true 表示操作成功。
+     */
     public boolean pageDown() {
         mListView.smoothScrollBy(0, ThemeManager.getContentHeight());
         return true;
     }
 
+    /**
+     * 向上翻页。
+     *
+     * @return true 表示操作成功。
+     */
     public boolean pageUp() {
         mListView.smoothScrollBy(0, -ThemeManager.getContentHeight());
         return true;
     }
 
+    /**
+     * 更新剪贴板数据。
+     * 停止滚动并重新加载数据,滚动到顶部。
+     */
     public void update() {
         if (mListView.isComputingLayout()) {
             // 如果正在布局，延迟一帧更新，防止冲突
@@ -224,6 +256,10 @@ public class ClipboardKeyboardView extends LinearLayout {
         //mListView.invalidateItemDecorations();
     }
 
+    /**
+     * 显示剪贴板视图。
+     * 加载剪贴板数据并滚动到顶部。
+     */
     public void show() {
         if (mListView.isComputingLayout()) {
             // 如果正在布局，延迟一帧更新，防止冲突
@@ -237,6 +273,10 @@ public class ClipboardKeyboardView extends LinearLayout {
     }
 
 
+    /**
+     * 显示常用语视图。
+     * 加载常用语数据并滚动到顶部。
+     */
     public void showPhrase() {
         if (mListView.isComputingLayout()) {
             // 如果正在布局，延迟一帧更新，防止冲突

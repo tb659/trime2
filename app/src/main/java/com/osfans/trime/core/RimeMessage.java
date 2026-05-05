@@ -5,44 +5,77 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Abstract base class for all Rime messages, replacing the Kotlin sealed class.
+ * 所有 Rime 消息的抽象基类,替换 Kotlin 的 sealed class。
  *
- * @param <T> The type of data carried by this message.
+ * @param <T> 此消息携带的数据类型。
  */
 public abstract class RimeMessage<T> {
 
-    // Abstract field for data (replaces Kotlin's open val data)
+    // ==================== 成员变量 ====================
+    // 抽象字段用于数据(替换 Kotlin 的 open val data)
+    /** 消息携带的数据 */
     public final T data;
 
-    // Abstract field for messageType
+    /** 消息类型(抽象方法) */
     public abstract MessageType getMessageType();
 
+    /**
+     * 构造函数。
+     *
+     * @param data 消息数据。
+     */
     public RimeMessage(T data) {
         this.data = data;
     }
 
+    /**
+     * 获取消息数据。
+     *
+     * @return 消息数据。
+     */
     public T getData(){
         return this.data;
     }
 
-    // --- Message Type Enum ---
+    // --- 消息类型枚举 ---
 
+    /**
+     * Rime 消息类型枚举。
+     */
     public enum MessageType {
+        /** 未知消息 */
         Unknown,
+        /** 方案消息 */
         Schema,
+        /** 选项消息 */
         Option,
+        /** 部署消息 */
         Deploy,
+        /** 提交消息 */
         Commit,
+        /** 编码区消息 */
         Composition,
+        /** 候选词菜单消息 */
         Menu,
+        /** 状态消息 */
         Status,
+        /** 候选词消息 */
         Candidate,
+        /** 按键消息 */
         Key,
     }
 
-    // --- Nested Message Classes (Replacing Kotlin Data Classes) ---
+    // --- 嵌套消息类(替换 Kotlin 数据类) ---
 
+    /**
+     * 未知消息类。
+     */
     public static final class UnknownMessage extends RimeMessage<Object[]> {
+        /**
+         * 构造函数。
+         *
+         * @param data 消息数据数组。
+         */
         public UnknownMessage(Object[] data) {
             super(data);
         }
@@ -52,6 +85,13 @@ public abstract class RimeMessage<T> {
             return MessageType.Unknown;
         }
 
+        /**
+         * 比较两个未知消息是否相等。
+         * 使用 Arrays.equals 进行内容比较。
+         *
+         * @param o 要比较的对象。
+         * @return true 表示相等。
+         */
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -61,14 +101,28 @@ public abstract class RimeMessage<T> {
             return Arrays.equals(data, that.data);
         }
 
+        /**
+         * 计算哈希码。
+         * 使用 Arrays.hashCode 进行内容哈希。
+         *
+         * @return 哈希码值。
+         */
         @Override
         public int hashCode() {
-            // Use Arrays.hashCode for content hash
+            // 使用 Arrays.hashCode 进行内容哈希
             return Arrays.hashCode(data);
         }
     }
 
+    /**
+     * 方案消息类。
+     */
     public static final class SchemaMessage extends RimeMessage<SchemaItem> {
+        /**
+         * 构造函数。
+         *
+         * @param data 方案项数据。
+         */
         public SchemaMessage(SchemaItem data) {
             super(data);
         }
@@ -84,7 +138,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 选项消息类。
+     */
     public static final class OptionMessage extends RimeMessage<OptionMessage.Data> {
+        /**
+         * 构造函数。
+         *
+         * @param data 选项数据。
+         */
         public OptionMessage(OptionMessage.Data data) {
             super(data);
         }
@@ -94,10 +156,21 @@ public abstract class RimeMessage<T> {
             return MessageType.Option;
         }
 
+        /**
+         * 选项数据类。
+         */
         public static final class Data {
+            /** 选项名称 */
             private final String option;
+            /** 选项值 */
             private final boolean value;
 
+            /**
+             * 构造函数。
+             *
+             * @param option 选项名称。
+             * @param value 选项值。
+             */
             public Data(String option, boolean value) {
                 this.option = option;
                 this.value = value;
@@ -136,7 +209,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 部署消息类。
+     */
     public static final class DeployMessage extends RimeMessage<DeployMessage.State> {
+        /**
+         * 构造函数。
+         *
+         * @param data 部署状态数据。
+         */
         public DeployMessage(DeployMessage.State data) {
             super(data);
         }
@@ -158,7 +239,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 提交文本消息类。
+     */
     public static final class CommitTextMessage extends RimeMessage<RimeProto.Commit> {
+        /**
+         * 构造函数。
+         *
+         * @param data 提交数据。
+         */
         public CommitTextMessage(RimeProto.Commit data) {
             super(data);
         }
@@ -169,7 +258,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 编码区消息类。
+     */
     public static final class CompositionMessage extends RimeMessage<RimeProto.Context.Composition> {
+        /**
+         * 构造函数。
+         *
+         * @param data 编码区数据。
+         */
         public CompositionMessage(RimeProto.Context.Composition data) {
             super(data);
         }
@@ -180,7 +277,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 候选词菜单消息类。
+     */
     public static final class CandidateMenuMessage extends RimeMessage<RimeProto.Context.Menu> {
+        /**
+         * 构造函数。
+         *
+         * @param data 菜单数据。
+         */
         public CandidateMenuMessage(RimeProto.Context.Menu data) {
             super(data);
         }
@@ -191,7 +296,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 状态消息类。
+     */
     public static final class StatusMessage extends RimeMessage<RimeProto.Status> {
+        /**
+         * 构造函数。
+         *
+         * @param data 状态数据。
+         */
         public StatusMessage(RimeProto.Status data) {
             super(data);
         }
@@ -202,7 +315,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 候选词列表消息类。
+     */
     public static final class CandidateListMessage extends RimeMessage<CandidateListMessage.Data> {
+        /**
+         * 构造函数。
+         *
+         * @param data 候选词列表数据。
+         */
         public CandidateListMessage(CandidateListMessage.Data data) {
             super(data);
         }
@@ -212,10 +333,21 @@ public abstract class RimeMessage<T> {
             return MessageType.Candidate;
         }
 
+        /**
+         * 候选词列表数据类。
+         */
         public static final class Data {
+            /** 候选词总数 */
             private final int total;
+            /** 候选词数组 */
             private final CandidateItem[] candidates;
 
+            /**
+             * 构造函数。
+             *
+             * @param total 候选词总数。
+             * @param candidates 候选词数组。
+             */
             public Data(int total, CandidateItem[] candidates) {
                 this.total = total;
                 this.candidates = candidates;
@@ -258,7 +390,15 @@ public abstract class RimeMessage<T> {
         }
     }
 
+    /**
+     * 按键消息类。
+     */
     public static final class KeyMessage extends RimeMessage<KeyMessage.Data> {
+        /**
+         * 构造函数。
+         *
+         * @param data 按键数据。
+         */
         public KeyMessage(KeyMessage.Data data) {
             super(data);
         }
@@ -268,11 +408,24 @@ public abstract class RimeMessage<T> {
             return MessageType.Key;
         }
 
+        /**
+         * 按键数据类。
+         */
         public static final class Data {
+            /** 键值 */
             private final KeyValue value;
+            /** 键修饰符 */
             private final KeyModifiers modifiers;
+            /** 是否为虚拟键 */
             private final boolean isVirtual;
 
+            /**
+             * 构造函数。
+             *
+             * @param value 键值。
+             * @param modifiers 键修饰符。
+             * @param isVirtual 是否为虚拟键。
+             */
             public Data(KeyValue value, KeyModifiers modifiers, boolean isVirtual) {
                 this.value = value;
                 this.modifiers = modifiers;
@@ -309,18 +462,19 @@ public abstract class RimeMessage<T> {
         }
     }
 
-    // --- Static Factory Methods (Replacing Kotlin Companion Object) ---
+    // --- 静态工厂方法(替换 Kotlin 伴生对象) ---
 
+    /** 消息类型数组 */
     private static final MessageType[] TYPES = MessageType.values();
 
     /**
-     * Factory method to create a RimeMessage from native parameters.
-     * This method is typically called from JNI.
+     * 工厂方法,从原生参数创建 RimeMessage。
+     * 此方法通常从 JNI 调用。
      *
-     * @param type The ordinal (int) of the MessageType.
-     * @param params An array of parameters from the native side.
-     * @return The constructed RimeMessage instance.
-     * @throws IllegalArgumentException if the type ordinal is invalid.
+     * @param type MessageType 的序数(int)。
+     * @param params 来自原生端的参数数组。
+     * @return 构造的 RimeMessage 实例。
+     * @throws IllegalArgumentException 如果类型序数无效。
      */
     public static RimeMessage<?> nativeCreate(
             int type,
@@ -388,11 +542,11 @@ public abstract class RimeMessage<T> {
     }
 
     /**
-     * Factory method to create a RimeMessage from a known MessageType and parameters.
+     * 工厂方法,从已知的 MessageType 和参数创建 RimeMessage。
      *
-     * @param type The specific message type.
-     * @param params An array of parameters matching the required message structure.
-     * @return The constructed RimeMessage instance.
+     * @param type 特定的消息类型。
+     * @param params 匹配所需消息结构的参数数组。
+     * @return 构造的 RimeMessage 实例。
      */
     public static RimeMessage<?> create(
             MessageType type,

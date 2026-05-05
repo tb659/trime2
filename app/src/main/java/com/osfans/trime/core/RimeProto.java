@@ -4,18 +4,26 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Rime protocol data classes, replacing the Kotlin data classes.
- *
- * This class serves as a container for all protocol-related data structures
- * used for communication with the Rime engine.
+ * Rime 协议数据类,替换 Kotlin 数据类。
+ * 此类作为所有协议相关数据结构的容器,
+ * 用于与 Rime 引擎通信。
  */
 public final class RimeProto {
 
-    // --- Commit Data Class ---
+    // --- Commit 数据类 ---
 
+    /**
+     * 提交数据类。
+     */
     public static final class Commit {
+        /** 提交文本 */
         private final String text;
 
+        /**
+         * 构造函数。
+         *
+         * @param text 提交文本。
+         */
         public Commit(String text) {
             this.text = text;
         }
@@ -43,13 +51,26 @@ public final class RimeProto {
         }
     }
 
-    // --- Candidate Data Class ---
+    // --- Candidate 数据类 ---
 
+    /**
+     * 候选词数据类。
+     */
     public static final class Candidate {
+        /** 候选词文本 */
         private final String text;
+        /** 候选词注释 */
         private final String comment;
+        /** 候选词标签 */
         private final String label;
 
+        /**
+         * 构造函数。
+         *
+         * @param text 候选词文本。
+         * @param comment 候选词注释。
+         * @param label 候选词标签。
+         */
         public Candidate(String text, String comment, String label) {
             this.text = text;
             this.comment = comment;
@@ -89,15 +110,24 @@ public final class RimeProto {
         }
     }
 
-    // --- Context Data Class ---
+    // --- Context 数据类 ---
 
+    /**
+     * 上下文数据类。
+     */
     public static final class Context {
+        /** 编码区组合 */
         private final Composition composition;
+        /** 候选词菜单 */
         private final Menu menu;
+        /** 输入文本 */
         private final String input;
+        /** 光标位置 */
         private final int caretPos;
 
-        // Default constructor matching Kotlin's default arguments
+        /**
+         * 默认构造函数(匹配 Kotlin 的默认参数)。
+         */
         public Context() {
             this(new Composition(), new Menu(), "", 0);
         }
@@ -146,17 +176,28 @@ public final class RimeProto {
             return "Context(composition=" + composition + ", menu=" + menu + ", input='" + input + "', caretPos=" + caretPos + ")";
         }
 
-        // --- Context.Composition Data Class ---
+        // --- Context.Composition 数据类 ---
 
+        /**
+         * 编码区组合数据类。
+         */
         public static final class Composition {
+            /** 长度 */
             private final int length;
+            /** 光标位置 */
             private final int cursorPos;
+            /** 选择起始位置 */
             private final int selStart;
+            /** 选择结束位置 */
             private final int selEnd;
+            /** 预编辑文本 */
             private final String preedit;
+            /** 提交文本预览 */
             private final String commitTextPreview;
 
-            // Full constructor matching Kotlin's primary constructor with defaults
+            /**
+             * 默认构造函数(匹配 Kotlin 的主构造函数,带默认值)。
+             */
             public Composition() {
                 this(0, 0, 0, 0, null, null);
             }
@@ -230,18 +271,30 @@ public final class RimeProto {
             }
         }
 
-        // --- Context.Menu Data Class ---
+        // --- Context.Menu 数据类 ---
 
+        /**
+         * 菜单数据类。
+         */
         public static final class Menu {
+            /** 每页大小 */
             private final int pageSize;
+            /** 页码 */
             private final int pageNumber;
+            /** 是否为最后一页 */
             private final boolean isLastPage;
+            /** 高亮候选词索引 */
             private final int highlightedCandidateIndex;
+            /** 候选词数组 */
             private final Candidate[] candidates;
+            /** 选择键 */
             private final String selectKeys;
+            /** 选择标签数组 */
             private final String[] selectLabels;
 
-            // Full constructor matching Kotlin's primary constructor with defaults
+            /**
+             * 默认构造函数(匹配 Kotlin 的主构造函数,带默认值)。
+             */
             public Menu() {
                 this(0, 0, false, 0, new Candidate[0], null, new String[0]);
             }
@@ -315,20 +368,34 @@ public final class RimeProto {
         }
     }
 
-    // --- Status Data Class ---
+    // --- Status 数据类 ---
 
+    /**
+     * 状态数据类。
+     */
     public static final class Status {
+        /** 方案 ID */
         private final String schemaId;
+        /** 方案名称 */
         private final String schemaName;
+        /** 是否禁用 */
         private final boolean isDisabled;
+        /** 是否正在编码 */
         private final boolean isComposing;
+        /** 是否为 ASCII 模式 */
         private final boolean isAsciiMode;
+        /** 是否为全角 */
         private final boolean isFullShape;
+        /** 是否为简体 */
         private final boolean isSimplified;
+        /** 是否为繁体 */
         private final boolean isTraditional;
+        /** 是否为 ASCII 标点 */
         private final boolean isAsciiPunch;
 
-        // Full constructor matching Kotlin's primary constructor with defaults
+        /**
+         * 默认构造函数(匹配 Kotlin 的主构造函数,带默认值)。
+         */
         public Status() {
             this("", "", true, false, true, false, false, false, true);
         }

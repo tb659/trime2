@@ -25,11 +25,25 @@ import com.osfans.trime.core.SchemaItem;
 import java.io.File;
 import java.util.Arrays;
 
+/**
+ * 方案组管理对话框。
+ * 用于选择、创建和管理 Rime 输入法方案组,支持新建方案组和切换当前方案组。
+ */
 public class SchemaGroupDialog {
+    // ==================== 成员变量 ====================
+    /** 对话框实例 */
     private AlertDialog mDig;
+    /** 是否需要更新 Rime 选项 */
     private boolean mNeedUpdateRimeOption;
+    /** 窗口 Token(用于依附于输入法窗口) */
     private IBinder mToken;
 
+    /**
+     * 构造函数。
+     * 加载所有方案组,显示单选对话框供用户选择,支持新建方案组。
+     *
+     * @param context 上下文。
+     */
     public SchemaGroupDialog(Context context) {
         //if (TrimeService.getInstance() == null) {
         //    Toast.makeText(context, "请先启用输入法", Toast.LENGTH_SHORT).show();
@@ -99,13 +113,21 @@ public class SchemaGroupDialog {
         mDig = builder.create();
     }
 
-
+    /**
+     * 显示对话框(无 Token)。
+     */
     public void show() {
         if(mDig==null)
             return;
         mDig.show();
     }
 
+    /**
+     * 显示对话框(带 Token,依附于输入法窗口)。
+     * 设置对话框类型为 TYPE_APPLICATION_ATTACHED_DIALOG,使其能依附于输入法窗口显示。
+     *
+     * @param token 窗口 Token。
+     */
     public void show(IBinder token) {
         if(mDig==null)
             return;

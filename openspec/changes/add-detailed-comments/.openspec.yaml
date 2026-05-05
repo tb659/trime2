@@ -1,0 +1,6 @@
+name: add-detailed-comments
+title: 为 com/osfans/trime 包添加详细注释
+description: 针对 com/osfans/trime 包目录及嵌套目录内的所有 Java/Kotlin 文件按顺序逐个文件添加详细的注释，尽量做到每行都有注释，如果之前有繁体注释，需要改为中文简体注释。
+status: draft
+created: 2026-05-03
+schema: default

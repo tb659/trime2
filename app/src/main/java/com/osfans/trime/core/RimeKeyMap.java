@@ -2,149 +2,182 @@ package com.osfans.trime.core;
 
 import android.view.KeyEvent;
 
+/**
+ * Rime 键值映射类。
+ * 提供 Rime 键值与 Android KeyEvent 之间的双向映射,
+ * 以及键值与字符串名称之间的转换。
+ */
 public final class RimeKeyMap {
 
-    // 私有构造函数防止实例化
+    /** 私有构造函数防止实例化 */
     private RimeKeyMap() {}
 
-    // 1. 常量定义
-    public static final int RimeKey_space = 0x0020;
-    public static final int RimeKey_numbersign = 0x0023;
-    public static final int RimeKey_apostrophe = 0x0027;
-    public static final int RimeKey_asterisk = 0x002a;
-    public static final int RimeKey_plus = 0x002b;
-    public static final int RimeKey_comma = 0x002c;
-    public static final int RimeKey_minus = 0x002d;
-    public static final int static_final_int_RimeKey_period = 0x002e;
-    public static final int RimeKey_period = 0x002e;
-    public static final int RimeKey_slash = 0x002f;
-    public static final int RimeKey_0 = 0x0030;
-    public static final int RimeKey_1 = 0x0031;
-    public static final int RimeKey_2 = 0x0032;
-    public static final int RimeKey_3 = 0x0033;
-    public static final int RimeKey_4 = 0x0034;
-    public static final int RimeKey_5 = 0x0035;
-    public static final int RimeKey_6 = 0x0036;
-    public static final int RimeKey_7 = 0x0037;
-    public static final int RimeKey_8 = 0x0038;
-    public static final int RimeKey_9 = 0x0039;
-    public static final int RimeKey_semicolon = 0x003b;
-    public static final int RimeKey_equal = 0x003d;
-    public static final int RimeKey_at = 0x0040;
-    public static final int RimeKey_A = 0x0041;
-    public static final int RimeKey_B = 0x0042;
-    public static final int RimeKey_C = 0x0043;
-    public static final int RimeKey_D = 0x0044;
-    public static final int RimeKey_E = 0x0045;
-    public static final int RimeKey_F = 0x0046;
-    public static final int RimeKey_G = 0x0047;
-    public static final int RimeKey_H = 0x0048;
-    public static final int RimeKey_I = 0x0049;
-    public static final int RimeKey_J = 0x004a;
-    public static final int RimeKey_K = 0x004b;
-    public static final int RimeKey_L = 0x004c;
-    public static final int RimeKey_M = 0x004d;
-    public static final int RimeKey_N = 0x004e;
-    public static final int RimeKey_O = 0x004f;
-    public static final int RimeKey_P = 0x0050;
-    public static final int RimeKey_Q = 0x0051;
-    public static final int RimeKey_R = 0x0052;
-    public static final int RimeKey_S = 0x0053;
-    public static final int RimeKey_T = 0x0054;
-    public static final int RimeKey_U = 0x0055;
-    public static final int RimeKey_V = 0x0056;
-    public static final int RimeKey_W = 0x0057;
-    public static final int RimeKey_X = 0x0058;
-    public static final int RimeKey_Y = 0x0059;
-    public static final int RimeKey_Z = 0x005a;
-    public static final int RimeKey_bracketleft = 0x005b;
-    public static final int RimeKey_backslash = 0x005c;
-    public static final int RimeKey_bracketright = 0x005d;
-    public static final int RimeKey_grave = 0x0060;
-    public static final int RimeKey_a = 0x0061;
-    public static final int RimeKey_b = 0x0062;
-    public static final int RimeKey_c = 0x0063;
-    public static final int RimeKey_d = 0x0064;
-    public static final int RimeKey_e = 0x0065;
-    public static final int RimeKey_f = 0x0066;
-    public static final int RimeKey_g = 0x0067;
-    public static final int RimeKey_h = 0x0068;
-    public static final int RimeKey_i = 0x0069;
-    public static final int RimeKey_j = 0x006a;
-    public static final int RimeKey_k = 0x006b;
-    public static final int RimeKey_l = 0x006c;
-    public static final int RimeKey_m = 0x006d;
-    public static final int RimeKey_n = 0x006e;
-    public static final int RimeKey_o = 0x006f;
-    public static final int RimeKey_p = 0x0070;
-    public static final int RimeKey_q = 0x0071;
-    public static final int RimeKey_r = 0x0072;
-    public static final int RimeKey_s = 0x0073;
-    public static final int RimeKey_t = 0x0074;
-    public static final int RimeKey_u = 0x0075;
-    public static final int RimeKey_v = 0x0076;
-    public static final int RimeKey_w = 0x0077;
-    public static final int RimeKey_x = 0x0078;
-    public static final int RimeKey_y = 0x0079;
-    public static final int RimeKey_z = 0x007a;
-    public static final int RimeKey_F1 = 0xffbe;
-    public static final int RimeKey_F2 = 0xffbf;
-    public static final int RimeKey_F3 = 0xffc0;
-    public static final int RimeKey_F4 = 0xffc1;
-    public static final int RimeKey_F5 = 0xffc2;
-    public static final int RimeKey_F6 = 0xffc3;
-    public static final int RimeKey_F7 = 0xffc4;
-    public static final int RimeKey_F8 = 0xffc5;
-    public static final int RimeKey_F9 = 0xffc6;
-    public static final int RimeKey_F10 = 0xffc7;
-    public static final int RimeKey_F11 = 0xffc8;
-    public static final int RimeKey_F12 = 0xffc9;
-    public static final int RimeKey_Shift_L = 0xffe1;
-    public static final int RimeKey_Shift_R = 0xffe2;
-    public static final int RimeKey_Control_L = 0xffe3;
-    public static final int RimeKey_Control_R = 0xffe4;
-    public static final int RimeKey_Caps_Lock = 0xffe5;
-    public static final int RimeKey_Meta_L = 0xffe7;
-    public static final int RimeKey_Meta_R = 0xffe8;
-    public static final int RimeKey_Alt_L = 0xffe9;
-    public static final int RimeKey_Alt_R = 0xffea;
-    public static final int RimeKey_Insert = 0xff63;
-    public static final int RimeKey_Delete = 0xffff;
-    public static final int RimeKey_Home = 0xff50;
-    public static final int RimeKey_End = 0xff57;
-    public static final int RimeKey_Page_Down = 0xff56;
-    public static final int RimeKey_Page_Up = 0xff55;
-    public static final int RimeKey_Tab = 0xff09;
-    public static final int RimeKey_BackSpace = 0xff08;
-    public static final int RimeKey_Return = 0xff0d;
-    public static final int RimeKey_Escape = 0xff1b;
-    public static final int RimeKey_Up = 0xff52;
-    public static final int RimeKey_Down = 0xff54;
-    public static final int RimeKey_Left = 0xff51;
-    public static final int RimeKey_Right = 0xff53;
-    public static final int RimeKey_KP_Divide = 0xffaf;
-    public static final int RimeKey_KP_Multiply = 0xffaa;
-    public static final int RimeKey_KP_Subtract = 0xffad;
-    public static final int RimeKey_KP_7 = 0xffb7;
-    public static final int RimeKey_KP_8 = 0xffb8;
-    public static final int RimeKey_KP_9 = 0xffb9;
-    public static final int RimeKey_KP_Add = 0xffab;
-    public static final int RimeKey_KP_4 = 0xffb4;
-    public static final int RimeKey_KP_5 = 0xffb5;
-    public static final int RimeKey_KP_6 = 0xffb6;
-    public static final int RimeKey_KP_1 = 0xffb1;
-    public static final int RimeKey_KP_2 = 0xffb2;
-    public static final int RimeKey_KP_3 = 0xffb3;
-    public static final int RimeKey_KP_Enter = 0xff8d;
-    public static final int RimeKey_KP_0 = 0xffb0;
-    public static final int RimeKey_KP_Decimal = 0xffae;
-    public static final int RimeKey_Eisu_toggle = 0xff30;
-    public static final int RimeKey_Kana_Lock = 0xff2d;
-    public static final int RimeKey_Hiragana_Katakana = 0xff27;
-    public static final int RimeKey_Zenkaku_Hankaku = 0xff2a;
-    public static final int RimeKey_VoidSymbol = 0xffffff;
+    // ==================== 常量定义 ====================
+    
+    // --- 特殊字符键 ---
+    public static final int RimeKey_space = 0x0020; // 空格键
+    public static final int RimeKey_numbersign = 0x0023; // # 号键
+    public static final int RimeKey_apostrophe = 0x0027; // 单引号键
+    public static final int RimeKey_asterisk = 0x002a; // * 号键
+    public static final int RimeKey_plus = 0x002b; // + 号键
+    public static final int RimeKey_comma = 0x002c; // 逗号键
+    public static final int RimeKey_minus = 0x002d; // 减号键
+    public static final int static_final_int_RimeKey_period = 0x002e; // 句号键(重复定义)
+    public static final int RimeKey_period = 0x002e; // 句号键
+    public static final int RimeKey_slash = 0x002f; // 斜杠键
+    
+    // --- 数字键 ---
+    public static final int RimeKey_0 = 0x0030; // 数字0
+    public static final int RimeKey_1 = 0x0031; // 数字1
+    public static final int RimeKey_2 = 0x0032; // 数字2
+    public static final int RimeKey_3 = 0x0033; // 数字3
+    public static final int RimeKey_4 = 0x0034; // 数字4
+    public static final int RimeKey_5 = 0x0035; // 数字5
+    public static final int RimeKey_6 = 0x0036; // 数字6
+    public static final int RimeKey_7 = 0x0037; // 数字7
+    public static final int RimeKey_8 = 0x0038; // 数字8
+    public static final int RimeKey_9 = 0x0039; // 数字9
+    
+    // --- 符号键 ---
+    public static final int RimeKey_semicolon = 0x003b; // 分号键
+    public static final int RimeKey_equal = 0x003d; // 等号键
+    public static final int RimeKey_at = 0x0040; // @ 符号键
+    
+    // --- 大写字母键 ---
+    public static final int RimeKey_A = 0x0041; // 字母A
+    public static final int RimeKey_B = 0x0042; // 字母B
+    public static final int RimeKey_C = 0x0043; // 字母C
+    public static final int RimeKey_D = 0x0044; // 字母D
+    public static final int RimeKey_E = 0x0045; // 字母E
+    public static final int RimeKey_F = 0x0046; // 字母F
+    public static final int RimeKey_G = 0x0047; // 字母G
+    public static final int RimeKey_H = 0x0048; // 字母H
+    public static final int RimeKey_I = 0x0049; // 字母I
+    public static final int RimeKey_J = 0x004a; // 字母J
+    public static final int RimeKey_K = 0x004b; // 字母K
+    public static final int RimeKey_L = 0x004c; // 字母L
+    public static final int RimeKey_M = 0x004d; // 字母M
+    public static final int RimeKey_N = 0x004e; // 字母N
+    public static final int RimeKey_O = 0x004f; // 字母O
+    public static final int RimeKey_P = 0x0050; // 字母P
+    public static final int RimeKey_Q = 0x0051; // 字母Q
+    public static final int RimeKey_R = 0x0052; // 字母R
+    public static final int RimeKey_S = 0x0053; // 字母S
+    public static final int RimeKey_T = 0x0054; // 字母T
+    public static final int RimeKey_U = 0x0055; // 字母U
+    public static final int RimeKey_V = 0x0056; // 字母V
+    public static final int RimeKey_W = 0x0057; // 字母W
+    public static final int RimeKey_X = 0x0058; // 字母X
+    public static final int RimeKey_Y = 0x0059; // 字母Y
+    public static final int RimeKey_Z = 0x005a; // 字母Z
+    
+    // --- 括号和反引号键 ---
+    public static final int RimeKey_bracketleft = 0x005b; // 左方括号 [
+    public static final int RimeKey_backslash = 0x005c; // 反斜杠 \
+    public static final int RimeKey_bracketright = 0x005d; // 右方括号 ]
+    public static final int RimeKey_grave = 0x0060; // 反引号 `
+    
+    // --- 小写字母键 ---
+    public static final int RimeKey_a = 0x0061; // 字母a
+    public static final int RimeKey_b = 0x0062; // 字母b
+    public static final int RimeKey_c = 0x0063; // 字母c
+    public static final int RimeKey_d = 0x0064; // 字母d
+    public static final int RimeKey_e = 0x0065; // 字母e
+    public static final int RimeKey_f = 0x0066; // 字母f
+    public static final int RimeKey_g = 0x0067; // 字母g
+    public static final int RimeKey_h = 0x0068; // 字母h
+    public static final int RimeKey_i = 0x0069; // 字母i
+    public static final int RimeKey_j = 0x006a; // 字母j
+    public static final int RimeKey_k = 0x006b; // 字母k
+    public static final int RimeKey_l = 0x006c; // 字母l
+    public static final int RimeKey_m = 0x006d; // 字母m
+    public static final int RimeKey_n = 0x006e; // 字母n
+    public static final int RimeKey_o = 0x006f; // 字母o
+    public static final int RimeKey_p = 0x0070; // 字母p
+    public static final int RimeKey_q = 0x0071; // 字母q
+    public static final int RimeKey_r = 0x0072; // 字母r
+    public static final int RimeKey_s = 0x0073; // 字母s
+    public static final int RimeKey_t = 0x0074; // 字母t
+    public static final int RimeKey_u = 0x0075; // 字母u
+    public static final int RimeKey_v = 0x0076; // 字母v
+    public static final int RimeKey_w = 0x0077; // 字母w
+    public static final int RimeKey_x = 0x0078; // 字母x
+    public static final int RimeKey_y = 0x0079; // 字母y
+    public static final int RimeKey_z = 0x007a; // 字母z
+    // --- 功能键 F1-F12 ---
+    public static final int RimeKey_F1 = 0xffbe; // F1功能键
+    public static final int RimeKey_F2 = 0xffbf; // F2功能键
+    public static final int RimeKey_F3 = 0xffc0; // F3功能键
+    public static final int RimeKey_F4 = 0xffc1; // F4功能键
+    public static final int RimeKey_F5 = 0xffc2; // F5功能键
+    public static final int RimeKey_F6 = 0xffc3; // F6功能键
+    public static final int RimeKey_F7 = 0xffc4; // F7功能键
+    public static final int RimeKey_F8 = 0xffc5; // F8功能键
+    public static final int RimeKey_F9 = 0xffc6; // F9功能键
+    public static final int RimeKey_F10 = 0xffc7; // F10功能键
+    public static final int RimeKey_F11 = 0xffc8; // F11功能键
+    public static final int RimeKey_F12 = 0xffc9; // F12功能键
+    
+    // --- 修饰键(Shift、Control、Caps Lock、Meta、Alt) ---
+    public static final int RimeKey_Shift_L = 0xffe1; // 左Shift键
+    public static final int RimeKey_Shift_R = 0xffe2; // 右Shift键
+    public static final int RimeKey_Control_L = 0xffe3; // 左Control键
+    public static final int RimeKey_Control_R = 0xffe4; // 右Control键
+    public static final int RimeKey_Caps_Lock = 0xffe5; // Caps Lock大写锁定键
+    public static final int RimeKey_Meta_L = 0xffe7; // 左Meta键
+    public static final int RimeKey_Meta_R = 0xffe8; // 右Meta键
+    public static final int RimeKey_Alt_L = 0xffe9; // 左Alt键
+    public static final int RimeKey_Alt_R = 0xffea; // 右Alt键
+    
+    // --- 编辑和导航键 ---
+    public static final int RimeKey_Insert = 0xff63; // Insert插入键
+    public static final int RimeKey_Delete = 0xffff; // Delete删除键
+    public static final int RimeKey_Home = 0xff50; // Home键(行首)
+    public static final int RimeKey_End = 0xff57; // End键(行尾)
+    public static final int RimeKey_Page_Down = 0xff56; // Page Down下翻页键
+    public static final int RimeKey_Page_Up = 0xff55; // Page Up上翻页键
+    public static final int RimeKey_Tab = 0xff09; // Tab制表键
+    public static final int RimeKey_BackSpace = 0xff08; // BackSpace退格键
+    public static final int RimeKey_Return = 0xff0d; // Return回车键
+    public static final int RimeKey_Escape = 0xff1b; // Escape退出键
+    public static final int RimeKey_Up = 0xff52; // 向上方向键
+    public static final int RimeKey_Down = 0xff54; // 向下方向键
+    public static final int RimeKey_Left = 0xff51; // 向左方向键
+    public static final int RimeKey_Right = 0xff53; // 向右方向键
+    
+    // --- 小键盘键 ---
+    public static final int RimeKey_KP_Divide = 0xffaf; // 小键盘除号键 /
+    public static final int RimeKey_KP_Multiply = 0xffaa; // 小键盘乘号键 *
+    public static final int RimeKey_KP_Subtract = 0xffad; // 小键盘减号键 -
+    public static final int RimeKey_KP_7 = 0xffb7; // 小键盘数字7
+    public static final int RimeKey_KP_8 = 0xffb8; // 小键盘数字8
+    public static final int RimeKey_KP_9 = 0xffb9; // 小键盘数字9
+    public static final int RimeKey_KP_Add = 0xffab; // 小键盘加号键 +
+    public static final int RimeKey_KP_4 = 0xffb4; // 小键盘数字4
+    public static final int RimeKey_KP_5 = 0xffb5; // 小键盘数字5
+    public static final int RimeKey_KP_6 = 0xffb6; // 小键盘数字6
+    public static final int RimeKey_KP_1 = 0xffb1; // 小键盘数字1
+    public static final int RimeKey_KP_2 = 0xffb2; // 小键盘数字2
+    public static final int RimeKey_KP_3 = 0xffb3; // 小键盘数字3
+    public static final int RimeKey_KP_Enter = 0xff8d; // 小键盘回车键
+    public static final int RimeKey_KP_0 = 0xffb0; // 小键盘数字0
+    public static final int RimeKey_KP_Decimal = 0xffae; // 小键盘小数点键 .
+    
+    // --- 日语输入相关键 ---
+    public static final int RimeKey_Eisu_toggle = 0xff30; // 英数切换键(日语输入法)
+    public static final int RimeKey_Kana_Lock = 0xff2d; // 假名锁定键(日语输入法)
+    public static final int RimeKey_Hiragana_Katakana = 0xff27; // 平假名/片假名切换键
+    public static final int RimeKey_Zenkaku_Hankaku = 0xff2a; // 全角/半角切换键
+    public static final int RimeKey_VoidSymbol = 0xffffff; // 无效符号(空值)
 
-    // 2. 方法定义
+    // ==================== 方法定义 ====================
+
+    /**
+     * 将 Rime 键值转换为 Android KeyEvent 键码。
+     *
+     * @param val Rime 键值(X11 keysym 标准)。
+     * @return 对应的 Android KeyEvent 键码,未知键返回 KEYCODE_UNKNOWN。
+     */
     public static int valToKeyCode(int val) {
         switch (val) {
             case RimeKey_space: return KeyEvent.KEYCODE_SPACE;
@@ -285,6 +318,13 @@ public final class RimeKeyMap {
         }
     }
 
+    /**
+     * 将 Android KeyEvent 键码转换为 Rime 键值。
+     *
+     * @param code Android KeyEvent 键码。
+     * @return 对应的 Rime 键值,未知键返回 RimeKey_VoidSymbol。
+     * @note 字母键统一映射到小写 rime key。
+     */
     public static int keyCodeToVal(int code) {
         switch (code) {
             case KeyEvent.KEYCODE_SPACE: return RimeKey_space;
@@ -399,6 +439,12 @@ public final class RimeKeyMap {
         }
     }
 
+    /**
+     * 将字符串名称转换为 Rime 键值。
+     *
+     * @param name 键的字符串名称(如 "space", "F1", "Shift_L" 等)。
+     * @return 对应的 Rime 键值,未知名称或 null 返回 RimeKey_VoidSymbol。
+     */
     public static int nameToKeyVal(String name) {
         if (name == null) return RimeKey_VoidSymbol;
         switch (name) {
@@ -540,6 +586,12 @@ public final class RimeKeyMap {
         }
     }
 
+    /**
+     * 将 Rime 键值转换为字符串名称。
+     *
+     * @param val Rime 键值。
+     * @return 对应的字符串名称,未知键返回 "VoidSymbol"。
+     */
     public static String keyValToName(int val) {
         switch (val) {
             case RimeKey_space: return "space";

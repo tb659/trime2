@@ -21,15 +21,35 @@ import com.google.android.flexbox.JustifyContent;
 
 import org.luaj.LuaValue;
 
+/**
+ * 列表分页适配器。
+ * 用于 ViewPager,每一页显示一个 RecyclerView,使用 FlexboxLayoutManager 实现流式布局。
+ */
 public class ListPagerAdapter extends RecyclerView.Adapter<ListPagerAdapter.ListViewHolder> {
 
-    private LuaValue mDataMap; // Key: 页面索引, Value: 该页的数据列表
+    // ==================== 成员变量 ====================
+    /** 数据映射表(Lua 值): Key 为页面索引, Value 为该页的数据列表 */
+    private LuaValue mDataMap;
+    /** 当前显示的 RecyclerView */
     private RecyclerView mListView;
 
+    /**
+     * 构造函数。
+     *
+     * @param dataMap Lua 数据映射表。
+     */
     public ListPagerAdapter(LuaValue dataMap) {
         this.mDataMap = dataMap;
     }
 
+    /**
+     * 创建 ViewHolder。
+     * 动态创建一个 RecyclerView 作为 ViewPager 的每一页,使用 FlexboxLayoutManager 实现流式布局。
+     *
+     * @param parent 父视图组。
+     * @param viewType 视图类型。
+     * @return ListViewHolder 实例。
+     */
     @NonNull
     @Override
     public ListViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -64,6 +84,12 @@ public class ListPagerAdapter extends RecyclerView.Adapter<ListPagerAdapter.List
         return new ListViewHolder(recyclerView);
     }
 
+    /**
+     * 绑定数据到 ViewHolder。
+     *
+     * @param holder ViewHolder 实例。
+     * @param position 页面位置。
+     */
     @Override
     public void onBindViewHolder(@NonNull ListViewHolder holder, int position) {
         // 获取当前页面的数据
@@ -74,11 +100,21 @@ public class ListPagerAdapter extends RecyclerView.Adapter<ListPagerAdapter.List
         mListView=holder.recyclerView;
     }
 
+    /**
+     * 获取页面数量。
+     *
+     * @return 页面总数。
+     */
     @Override
     public int getItemCount() {
         return mDataMap.length();
     }
 
+    /**
+     * 获取当前显示的 RecyclerView。
+     *
+     * @return RecyclerView 实例。
+     */
     public RecyclerView getListView() {
         return mListView;
     }

@@ -481,3 +481,5 @@ app/src/main/jni/boost/
 # kotlin
 .kotlin
 
+# opencode
+/.opencode/

@@ -39,37 +39,73 @@ import com.osfans.trime.util.Function;
 
 import java.util.ArrayList;
 
+/**
+ * 根输入视图类，管理输入法的所有 UI 组件。
+ * 包含键盘、候选词栏、编码区、工具栏等核心界面元素。
+ * 支持小屏模式、浮动模式等特殊显示方式。
+ */
 public class RootInputView extends FrameLayout {
 
-    // 2. 成员变量 - UI 根布局与框架
+    // ==================== 成员变量 - UI 根布局与框架 ====================
+    // 根布局容器（水平方向）
     private LinearLayout mRoot;
+    // 输入视图的根布局
     private LinearLayout mInputViewRoot;
+    // 左侧布局（小屏模式用）
     private FrameLayout mLeftLayout;
+    // 右侧布局（小屏模式用）
     private FrameLayout mRightLayout;
+    // 左侧按钮（切换位置）
     private KeyView mLeftButton;
+    // 右侧按钮（切换位置）
     private KeyView mRightButton;
 
-    // 成员变量 - 核心组件视图
+    // ==================== 成员变量 - 核心组件视图 ====================
+    // 候选词视图（普通模式）
     private CandidateView mCandidateView;
+    // 键盘输入视图
     private InputView mInputView;
+    // 扩展候选词视图（全屏模式）
     private ExpandedCandidateView mExpandedCandidateView;
+    // 符号键盘视图
     private SymbolsKeyboardView mSymbolsKeyboardView;
+    // 编码区视图（显示预编辑文本）
     private Composition mPreedit;
+    // 云输入结果显示区
     private TextView mCloud;
+    // 中心布局容器
     private FrameLayout mCenterLayout;
+    // 自定义视图（如 Lua 脚本创建的视图）
     private View mCustomView;
+    // 是否显示提取的候选词视图
     private boolean mShowExtractedCandidatesView;
+    // 主线程 Handler
     private final Handler mHandler = new Handler(Looper.getMainLooper());
+    // 剪贴板键盘视图
     private ClipboardKeyboardView mClipboardKeyboardView;
+    // 候选词起始索引（用于分页）
     private int mStartIdx = 0;
+    // 编码区最小长度过滤条件
     private int mCompositionMinLength;
 
+    /**
+     * 构造函数，创建根输入视图并初始化所有子组件。
+     *
+     * @param context Android 上下文环境。
+     */
     public RootInputView(@NonNull Context context) {
         super(context);
         initView(context);
         //setFitsSystemWindows(false);
     }
 
+    /**
+     * 测量视图尺寸时的异常处理。
+     * 如果测量失败，打印堆栈跟踪信息。
+     *
+     * @param widthMeasureSpec 宽度测量规范。
+     * @param heightMeasureSpec 高度测量规范。
+     */
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         try {
@@ -80,13 +116,23 @@ public class RootInputView extends FrameLayout {
         }
     }
 
+    /**
+     * 初始化根输入视图的所有子组件。
+     * 创建键盘、候选词栏、编码区、工具栏等 UI 元素，并设置布局和事件监听器。
+     * 支持小屏模式和浮动模式的特殊布局。
+     *
+     * @param context Android 上下文环境。
+     */
     @SuppressLint({"ClickableViewAccessibility", "AppCompatCustomView"})
     private void initView(@NonNull Context context) {
+        // 禁用子视图裁剪，允许溢出显示（用于弹出窗口）
         setClipChildren(false);
         setClipToPadding(false);
+        // 从主题配置中读取是否有编码区配置和最小长度过滤条件
         mHasComposition = ThemeManager.getStyle().hasKey("composition");
         mCompositionMinLength = ThemeManager.getStyle().getStyle("composition").getInt("min_length");
 
+        // 初始化各个视图引用为空
         mShowExtractedCandidatesView = false;
         mExpandedCandidateView = null;
         mClipboardKeyboardView = null;
@@ -94,17 +140,20 @@ public class RootInputView extends FrameLayout {
         mSymbolsKeyboardView = null;
         TrimeService trime = TrimeService.getInstance();
 
+        // 创建根布局容器（水平方向）
         mRoot = new LinearLayout(context);
 
         mRoot.setClipChildren(false);
         mRoot.setClipToPadding(false);
         mRoot.setOrientation(LinearLayout.HORIZONTAL);
+        // 如果是小屏模式，创建左右侧布局用于切换位置
         if (Config.isSmallMode()) {
             mLeftLayout = new FrameLayout(context);
             mLeftLayout.setVisibility(View.GONE);
             mRightLayout = new FrameLayout(context);
             mRightLayout.setVisibility(View.GONE);
 
+            // 创建左侧按钮（◀），点击后显示在左侧
             mLeftButton = new KeyView(context, ThemeManager.getStyle().getStyle("toolbar").getKeyStyle());
             mLeftButton.setText("◀");
             mLeftButton.setContentDescription("显示在左侧");
@@ -124,6 +173,7 @@ public class RootInputView extends FrameLayout {
                     return true;
                 }
             });
+            // 左侧按钮触摸事件：长按拖动调整宽度
             mLeftButton.setOnTouchListener(new OnTouchListener() {
                 private float mWidth;
                 private int mLastW;
@@ -158,6 +208,7 @@ public class RootInputView extends FrameLayout {
                 }
             });
 
+            // 创建右侧按钮（▶），点击后显示在右侧
             mRightButton = new KeyView(context, ThemeManager.getStyle().getStyle("toolbar").getKeyStyle());
             mRightButton.setText("▶");
             mRightButton.setContentDescription("显示在右侧");
@@ -178,6 +229,7 @@ public class RootInputView extends FrameLayout {
                     return true;
                 }
             });
+            // 右侧按钮触摸事件：长按拖动调整宽度
             mRightButton.setOnTouchListener(new OnTouchListener() {
                 private float mWidth;
                 private int mLastW;
@@ -214,33 +266,40 @@ public class RootInputView extends FrameLayout {
         }
 
 
+        // 创建中心布局容器，用于放置键盘和候选词栏
         mCenterLayout = new FrameLayout(context);
         mCenterLayout.setClipChildren(false);
         mCenterLayout.setClipToPadding(false);
+        // 根据小屏模式添加左右侧布局和中心布局到根布局
         if (Config.isSmallMode())
             mRoot.addView(mLeftLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ThemeManager.getContentHeight(), 1));
         mRoot.addView(mCenterLayout, new LinearLayout.LayoutParams(trime.getWidth(), ThemeManager.getContentHeight()));
         if (Config.isSmallMode())
             mRoot.addView(mRightLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ThemeManager.getContentHeight(), 1));
 
+        // 创建输入视图的根布局（垂直方向）
         mInputViewRoot = new LinearLayout(context);
         mInputViewRoot.setClipChildren(false);
         mInputViewRoot.setClipToPadding(false);
         mInputViewRoot.setOrientation(LinearLayout.VERTICAL);
         mCenterLayout.addView(mInputViewRoot, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // 创建候选词视图和键盘输入视图
         mCandidateView = new CandidateView(context);
         mInputView = new InputView(context);
         mInputViewRoot.addView(mCandidateView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ThemeManager.getCandidateHeight()));
         mInputViewRoot.addView(mInputView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ThemeManager.getKeyboardHeight()));
+        // 设置根布局的背景
         Style color = ThemeManager.getStyle();
         mRoot.setBackground(color.getBackground(0xffdddddd));
 
+        // 创建编码区视图（显示预编辑文本）
         mPreedit = new Composition(context) {
             @Override
             protected void onSizeChanged(int w, int h, int oldw, int oldh) {
                 super.onSizeChanged(w, h, oldw, oldh);
                 if (isSelected())
                     return;
+                // 根据浮动模式调整编码区位置
                 if (Config.isFloatMode()) {
                     float targetY = mRoot.getY() - mPreedit.getHeight();
                     mPreedit.setTranslationY(targetY);
@@ -252,6 +311,7 @@ public class RootInputView extends FrameLayout {
                 }
             }
         };
+        // 设置编码区的样式（颜色、背景、字体大小、边距）
         Style preeditColor = ThemeManager.getStyle().getStyle("preedit");
         mPreedit.setTextColor(preeditColor.getTextColor(0xffaaaaaa));
         mPreedit.setBackground(preeditColor.getBackground(0xff888888));
@@ -261,6 +321,7 @@ public class RootInputView extends FrameLayout {
         mPreedit.setVisibility(View.INVISIBLE);
         //mPreedit.setText(" ");
 
+        // 创建云输入结果显示区
         mCloud = new TextView(context);
         mCloud.setTextColor(preeditColor.getTextColor(0xffaaaaaa));
         mCloud.setBackground(preeditColor.getBackground(0xff888888));
@@ -268,6 +329,7 @@ public class RootInputView extends FrameLayout {
         mCloud.setPadding(pd, pd, pd, pd);
         mCloud.setVisibility(View.INVISIBLE);
         mCloud.setText(" ");
+        // 将根布局、编码区、云输入添加到视图中
         addView(mRoot, new FrameLayout.LayoutParams(Config.isFloatMode() ? ViewGroup.LayoutParams.WRAP_CONTENT : ViewGroup.LayoutParams.MATCH_PARENT, ThemeManager.getHeight(), Gravity.BOTTOM));
         addView(mPreedit, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT));
         addView(mCloud, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT));
@@ -478,42 +540,78 @@ public class RootInputView extends FrameLayout {
             });
         }
 
+        // 根据 Rime 选项决定是否隐藏候选词栏
         if(Rime.getRimeOption("_hide_candidate"))
             mCandidateView.setVisibility(GONE);
         else
             mCandidateView.setVisibility(VISIBLE);
+        // 根据 Rime 选项决定是否隐藏按键提示和候选词注释
         Config.set_hide_comment(Rime.getRimeOption("_hide_comment"));
         Config.set_hide_key_hint(Rime.getRimeOption("_hide_key_hint"));
 
     }
 
+    /**
+     * 获取根布局视图。
+     *
+     * @return 根布局 LinearLayout 对象。
+     */
     public View getRoot() {
         return mRoot;
     }
 
+    /**
+     * 获取编码区视图。
+     *
+     * @return 编码区 Composition 对象。
+     */
     public View getPreedit() {
         return mPreedit;
     }
 
+    /**
+     * 获取云输入结果显示区。
+     *
+     * @return 云输入 TextView 对象。
+     */
     public TextView getCloud() {
         return mCloud;
     }
 
+    /**
+     * 刷新所有编码区按键的显示状态。
+     */
     public void invalidateComposingKeys() {
         if (mInputView != null)
             mInputView.invalidateComposingKeys();
     }
 
+    /**
+     * 重新加载主题配置，重建所有 UI 组件。
+     *
+     * @param theme 主题名称。
+     */
     public void setTheme(String theme) {
         removeAllViews();
         initView(getContext());
     }
 
+    /**
+     * 重新加载样式配置，重建所有 UI 组件。
+     *
+     * @param theme 样式名称。
+     */
     public void setStyle(String theme) {
         removeAllViews();
         initView(getContext());
     }
 
+    /**
+     * 显示或隐藏自定义视图（如 Lua 脚本创建的视图）。
+     * 如果 keyboardView 为 null，则显示正常的键盘和候选词栏。
+     *
+     * @param keyboardView 自定义视图对象，null 表示恢复正常视图。
+     */
     public void showCustomView(View keyboardView) {
         if (mCustomView != null) {
             mCenterLayout.removeView(mCustomView);
@@ -527,6 +625,12 @@ public class RootInputView extends FrameLayout {
         mInputViewRoot.setVisibility(View.GONE);
     }
 
+    /**
+     * 显示或隐藏提取的候选词视图（全屏模式）。
+     * 切换时会同步候选词数据和索引。
+     *
+     * @param b true 显示全屏候选词视图，false 显示普通候选词栏。
+     */
     public void showExtractedCandidatesView(boolean b) {
         showCustomView(null);
         if (mExpandedCandidateView == null) {
@@ -550,6 +654,11 @@ public class RootInputView extends FrameLayout {
         }
     }
 
+    /**
+     * 显示或隐藏符号键盘视图。
+     *
+     * @param b true 显示符号键盘，false 显示正常键盘。
+     */
     public void showSymbolsView(boolean b) {
         showCustomView(null);
         if (mSymbolsKeyboardView == null) {
@@ -563,22 +672,32 @@ public class RootInputView extends FrameLayout {
         mSymbolsKeyboardView.setVisibility(b ? View.VISIBLE : View.GONE);
     }
 
+    // 候选词更新的 Runnable，用于防抖处理
     private final Runnable mUpdateCandidateRunnable = () -> {
         if (mShowExtractedCandidatesView) mExpandedCandidateView.show();
         else mCandidateView.show(mStartIdx);
     };
 
+    /**
+     * 更新候选词显示。
+     * 使用防抖机制，避免频繁更新导致性能问题。
+     */
     public void updateCandidate() {
         // 必须有延迟（如 10-20ms），才能在 Handler 队列中起到去重效果
         mHandler.removeCallbacks(mUpdateCandidateRunnable);
         mHandler.postDelayed(mUpdateCandidateRunnable, 10);
     }
 
+    // 候选词过滤的 Runnable，用于防抖处理
     private final Runnable mFilterCandidateRunnable = () -> {
         if (mShowExtractedCandidatesView) mExpandedCandidateView.update();
         else mCandidateView.update();
     };
 
+    /**
+     * 过滤候选词显示。
+     * 使用防抖机制，避免频繁更新导致性能问题。
+     */
     public void filterCandidate() {
         // 必须有延迟（如 10-20ms），才能在 Handler 队列中起到去重效果
         mHandler.removeCallbacks(mFilterCandidateRunnable);
@@ -620,6 +739,12 @@ public class RootInputView extends FrameLayout {
         }
     };
 
+    /**
+     * 设置编码区文本。
+     * 使用防抖机制和去重判断，避免频繁更新导致性能问题。
+     *
+     * @param s 预编辑文本字符串。
+     */
     public void setComposingText(String s) {
         // 3. 在非 UI 线程预判：如果内容没变，直接拦截，不向主线程发消息
         if (s == null) s = "";
@@ -662,6 +787,12 @@ public class RootInputView extends FrameLayout {
         }
     };
 
+    /**
+     * 设置云输入结果显示文本。
+     * 使用防抖机制和内容去重判断，避免频繁更新导致性能问题。
+     *
+     * @param s 云输入结果文本字符串。
+     */
     public void setCloudText(String s) {
         // 3. 内容一致性拦截
         if (s == null) s = "";
@@ -674,6 +805,12 @@ public class RootInputView extends FrameLayout {
         mHandler.post(mCloudRunnable);
     }
 
+    /**
+     * 设置键盘布局。
+     * 根据 ID 切换到不同的键盘类型：候选词、剪贴板、常用语、符号或普通键盘。
+     *
+     * @param id 键盘标识符。
+     */
     public void setKeyboard(String id) {
         mHandler.post(() -> {
             if (mCustomView != null) {
@@ -702,14 +839,28 @@ public class RootInputView extends FrameLayout {
         });
     }
 
+    /**
+     * 判断当前是否处于 Shift 状态。
+     *
+     * @return true 如果 Shift 已按下，false 否则。
+     */
     public boolean isShifted() {
         return mInputView.isShifted();
     }
 
+    /**
+     * 设置 Shift 状态。
+     *
+     * @param shifted true 表示按下 Shift，false 表示释放。
+     */
     public void setShifted(boolean shifted) {
         mInputView.setShifted(shifted);
     }
 
+    /**
+     * 刷新所有按键的显示状态。
+     * 包括键盘按键和候选词栏，同时更新 Rime 选项配置。
+     */
     public void invalidateAllKeys() {
          Config.set_hide_comment(Rime.getRimeOption("_hide_comment"));
         Config.set_hide_key_hint(Rime.getRimeOption("_hide_key_hint"));
@@ -724,6 +875,11 @@ public class RootInputView extends FrameLayout {
         }
     }
 
+    /**
+     * 显示或隐藏剪贴板键盘视图。
+     *
+     * @param b true 显示剪贴板，false 隐藏。
+     */
     public void showClipboardView(boolean b) {
         showCustomView(null);
         if (mClipboardKeyboardView == null) {
@@ -741,21 +897,37 @@ public class RootInputView extends FrameLayout {
 
     }
 
+    /**
+     * 显示或隐藏工具栏视图。
+     *
+     * @param b true 显示工具栏，false 隐藏。
+     */
     public void showToolbarView(boolean b) {
         mCandidateView.showToolbarView(b);
     }
 
+    /**
+     * 设置 ASCII 模式状态。
+     *
+     * @param asciiMode true 表示 ASCII 模式，false 表示中文模式。
+     */
     public void setAsciiMode(boolean asciiMode) {
         mInputView.setAsciiMode(asciiMode);
     }
 
+    /**
+     * 设置输入法方案。
+     * 保存选择的方案 ID，启用软光标，并重新加载主题。
+     *
+     * @param id 方案 ID。
+     */
     public void setSchema(String id) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
                 Function.saveString(getContext(), "select_schema_id", id);
                 String soft_cursor_key = "soft_cursor";
-                Rime.setRimeOption(soft_cursor_key, true); //軟光標
+                Rime.setRimeOption(soft_cursor_key, true); //软光标
                 setTheme(Config.getTheme());
                 //mInputView.setKeyboard(id);
                 //mCandidateView.setSchema(id);
@@ -763,14 +935,29 @@ public class RootInputView extends FrameLayout {
         });
     }
 
+    /**
+     * 切换到上一个候选词。
+     *
+     * @return true 如果切换成功，false 否则。
+     */
     public boolean prevCandidate() {
         return mCandidateView.prevCandidate();
     }
 
+    /**
+     * 切换到下一个候选词。
+     *
+     * @return true 如果切换成功，false 否则。
+     */
     public boolean nextCandidate() {
         return mCandidateView.nextCandidate();
     }
 
+    /**
+     * 设置候选词列表数据。
+     *
+     * @param items 候选词项列表。
+     */
     public void setCandidates(final ArrayList<CandidateItem> items) {
         mHandler.post(new Runnable() {
             @Override
@@ -781,6 +968,11 @@ public class RootInputView extends FrameLayout {
         });
     }
 
+    /**
+     * 设置小屏模式状态。
+     *
+     * @param value true 启用小屏模式，false 禁用。
+     */
     public void setSmallMode(boolean value) {
         Config.setSmallMode(value);
         mHandler.post(new Runnable() {
@@ -791,6 +983,11 @@ public class RootInputView extends FrameLayout {
         });
     }
 
+    /**
+     * 设置浮动模式状态。
+     *
+     * @param value true 启用浮动模式，false 禁用。
+     */
     public void setFloatMode(boolean value) {
         Config.setFloatMode(value);
         mHandler.post(new Runnable() {
@@ -801,6 +998,11 @@ public class RootInputView extends FrameLayout {
         });
     }
 
+    /**
+     * 设置编码区文本（CharSequence 版本）。
+     *
+     * @param c 预编辑文本。
+     */
     public void setComposition(CharSequence c) {
         mHandler.post(new Runnable() {
             @Override
@@ -810,6 +1012,11 @@ public class RootInputView extends FrameLayout {
         });
     }
 
+    /**
+     * 添加多个编码内容到编码区。
+     *
+     * @param list 编码内容字符串列表。
+     */
     public void addCompositions(ArrayList<String> list) {
         mHandler.post(new Runnable() {
             @Override

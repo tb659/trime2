@@ -27,19 +27,42 @@ import com.osfans.trime.theme.ThemeManager;
 
 import java.util.ArrayList;
 
+/**
+ * Flexbox 候选词适配器类。
+ * 用于 FlexboxLayoutManager 的 RecyclerView,支持流式布局展示候选词。
+ */
 public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandidateAdapter.CandidateViewHolder> {
 
+    // ==================== 成员变量 ====================
+    
+    /** 候选词数据列表 */
     private final ArrayList<CandidateItem> mData;
+    /** 候选词文本样式 */
     private final KeyStyle mCandidateStyle;
+    /** 候选词注释样式 */
     private final KeyStyle mCommentStyle;
+    /** 是否正在加载下一页 */
     private boolean mIsLoading;
 
+    /**
+     * 构造函数。
+     *
+     * @param data 候选词数据列表。
+     */
     public FlexboxCandidateAdapter(ArrayList<CandidateItem> data) {
         this.mData = data;
-        mCandidateStyle = ThemeManager.getStyle().getKeyStyle("candidate");
-        mCommentStyle = mCandidateStyle.getKeyStyle("comment",mCandidateStyle);
+        mCandidateStyle = ThemeManager.getStyle().getKeyStyle("candidate"); // 获取候选词样式
+        mCommentStyle = mCandidateStyle.getKeyStyle("comment",mCandidateStyle); // 获取注释样式
     }
 
+    /**
+     * 创建 ViewHolder。
+     * 构建候选词项的视图结构,使用 FlexboxLayoutParams 支持流式布局。
+     *
+     * @param parent 父容器。
+     * @param viewType 视图类型。
+     * @return 新创建的 CandidateViewHolder。
+     */
     @NonNull
     @Override
     public FlexboxCandidateAdapter.CandidateViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -56,13 +79,13 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
         int dp = ThemeManager.dp2px(12);
         int dp2 = ThemeManager.dp2px(6);
         layout.setPadding(dp, dp2, dp, dp2);
-        // 关键：必须使用 FlexboxLayoutManager.LayoutParams
-        // 宽度设为 WRAP_CONTENT，高度设为 WRAP_CONTENT
+        // 关键:必须使用 FlexboxLayoutManager.LayoutParams
+        // 宽度设为 WRAP_CONTENT,高度设为 WRAP_CONTENT
         FlexboxLayoutManager.LayoutParams lp = new FlexboxLayoutManager.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         //lp.setFlexBasisPercent(0.2f);
-        lp.setFlexGrow(1.0f);
+        lp.setFlexGrow(1.0f); // 设置弹性增长系数,使项目均匀填充空间
         layout.setLayoutParams(lp);
 
         // 2. 创建并配置 TextView (关键：必须给子 View 设置 LayoutParams)
@@ -94,13 +117,20 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
             int position = holder.getBindingAdapterPosition(); // 获取当前实时位置
             if (position != RecyclerView.NO_POSITION && mData != null) {
                 CandidateItem item = mData.get(position);
-                TrimeService.getInstance().selectCandidate(item.getIndex());
+                TrimeService.getInstance().selectCandidate(item.getIndex()); // 选择候选词
             }
         });
 
         return holder;
     }
 
+    /**
+     * 绑定数据到 ViewHolder。
+     * 设置候选词文本、注释,并处理自动加载下一页。
+     *
+     * @param holder ViewHolder 实例。
+     * @param position 数据位置索引。
+     */
     @Override
     public void onBindViewHolder(@NonNull FlexboxCandidateAdapter.CandidateViewHolder holder, int position) {
         final CandidateItem data = mData.get(position);
@@ -123,47 +153,80 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
                 //holder.itemView.requestLayout();
             }
         });
-        // 检查是否滑到了最后三项（提前加载，体验更好）
+        // 检查是否滑到了最后十项(提前加载,体验更好)
         if (position >= getItemCount() - 10) {
             // 使用 post 避免在布局阶段刷新
-            holder.itemView.post(this::loadNextPage);
+            holder.itemView.post(this::loadNextPage); // 触发加载下一页
         }
     }
 
+    /**
+     * 加载下一页候选词。
+     * 从 CandidatesManager 获取下一页数据并追加到列表末尾。
+     */
     private void loadNextPage() {
-        if (mIsLoading) return;
+        if (mIsLoading) return; // 防止重复加载
         mIsLoading = true;
-        ArrayList<CandidateItem> cand = CandidatesManager.next();
+        ArrayList<CandidateItem> cand = CandidatesManager.next(); // 获取下一页数据
         if (!cand.isEmpty()) {
-            int startPos = mData.size();
-            mData.addAll(cand);
-            // 不要 notifyDataSetChanged()，只通知新增的部分，性能更好
-            notifyItemRangeInserted(startPos, cand.size());
+            int startPos = mData.size(); // 记录起始位置
+            mData.addAll(cand); // 添加到数据列表
+            // 不要 notifyDataSetChanged(),只通知新增的部分,性能更好
+            notifyItemRangeInserted(startPos, cand.size()); // 通知插入新项
         }
-        mIsLoading = false;
+        mIsLoading = false; // 重置加载标志
     }
 
+    /**
+     * 获取数据项数量。
+     *
+     * @return 候选词列表大小。
+     */
     @Override
     public int getItemCount() {
         return mData == null ? 0 : mData.size();
     }
 
+    /**
+     * 设置新的候选词数据。
+     * 清空旧数据,加载新数据。
+     *
+     * @param next 新的候选词列表。
+     */
     @SuppressLint("NotifyDataSetChanged")
     public void setData(ArrayList<CandidateItem> next) {
-        mData.clear();
-        mData.addAll(next);
-        notifyDataSetChanged();
+        mData.clear(); // 清空旧数据
+        mData.addAll(next); // 添加新数据
+        notifyDataSetChanged(); // 通知数据更新
     }
 
+    /**
+     * 获取所有候选词数据。
+     *
+     * @return 候选词列表。
+     */
     public ArrayList<CandidateItem> getData() {
         return mData;
     }
 
+    /**
+     * 候选词 ViewHolder 类。
+     * 持有候选词项的视图引用,包括注释文本和候选词文本。
+     */
     public static class CandidateViewHolder extends RecyclerView.ViewHolder {
 
+        /** 注释文本视图 */
         public final TextView tvComment;
+        /** 候选词文本视图 */
         public final TextView tvText;
 
+        /**
+         * 构造函数。
+         *
+         * @param itemView 根视图。
+         * @param tvComment 注释文本视图。
+         * @param tvText 候选词文本视图。
+         */
         public CandidateViewHolder(@NonNull View itemView, TextView tvComment, TextView tvText) {
             super(itemView);
             this.tvComment = tvComment;

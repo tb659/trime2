@@ -27,12 +27,26 @@ import org.luaj.LuaValue;
 
 import java.util.List;
 
+/**
+ * Lua 值列表适配器。
+ * 用于显示符号候选词列表,支持横竖屏不同的布局策略。
+ */
 public class LuaValueListAdapter extends RecyclerView.Adapter<LuaValueListAdapter.ListViewHolder> {
+    // ==================== 成员变量 ====================
+    /** Lua 数据列表 */
     private final LuaValue mData;
+    /** 符号样式 */
     private final Style mSymbolStyle;
+    /** 文本样式 */
     private final KeyStyle mTextStyle;
+    /** 是否为横屏模式 */
     private final boolean mLandscape;
 
+    /**
+     * 构造函数。
+     *
+     * @param data Lua 数据列表。
+     */
     public LuaValueListAdapter(LuaValue data) {
         mData = data;
         mSymbolStyle = ThemeManager.getStyle().getStyle("symbol");
@@ -48,6 +62,14 @@ public class LuaValueListAdapter extends RecyclerView.Adapter<LuaValueListAdapte
         }
     }
 
+    /**
+     * 创建 ViewHolder。
+     * 创建 KeyView 并设置点击事件,点击后提交文本。
+     *
+     * @param parent 父视图组。
+     * @param viewType 视图类型。
+     * @return ListViewHolder 实例。
+     */
     @NonNull
     @Override
     public ListViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -78,6 +100,13 @@ public class LuaValueListAdapter extends RecyclerView.Adapter<LuaValueListAdapte
         return holder;
     }
 
+    /**
+     * 绑定数据到 ViewHolder。
+     * 根据文本长度动态调整 FlexBasisPercent,短文本占用更小空间。
+     *
+     * @param holder ViewHolder 实例。
+     * @param position 数据位置。
+     */
     @Override
     public void onBindViewHolder(@NonNull ListViewHolder holder, int position) {
         holder.tv.setText(mData.get(position + 1).optjstring(String.valueOf(position + 1)));
@@ -94,6 +123,11 @@ public class LuaValueListAdapter extends RecyclerView.Adapter<LuaValueListAdapte
         holder.tv.setLayoutParams(params);
     }
 
+    /**
+     * 获取数据项数量。
+     *
+     * @return 数据项总数。
+     */
     @Override
     public int getItemCount() {
         return mData.length();

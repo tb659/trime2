@@ -18,10 +18,21 @@
 
 package com.osfans.trime.enums;
 
-/** 嵌入模式枚举 */
+/**
+ * 嵌入模式枚举。
+ * 定义编码区文本的显示方式:
+ * - INLINE_NONE: 不嵌入显示
+ * - INLINE_PREVIEW: 嵌入显示预览文本
+ * - INLINE_COMPOSITION: 嵌入显示编码文本
+ * - INLINE_INPUT: 嵌入显示输入文本
+ */
 public enum InlineModeType {
+  /** 不嵌入显示 */
   INLINE_NONE,
+  /** 嵌入显示预览文本(候选词) */
   INLINE_PREVIEW,
+  /** 嵌入显示编码文本(拼音等) */
   INLINE_COMPOSITION,
+  /** 嵌入显示输入文本(原始输入) */
   INLINE_INPUT
 }

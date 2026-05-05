@@ -36,70 +36,139 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import timber.log.Timber;
 
-
+/**
+ * Rime 输入法引擎核心类。
+ * 实现了 RimeApi 接口和 RimeLifecycleOwner 生命周期管理,
+ * 负责与原生 RIME 引擎(JNI)交互,处理按键输入、候选词选择、方案切换等功能。
+ */
+@SuppressWarnings("unused") // JNI 方法由原生库实现,IDE 可能无法识别
 public class Rime implements RimeApi, RimeLifecycleOwner {
+    // ==================== 常量定义 ====================
+    
+    /** Shift 修饰符掩码 */
     public static final int META_SHIFT_ON = RimeKeyEvent.getModifierByName("Shift");
+    /** Control 修饰符掩码 */
     public static final int META_CTRL_ON = RimeKeyEvent.getModifierByName("Control");
+    /** Alt 修饰符掩码 */
     public static final int META_ALT_ON = RimeKeyEvent.getModifierByName("Alt");
+    /** Release(释放)修饰符掩码 */
     public static final int META_RELEASE_ON = RimeKeyEvent.getModifierByName("Release");
+    // ==================== 成员变量 ====================
+    
+    /** 当前是否为 ASCII(英文)模式 */
     private static boolean isAsciiMode;
+    /** 生命周期管理实现 */
     private final RimeLifecycleImpl lifecycleImpl = new RimeLifecycleImpl();
 
-    // WARNING: Kotlin Flows cannot be directly mapped to standard Java, this is a conceptual conversion.
+    /** Rime 消息流,用于向观察者发送引擎状态变化消息 */
     private static final SharedFlowImpl<RimeMessage> messageFlow_ = new SharedFlowImpl<>(15);
     //TODO 获取 LuaApplication.getInstance().getApplicationContext();
+    /** 应用上下文 */
     private final TrimeApplication appContext = LuaApplication.getInstance();
+    /** 是否正在组字(输入中) */
     private static boolean isComposing = false;
+    /** 是否有候选菜单 */
     private static boolean hasMenu = false;
+    /** 是否正在翻页 */
     private static boolean paging = false;
 
+    /**
+     * 获取当前是否正在组字(输入中)。
+     *
+     * @return true 表示正在输入中,false 表示未输入。
+     */
     public static boolean isComposing() {
         return isComposing;
     }
 
+    /**
+     * 切换指定的 Rime 选项开关。
+     *
+     * @param toggle 选项名称(如 "ascii_mode", "full_shape" 等)。
+     */
     public static void toggleOption(String toggle) {
-        setRimeOption(toggle, !getRimeOption(toggle));
+        setRimeOption(toggle, !getRimeOption(toggle)); // 切换选项值
         if(toggle.equals("ascii_mode"))
-           isAsciiMode =getRimeOption(toggle);
+           isAsciiMode =getRimeOption(toggle); // 更新 ASCII 模式状态
     }
 
+    /**
+     * 获取当前是否为 ASCII(英文)模式。
+     *
+     * @return true 表示英文模式,false 表示中文模式。
+     */
     public static boolean isAsciiMode() {
         return isAsciiMode;
     }
 
+    /**
+     * 检查键码是否为无效键。
+     *
+     * @param keycode 要检查的键码。
+     * @return true 表示是无效键(<=0 或等于 XK_VoidSymbol)。
+     */
     public static boolean isVoidKeycode(int keycode) {
-        int XK_VoidSymbol = 0xffffff;
+        int XK_VoidSymbol = 0xffffff; // X11 空符号常量
         return keycode <= 0 || keycode == XK_VoidSymbol;
     }
 
+    /**
+     * 处理文本输入。
+     *
+     * @param text 要输入的文本。
+     * @return true 表示成功处理,false 表示失败或文本为空。
+     */
     public boolean onText(CharSequence text) {
         if (text == null || text.length() == 0) return false;
         return Boolean.TRUE.equals(withRimeContext(() -> {
+            // 模拟按键序列,将 {} 替换为 {braceleft}{braceright}
             boolean it = simulateRimeKeySequence(text.toString().replace("{}", "{braceleft}{braceright}"));
-            if (it) Rime.this.emitResponse();
+            if (it) Rime.this.emitResponse(); // 如果成功,发送响应
             return it;
         }));
     }
 
-    // 对应 Kotlin 的 private set
+    /**
+     * 设置是否正在组字(私有 setter)。
+     *
+     * @param composing 组字状态。
+     */
     private void setComposing(boolean composing) {
         isComposing = composing;
     }
 
+    /**
+     * 获取是否有候选菜单。
+     *
+     * @return true 表示有候选词菜单。
+     */
     public static boolean hasMenu() {
         return hasMenu;
     }
 
-    // 对应 Kotlin 的 private set
+    /**
+     * 设置是否有候选菜单(私有 setter)。
+     *
+     * @param hasMenu 菜单状态。
+     */
     private void setHasMenu(boolean hasMenu) {
         this.hasMenu = hasMenu;
     }
 
+    /**
+     * 获取是否正在翻页。
+     *
+     * @return true 表示正在翻页。
+     */
     public static boolean isPaging() {
         return paging;
     }
 
-    // 对应 Kotlin 的 private set
+    /**
+     * 设置是否正在翻页(私有 setter)。
+     *
+     * @param paging 翻页状态。
+     */
     private void setPaging(boolean paging) {
         this.paging = paging;
     }
@@ -149,26 +218,47 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         return menuCached;
     }
 
-
+    // ==================== 缓存数据 ====================
+    
+    /** 当前方案缓存 */
     private RimeSchema schemaCached;
+    /** 状态缓存 */
     private RimeProto.Status statusCached = new RimeProto.Status();
+    /** 组字上下文缓存 */
     private RimeProto.Context.Composition compositionCached = new RimeProto.Context.Composition();
+    /** 候选菜单缓存 */
     private RimeProto.Context.Menu menuCached = new RimeProto.Context.Menu();
 
-    // Simulating delegated property: AppPrefs.defaultInstance().general.asciiSwitchTips
+    /**
+     * 获取是否显示 ASCII 模式切换提示。
+     * <p>
+     * 该方法模拟了 Kotlin 中的委托属性访问，实际逻辑应从应用偏好设置中读取。
+     * 目前暂时返回 false，待 AppPrefs 实现后替换为真实配置读取逻辑。
+     *
+     * @return true 表示显示提示，false 表示不显示。
+     */
     private boolean getShowAsciiSwitchTips() {
-        // Assume AppPrefs.defaultInstance().general.getAsciiSwitchTips() is implemented in Java
-        //return AppPrefs.defaultInstance().general.getAsciiSwitchTips();
+        // TODO: 接入真实的偏好设置读取逻辑
+        // return AppPrefs.defaultInstance().general.getAsciiSwitchTips();
         return false;
     }
 
+    /** 上次 ASCII 切换提示文本 */
     private String lastAsciiTipsText = "";
+    /** 调度器,用于延迟任务 */
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    /** ASCII 切换提示任务的引用,用于取消之前的任务 */
     private AtomicReference<ScheduledFuture<?>> asciiSwitchTipsJob = new AtomicReference<>(null);
 
-    // Executor for Rime context operations (simulating CoroutineDispatcher)
+    /** Rime 调度器,用于在独立线程中执行 Rime 操作 */
     private final RimeDispatcher dispatcher;
 
+    /**
+     * 构造函数。
+     *
+     * @param runnable 初始化完成后要执行的回调函数。
+     * @throws IllegalStateException 如果 Rime 已经创建过。
+     */
     public Rime(Runnable runnable) {
         if (lifecycleImpl.getCurrentState() != RimeLifecycle.State.STOPPED) {
             throw new IllegalStateException("Rime has already been created!");
@@ -178,20 +268,26 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
             @Override
             public void nativeStartup() {
                 Log.w("rime", "nativeStartup: " );
-                startRime(false);
-                runnable.run();
-                lifecycleImpl.emitState(RimeLifecycle.State.READY);
+                startRime(false); // 启动 Rime 引擎
+                runnable.run(); // 执行初始化回调
+                lifecycleImpl.emitState(RimeLifecycle.State.READY); // 更新状态为就绪
             }
 
             @Override
             public void nativeFinalize() {
                 Log.w("rime", "nativeFinalize: " );
-                exitRime();
+                exitRime(); // 退出 Rime 引擎
             }
         });
     }
 
-    // Helper method to run code on the Rime dispatcher (Simulating withContext)
+    /**
+     * 在 Rime 上下文中执行代码块(模拟 Kotlin 的 withContext)。
+     *
+     * @param block 要在 Rime 上下文中执行的代码块。
+     * @param <T> 返回值类型。
+     * @return 代码块的执行结果,失败时返回 null。
+     */
     private <T> T withRimeContext(Callable<T> block) {
         // In a real Android Java environment, you would use an Executor or a specific Handler/Thread
         // here to synchronize access to Rime JNI calls. For this conversion, we assume
@@ -204,8 +300,13 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }
     }
 
-    // --- RimeApi Implementation (Public Methods) ---
+    // ==================== RimeApi 接口实现 ====================
 
+    /**
+     * 检查当前是否为空方案(未选择任何输入方案)。
+     *
+     * @return true 表示当前是默认方案(无方案)。
+     */
     @Override
     public boolean isEmpty() {
         return Boolean.TRUE.equals(withRimeContext(new Callable<Boolean>() {
@@ -216,6 +317,10 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         })); // 無方案
     }
 
+    /**
+     * 重新部署 Rime 引擎(完全重启)。
+     * 会退出并重新启动 Rime,用于应用配置更改后的生效。
+     */
     @Override
     public void deploy() {
         withRimeContext((Callable<String>) () -> {
@@ -224,6 +329,10 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
             return null;
         });
     }
+    /**
+     * 重启 Rime 引擎(不完全检查)。
+     * 与 deploy() 不同,不会进行完整的方案检查。
+     */
     public void restart() {
         withRimeContext((Callable<String>) () -> {
             Rime.exitRime();
@@ -232,11 +341,24 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         });
     }
 
+    /**
+     * 同步用户数据。
+     *
+     * @return true 表示同步成功。
+     */
     @Override
     public boolean syncUserData() {
         return withRimeContext(Rime::syncRimeUserData);
     }
 
+    /**
+     * 处理按键事件。
+     *
+     * @param value 键值(Rime 键码)。
+     * @param modifiers 修饰符掩码。
+     * @param isVirtual 是否为虚拟按键(软键盘)。
+     * @return true 表示按键被处理,false 表示未处理。
+     */
     @Override
     public boolean processKey(int value, long modifiers, boolean isVirtual) {
         return Boolean.TRUE.equals(withRimeContext(() -> Rime.this.processKeyInner(value, (int) modifiers, isVirtual)));
@@ -262,6 +384,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         return Boolean.TRUE.equals(withRimeContext(() -> processKeyInner(value.getValue(), modifiers.toInt(), isVirtual)));
     }
 
+    /**
+     * 模拟按键序列输入。
+     *
+     * @param sequence 按键序列字符串。
+     * @return true 表示成功处理,false 表示失败。
+     */
     @Override
     public boolean simulateKeySequence(String sequence) {
         boolean composing = isComposing();
@@ -301,6 +429,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));//.also(result -> Timber.d("simulateKeySequence " + (result ? "success" : "failed")));
     }
 
+    /**
+     * 选择指定索引的候选词。
+     *
+     * @param idx 候选词索引(从0开始)。
+     * @return true 表示选择成功。
+     */
     @Override
     public boolean selectCandidate(int idx) {
         return Boolean.TRUE.equals(withRimeContext(() -> {
@@ -310,6 +444,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));
     }
 
+    /**
+     * 忘记指定索引的候选词(从用户词典中删除)。
+     *
+     * @param idx 候选词索引。
+     * @return true 表示删除成功。
+     */
     @Override
     public boolean forgetCandidate(int idx) {
         return Boolean.TRUE.equals(withRimeContext(() -> {
@@ -319,6 +459,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));
     }
 
+    /**
+     * 选择当前页中指定索引的候选词。
+     *
+     * @param idx 当前页中的候选词索引。
+     * @return true 表示选择成功。
+     */
     @Override
     public boolean selectPagedCandidate(int idx) {
         return Boolean.TRUE.equals(withRimeContext(() -> {
@@ -328,6 +474,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));
     }
 
+    /**
+     * 删除当前页中指定索引的候选词。
+     *
+     * @param idx 当前页中的候选词索引。
+     * @return true 表示删除成功。
+     */
     @Override
     public boolean deletedPagedCandidate(int idx) {
         return Boolean.TRUE.equals(withRimeContext(() -> {
@@ -337,6 +489,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));
     }
 
+    /**
+     * 切换候选词页面。
+     *
+     * @param backward true 表示向前翻页,false 表示向后翻页。
+     * @return true 表示翻页成功。
+     */
     @Override
     public boolean changeCandidatePage(boolean backward) {
         return Boolean.TRUE.equals(withRimeContext(() -> {
@@ -346,6 +504,11 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));
     }
 
+    /**
+     * 移动光标位置。
+     *
+     * @param position 目标光标位置。
+     */
     @Override
     public void moveCursorPos(int position) {
          withRimeContext((Callable<String>) () -> {
@@ -355,41 +518,83 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
          });
     }
 
+    /**
+     * 获取所有可用的输入方案列表。
+     *
+     * @return 可用方案数组。
+     */
     @Override
     public SchemaItem[] availableSchemata() {
         return withRimeContext(Rime::getAvailableRimeSchemaList);
     }
 
+    /**
+     * 获取已启用的输入方案列表。
+     *
+     * @return 已启用方案数组。
+     */
     @Override
     public SchemaItem[] enabledSchemata() {
         return withRimeContext(Rime::getSelectedRimeSchemaList);
     }
 
+    /**
+     * 设置启用的输入方案列表。
+     *
+     * @param schemaIds 方案 ID 数组。
+     * @return true 表示设置成功。
+     */
     @Override
     public boolean setEnabledSchemata(String[] schemaIds) {
         return Boolean.TRUE.equals(withRimeContext(() -> selectRimeSchemas(schemaIds)));
     }
 
+    /**
+     * 获取当前选中的输入方案列表。
+     *
+     * @return 选中方案数组。
+     */
     @Override
     public SchemaItem[] selectedSchemata() {
         return withRimeContext(Rime::getRimeSchemaList);
     }
 
+    /**
+     * 获取当前选中的方案 ID。
+     *
+     * @return 当前方案 ID。
+     */
     @Override
     public String selectedSchemaId() {
         return withRimeContext(Rime::getCurrentRimeSchema);
     }
 
+    /**
+     * 选择指定的输入方案。
+     *
+     * @param schemaId 方案 ID。
+     * @return true 表示选择成功。
+     */
     @Override
     public boolean selectSchema(String schemaId) {
         return Boolean.TRUE.equals(withRimeContext(() -> selectRimeSchema(schemaId)));
     }
 
+    /**
+     * 获取当前输入方案的详细信息。
+     *
+     * @return 当前方案对象。
+     */
     @Override
     public RimeSchema currentSchema() {
         return withRimeContext(() -> new RimeSchema(getCurrentRimeSchema()));
     }
 
+    /**
+     * 提交当前组字内容(上屏)。
+     *
+     * @return true 表示提交成功。
+     */
     @Override
     public boolean commitComposition() {
         return Boolean.TRUE.equals(withRimeContext(() -> {
@@ -399,6 +604,9 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));
     }
 
+    /**
+     * 清除当前组字内容(取消输入)。
+     */
     @Override
     public void clearComposition() {
         withRimeContext((Callable<String>) () -> {
@@ -408,6 +616,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         });
     }
 
+    /**
+     * 设置运行时选项。
+     *
+     * @param option 选项名称。
+     * @param value 选项值。
+     */
     @Override
     public void setRuntimeOption(String option, boolean value) {
         withRimeContext((Callable<String>) () -> {
@@ -416,6 +630,11 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         });
     }
 
+    /**
+     * 切换运行时选项的开关状态。
+     *
+     * @param option 选项名称。
+     */
     public void toggleRuntimeOption(String option) {
         withRimeContext((Callable<String>) () -> {
             toggleOption(option);
@@ -423,18 +642,36 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         });
     }
 
+    /**
+     * 获取运行时选项的值。
+     *
+     * @param option 选项名称。
+     * @return 选项值。
+     */
     @Override
     public boolean getRuntimeOption(String option) {
         return Boolean.TRUE.equals(withRimeContext(() -> getRimeOption(option)));
     }
 
+    /**
+     * 获取候选词列表。
+     *
+     * @param startIndex 起始索引。
+     * @param limit 获取数量限制。
+     * @return 候选词数组。
+     */
     @Override
     public CandidateItem[] getCandidates(int startIndex, int limit) {
         return withRimeContext(() -> getRimeCandidates(startIndex, limit));
     }
 
-    // --- Private Helper Methods ---
+    // ==================== 私有辅助方法 ====================
 
+    /**
+     * 启动 Rime 引擎。
+     *
+     * @param fullCheck 是否进行完整检查(首次启动时为 true)。
+     */
     @SuppressLint("StringFormatInTimber")
     public static void startRime(boolean fullCheck) {
         DataManager.sync();
@@ -451,6 +688,14 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         startupRime(sharedDataDir, userDataDir, BuildConfig.BUILD_VERSION_NAME, fullCheck);
     }
 
+    /**
+     * 内部处理按键事件。
+     *
+     * @param value 键值。
+     * @param modifiers 修饰符掩码。
+     * @param isVirtual 是否为虚拟按键。
+     * @return true 表示按键被处理。
+     */
     private boolean processKeyInner(int value, int modifiers, boolean isVirtual) {
         //lastAsciiTipsText = getAsciiTipsText();
         boolean handled = processRimeKey(value, modifiers);
@@ -464,6 +709,11 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         return handled;
     }
 
+    /**
+     * 获取 ASCII 切换提示文本。
+     *
+     * @return 提示文本(如 "En" 或方案名称前两个字符)。
+     */
     private String getAsciiTipsText() {
         RimeProto.Status status = getRimeStatus();
         if (status.isAsciiMode()) {
@@ -478,10 +728,20 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }
     }
 
+    /**
+     * 发送响应消息(无提交内容)。
+     * 会触发所有相关消息的更新和发送。
+     */
     public void emitResponse() {
         emitResponse(Rime.getRimeCommit());
     }
 
+    /**
+     * 发送响应消息(带提交内容)。
+     * 会向消息流发送组字、菜单、状态等更新消息。
+     *
+     * @param commit 提交内容。
+     */
     private void emitResponse(RimeProto.Commit commit) {
         handleRimeMessage(4, new Object[]{commit});
 
@@ -504,6 +764,13 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         handleRimeMessage(7, new Object[]{getRimeStatus()});
     }
 
+    /**
+     * 处理 Rime 消息(静态方法)。
+     * 创建消息对象,通知所有处理器,并发送到消息流。
+     *
+     * @param type 消息类型。
+     * @param params 消息参数。
+     */
     public static void handleRimeMessage(int type, Object[] params) {
         // 1. 调用静态工厂方法创建消息
         RimeMessage<?> message = RimeMessage.nativeCreate(type, params);
@@ -522,6 +789,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         messageFlow_.tryEmit(message);
     }
 
+    /**
+     * 处理 Rime 消息(实例方法)。
+     * 根据消息类型更新缓存状态和 UI。
+     *
+     * @param message Rime 消息对象。
+     */
     public void handleRimeMessage(RimeMessage<?> message) {
         if (message instanceof RimeMessage.SchemaMessage) {
             RimeMessage.SchemaMessage msg = (RimeMessage.SchemaMessage) message;
@@ -611,6 +884,12 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }
     }
 
+    /**
+     * 更新方案缓存。
+     * 如果方案 ID 发生变化,会创建新的方案对象并发送方案变更消息。
+     *
+     * @param status 当前状态。
+     */
     private void updateSchemaCached(RimeProto.Status status) {
         try {
             String schemaId = status.getSchemaId();
@@ -630,6 +909,10 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
 
     }
 
+    /**
+     * 显示 ASCII 模式切换提示。
+     * 会在组字区显示提示文本,并在 1 秒后自动清除。
+     */
     private void showAsciiSwitchTips() {
         //Function.printStackTrace("showAsciiSwitchTips");
         if (!getShowAsciiSwitchTips()) return;
@@ -652,9 +935,15 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         };
         asciiSwitchTipsJob.set(scheduler.schedule(job, 1000L, TimeUnit.MILLISECONDS));
     }
-    // 1. 在类中定义一个成员变量来保存监听器
+    // ==================== 生命周期管理 ====================
+    
+    /** Rime 消息处理器引用 */
     private final Rime.Consumer<RimeMessage<?>> mMessageHandler = this::handleRimeMessage;
 
+    /**
+     * 启动 Rime 引擎。
+     * 检查存储可用性,注册消息处理器,并启动调度器。
+     */
     public void startup() {
         if (lifecycleImpl.getCurrentState() != RimeLifecycle.State.STOPPED) {
             Timber.w("Skip starting rime: not at stopped state!");
@@ -667,6 +956,10 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }
     }
 
+    /**
+     * 停止 Rime 引擎。
+     * 更新生命周期状态,停止调度器,取消所有待处理任务,并注销消息处理器。
+     */
     public void finalize() {
         if (lifecycleImpl.getCurrentState() != RimeLifecycle.State.READY) {
             Timber.w("Skip stopping rime: not at ready state!");
@@ -684,15 +977,23 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
 
-    // --- Companion Object / Static JNI Methods ---
+    // ==================== JNI 原生方法 ====================
 
     static {
-        System.loadLibrary("rime_jni");
+        System.loadLibrary("rime_jni"); // 加载原生库
     }
 
+    /** Rime 消息处理器列表 */
     private static final List<Consumer<RimeMessage<?>>> rimeMessageHandlers = new ArrayList<>();
 
-    // init
+    /**
+     * 初始化 Rime 引擎(原生方法)。
+     *
+     * @param sharedDir 共享数据目录。
+     * @param userDir 用户数据目录。
+     * @param versionName 版本号。
+     * @param fullCheck 是否进行完整检查。
+     */
     public static native void startupRime(
             String sharedDir,
             String userDir,
@@ -700,82 +1001,255 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
             boolean fullCheck
     );
 
+    /**
+     * 退出 Rime 引擎(原生方法)。
+     */
     public static native void exitRime();
 
+    /**
+     * 部署 Rime 方案文件(原生方法)。
+     *
+     * @param schemaFile 方案文件路径。
+     * @return true 表示部署成功。
+     */
     public static native boolean deployRimeSchemaFile(String schemaFile);
 
+    /**
+     * 部署 Rime 配置文件(原生方法)。
+     *
+     * @param fileName 配置文件名。
+     * @param versionKey 版本键。
+     * @return true 表示部署成功。
+     */
     public static native boolean deployRimeConfigFile(
             String fileName,
             String versionKey
     );
 
+    /**
+     * 同步用户数据(原生方法)。
+     *
+     * @return true 表示同步成功。
+     */
     public static native boolean syncRimeUserData();
 
-    // input
+    // ==================== 输入相关原生方法 ====================
+
+    /**
+     * 处理 Rime 按键(原生方法)。
+     *
+     * @param keycode 键码。
+     * @param mask 修饰符掩码。
+     * @return true 表示按键被处理。
+     */
     public static native boolean processRimeKey(
             int keycode,
             int mask
     );
 
+    /**
+     * 提交当前组字内容(原生方法)。
+     *
+     * @return true 表示提交成功。
+     */
     public static native boolean commitRimeComposition();
 
+    /**
+     * 清除当前组字内容(原生方法)。
+     */
     public static native void clearRimeComposition();
 
-    // output
+    // ==================== 输出相关原生方法 ====================
+
+    /**
+     * 获取提交内容(原生方法)。
+     *
+     * @return 提交对象。
+     */
     public static native RimeProto.Commit getRimeCommit();
 
+    /**
+     * 获取组字上下文(原生方法)。
+     *
+     * @return 上下文对象。
+     */
     public static native RimeProto.Context getRimeContext();
 
+    /**
+     * 获取引擎状态(原生方法)。
+     *
+     * @return 状态对象。
+     */
     public static native RimeProto.Status getRimeStatus();
 
-    // runtime options
+    // ==================== 运行时选项相关原生方法 ====================
+
+    /**
+     * 设置 Rime 选项(原生方法)。
+     *
+     * @param option 选项名称。
+     * @param value 选项值。
+     */
     public static native void setRimeOption(
             String option,
             boolean value
     );
 
+    /**
+     * 获取 Rime 选项值(原生方法)。
+     *
+     * @param option 选项名称。
+     * @return 选项值。
+     */
     public static native boolean getRimeOption(String option);
 
+    /**
+     * 获取方案列表(原生方法)。
+     *
+     * @return 方案数组。
+     */
     public static native SchemaItem[] getRimeSchemaList();
 
+    /**
+     * 获取当前方案 ID(原生方法)。
+     *
+     * @return 当前方案 ID。
+     */
     public static native String getCurrentRimeSchema();
 
+    /**
+     * 选择指定方案(原生方法)。
+     *
+     * @param schemaId 方案 ID。
+     * @return true 表示选择成功。
+     */
     public static native boolean selectRimeSchema(String schemaId);
 
-    // testing
+    // ==================== 测试相关原生方法 ====================
+
+    /**
+     * 模拟按键序列(原生方法)。
+     *
+     * @param keySequence 按键序列字符串。
+     * @return true 表示模拟成功。
+     */
     public static native boolean simulateRimeKeySequence(String keySequence);
 
+    /**
+     * 获取原始输入内容(原生方法)。
+     *
+     * @return 原始输入字符串。
+     */
     public static native String getRimeRawInput();
 
+    /**
+     * 获取光标位置(原生方法)。
+     *
+     * @return 光标位置索引。
+     */
     public static native int getRimeCaretPos();
 
+    /**
+     * 设置光标位置(原生方法)。
+     *
+     * @param caretPos 目标光标位置。
+     */
     public static native void setRimeCaretPos(int caretPos);
 
+    /**
+     * 选择当前页中的候选词(原生方法)。
+     *
+     * @param index 候选词索引。
+     * @return true 表示选择成功。
+     */
     public static native boolean selectRimeCandidateOnCurrentPage(int index);
 
+    /**
+     * 删除当前页中的候选词(原生方法)。
+     *
+     * @param index 候选词索引。
+     * @return true 表示删除成功。
+     */
     public static native boolean deleteRimeCandidateOnCurrentPage(int index);
 
+    /**
+     * 选择指定索引的候选词(原生方法)。
+     *
+     * @param index 候选词索引。
+     * @return true 表示选择成功。
+     */
     public static native boolean selectRimeCandidate(int index);
 
+    /**
+     * 忘记指定索引的候选词(原生方法)。
+     *
+     * @param index 候选词索引。
+     * @return true 表示忘记成功。
+     */
     public static native boolean forgetRimeCandidate(int index);
 
+    /**
+     * 切换候选词页面(原生方法)。
+     *
+     * @param backward true 向前翻页,false 向后翻页。
+     * @return true 表示翻页成功。
+     */
     public static native boolean changeRimeCandidatePage(boolean backward);
 
+    /**
+     * 高亮指定索引的候选词(原生方法)。
+     *
+     * @param index 候选词索引。
+     * @return true 表示高亮成功。
+     */
     public static native boolean highlightRimeCandidate(int index);
 
+    /**
+     * 获取当前高亮的候选词索引(原生方法)。
+     *
+     * @return 高亮索引。
+     */
     public static native int getHighlightRimeCandidate();
 
+    /**
+     * 获取可用方案列表(原生方法)。
+     *
+     * @return 可用方案数组。
+     */
     public static native SchemaItem[] getAvailableRimeSchemaList();
 
+    /**
+     * 获取已选中方案列表(原生方法)。
+     *
+     * @return 已选中方案数组。
+     */
     public static native SchemaItem[] getSelectedRimeSchemaList();
 
+    /**
+     * 选择多个方案(原生方法)。
+     *
+     * @param schemaIds 方案 ID 数组。
+     * @return true 表示选择成功。
+     */
     public static native boolean selectRimeSchemas(String[] schemaIds);
 
+    /**
+     * 获取候选词列表(原生方法)。
+     *
+     * @param startIndex 起始索引。
+     * @param limit 数量限制。
+     * @return 候选词数组。
+     */
     public static native CandidateItem[] getRimeCandidates(
             int startIndex,
             int limit
     );
 
+    /**
+     * 获取当前组字文本。
+     *
+     * @return 组字文本,如果没有组字则返回空字符串。
+     */
     public String getComposingText() {
         RimeProto.Context.Composition cc = getCompositionCached();
         if(cc!=null)
@@ -784,6 +1258,11 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
 
+    /**
+     * 消费者函数式接口(用于消息处理)。
+     *
+     * @param <T> 输入参数类型。
+     */
     @FunctionalInterface
     public interface Consumer<T> {
 
@@ -815,15 +1294,28 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }
     }
 
+    /**
+     * 注册 Rime 消息处理器。
+     *
+     * @param handler 消息处理器。
+     */
     public static void registerRimeMessageHandler(Consumer<RimeMessage<?>> handler) {
         if (rimeMessageHandlers.contains(handler)) return;
         rimeMessageHandlers.add(handler);
     }
 
+    /**
+     * 注销 Rime 消息处理器。
+     *
+     * @param handler 要注销的消息处理器。
+     */
     public static void unregisterRimeMessageHandler(Consumer<RimeMessage<?>> handler) {
          rimeMessageHandlers.remove(handler);
     }
 
+    /**
+     * 注销所有 Rime 消息处理器。
+     */
     public static void unregisterAllRimeMessageHandlers() {
         rimeMessageHandlers.clear();
     }

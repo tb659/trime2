@@ -10,24 +10,37 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
- * Represents the configuration and structure of a Rime input schema.
- * This class loads its properties from Rime configuration files.
+ * 表示 Rime 输入方案的配置和结构。
+ * 此类从 Rime 配置文件加载其属性。
  */
 public final class RimeSchema {
 
+    // ==================== 成员变量 ====================
+    /** 方案 ID */
     private final String schemaId;
+    /** 开关列表 */
     private  List<Switch> switches;
+    /** 字母表 */
     private  String alphabet;
 
-    // --- Switch Data Class ---
+    // --- Switch 数据类 ---
 
+    /**
+     * 开关数据类。
+     */
     public static final class Switch {
+        /** 开关名称 */
         private final String name;
+        /** 选项列表 */
         private final List<String> options;
+        /** 重置值 */
         private int reset;
+        /** 状态列表 */
         private final List<String> states;
 
-        // Default constructor matching Kotlin's default arguments
+        /**
+         * 默认构造函数(匹配 Kotlin 的默认参数)。
+         */
         public Switch() {
             this("", Collections.emptyList(), 0, Collections.emptyList());
         }
@@ -76,6 +89,11 @@ public final class RimeSchema {
             return "Switch(name='" + name + "', options=" + options + ", reset=" + reset + ", states=" + states + ")";
         }
 
+        /**
+         * 获取当前状态。
+         *
+         * @return 状态字符串。
+         */
         public String getState() {
             if (!options.isEmpty()) {
                 return getStates().get(reset);
@@ -84,6 +102,11 @@ public final class RimeSchema {
             }
         }
 
+        /**
+         * 获取未选中状态。
+         *
+         * @return 未选中状态字符串。
+         */
         public String getUnState() {
             if (!options.isEmpty()) {
                 return getStates().get((reset + 1) % options.size());
@@ -92,6 +115,9 @@ public final class RimeSchema {
             }
         }
 
+        /**
+         * 切换选项状态。
+         */
         public void toggleOption() {
             if (!options.isEmpty()) {
                 Rime.setRimeOption(options.get(reset), false);
@@ -106,13 +132,19 @@ public final class RimeSchema {
         }
     }
 
-    // --- Constructor (Replaces Kotlin's Primary Constructor and init block) ---
+    // --- 构造函数(替换 Kotlin 的主构造函数和 init 块) ---
 
+    /**
+     * 构造函数。
+     * 从 Rime 配置文件加载方案属性。
+     *
+     * @param schemaId 方案 ID。
+     */
     public RimeSchema(String schemaId) {
         this.schemaId = schemaId;
         RimeConfig schemaConfig;
 
-        // Equivalent of Kotlin's 'when' expression for opening the config
+        // 等价于 Kotlin 的 'when' 表达式,用于打开配置
         if (schemaId == null || schemaId.isEmpty()) {
             schemaConfig = RimeConfig.openConfig("default");
         } else if (schemaId.startsWith(".")) {
@@ -121,17 +153,17 @@ public final class RimeSchema {
             schemaConfig = RimeConfig.openSchema(schemaId);
         }
 
-        // Equivalent of Kotlin's 'use' block (try-with-resources)
+        // 等价于 Kotlin 的 'use' 块(try-with-resources)
         try (RimeConfig config = schemaConfig) {
 
-            // 1. Load switches list
-            // Define the RimeConfigAction for loading a single Switch object
+            // 1. 加载开关列表
+            // 定义用于加载单个 Switch 对象的 RimeConfigAction
             RimeConfig.RimeConfigAction<Switch> switchLoader = (rc, path) -> {
-                // Get the nested properties. Null checks convert Kotlin's ? : defaults.
+                // 获取嵌套属性。Null 检查转换 Kotlin 的 ? : 默认值。
                 String switchName = rc.getString(path + "/name");
                 if (switchName == null) switchName = "";
 
-                // For nested lists (options, states), we need another action to get Strings
+                // 对于嵌套列表(options, states),我们需要另一个操作来获取字符串
                 RimeConfig.RimeConfigAction<String> stringAction = (innerRc, innerPath) -> innerRc.getString(innerPath);
 
                 List<String> options = rc.getList(path + "/options", stringAction);
@@ -144,30 +176,45 @@ public final class RimeSchema {
 
             this.switches = config.getList("switches", switchLoader);
 
-            // 2. Load alphabet string
+            // 2. 加载字母表字符串
             String alpha = config.getString("speller/alphabet");
             this.alphabet = (alpha != null) ? alpha : "";
 
         } catch (Exception e) {
-            // Handle AutoCloseable exception if RimeConfig.close() fails or during construction/loading
-            // For simplicity, we initialize to defaults on fatal failure.
-            // In a real app, this should throw/log more aggressively.
+            // 处理 AutoCloseable 异常,如果 RimeConfig.close() 失败或在构造/加载期间发生异常
+            // 为简单起见,我们在致命失败时初始化为默认值。
+            // 在实际应用中,这应该更积极地抛出/记录日志。
             System.err.println("Error loading RimeSchema for ID: " + schemaId + ". " + e.getMessage());
             this.switches = Collections.emptyList();
             this.alphabet = "";
         }
     }
 
-    // --- Public Getters ---
+    // --- 公共 Getter 方法 ---
 
+    /**
+     * 获取方案 ID。
+     *
+     * @return 方案 ID。
+     */
     public String getSchemaId() {
         return schemaId;
     }
 
+    /**
+     * 获取开关列表。
+     *
+     * @return 开关列表。
+     */
     public List<Switch> getSwitches() {
         return switches;
     }
 
+    /**
+     * 获取字母表。
+     *
+     * @return 字母表字符串。
+     */
     public String getAlphabet() {
         return alphabet;
     }

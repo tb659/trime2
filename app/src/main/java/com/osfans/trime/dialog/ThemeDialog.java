@@ -28,16 +28,26 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+/**
+ * 主题选择对话框。
+ * 用于切换输入法主题,支持从 Lua 配置中读取主题显示名称,并按名称排序。
+ */
 public class ThemeDialog {
-    private AlertDialog mDialog; // 原 mDig
+    // ==================== 成员变量 ====================
+    /** 对话框实例 */
+    private AlertDialog mDialog;
+    /** 是否需要更新 Rime 选项 */
     private boolean mNeedUpdateRimeOption;
-    private IBinder mWindowToken; // 原 mToken
+    /** 窗口 Token(用于依附于输入法窗口) */
+    private IBinder mWindowToken;
 
     /**
-     * 内部类：用于绑定主题 ID 和 Lua 中定义的显示名称
+     * 内部类：用于绑定主题 ID 和 Lua 中定义的显示名称。
      */
     private static class ThemeItem {
+        /** 主题 ID(文件夹名) */
         String id;
+        /** 显示名称(从 main.lua 读取) */
         String displayName;
 
         ThemeItem(String id, String displayName) {
@@ -46,6 +56,12 @@ public class ThemeDialog {
         }
     }
 
+    /**
+     * 构造函数。
+     * 加载所有可用主题,从 Lua 配置中读取显示名称,按名称排序后显示单选对话框。
+     *
+     * @param context 上下文。
+     */
     public ThemeDialog(Context context) {
         AlertDialog.Builder builder =
                 new AlertDialog.Builder(context, ThemeManager.getDialogTheme())
@@ -127,7 +143,12 @@ public class ThemeDialog {
     }
 
     /**
-     * 从主题目录下的 main.lua 文件中读取 name 变量
+     * 从主题目录下的 main.lua 文件中读取 name 变量。
+     * 如果 Lua 中定义了 name,则返回 "显示名称 (ID)" 格式,否则返回 ID。
+     *
+     * @param globals Lua 全局环境。
+     * @param themeId 主题 ID(文件夹名)。
+     * @return 主题的显示名称。
      */
     private String getThemeNameFromLua(Globals globals, String themeId) {
         LuaTable env = new LuaTable();
@@ -152,13 +173,19 @@ public class ThemeDialog {
         return themeId; // 默认返回文件夹 ID
     }
 
+    /**
+     * 显示对话框(无 Token)。
+     */
     public void show() {
         if (mDialog == null) return;
         mDialog.show();
     }
 
     /**
-     * 将对话框附着到指定的 IBinder Token（通常由 TrimeService 传入）
+     * 显示对话框(带 Token,依附于输入法窗口)。
+     * 设置对话框类型为 TYPE_APPLICATION_ATTACHED_DIALOG,使其能依附于输入法窗口显示。
+     *
+     * @param token 窗口 Token。
      */
     public void show(IBinder token) {
         if (mDialog == null) return;

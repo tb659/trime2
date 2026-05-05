@@ -32,10 +32,24 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+/**
+ * 键盘选择对话框。
+ * 用于切换默认键盘布局,实现 ResourceFinder 接口以支持 Lua 脚本加载键盘配置文件。
+ */
 public class KeyboardDialog implements ResourceFinder {
+    // ==================== 成员变量 ====================
+    /** 对话框实例 */
     private final AlertDialog mDialog;
+    /** 窗口 Token(用于依附于输入法窗口) */
     private IBinder mWindowToken;
 
+    /**
+     * 查找资源文件(实现 ResourceFinder 接口)。
+     * 按优先级查找:绝对路径 -> 键盘目录。
+     *
+     * @param name 资源文件名。
+     * @return 输入流,未找到则返回 null。
+     */
     @Override
     public InputStream findResource(String name) {
         if (TextUtils.isEmpty(name))
@@ -56,6 +70,13 @@ public class KeyboardDialog implements ResourceFinder {
         return null;
     }
 
+    /**
+     * 查找文件路径(实现 ResourceFinder 接口)。
+     * 如果是绝对路径则直接返回,否则返回键盘目录下的完整路径。
+     *
+     * @param filename 文件名。
+     * @return 文件的绝对路径。
+     */
     @Override
     public String findFile(String filename) {
         if (TextUtils.isEmpty(filename))
@@ -66,10 +87,12 @@ public class KeyboardDialog implements ResourceFinder {
     }
 
     /**
-     * 内部辅助类：用于绑定样式ID和解析出的显示名称
+     * 内部辅助类：用于绑定键盘 ID 和解析出的显示名称。
      */
     private static class KeyboardItem {
+        /** 键盘 ID(文件名,不含 .lua) */
         String id;
+        /** 显示名称(从 Lua 配置读取) */
         String displayName;
 
         KeyboardItem(String id, String displayName) {
@@ -78,6 +101,12 @@ public class KeyboardDialog implements ResourceFinder {
         }
     }
 
+    /**
+     * 构造函数。
+     * 加载所有可用键盘布局,从 Lua 配置中读取显示名称,按名称排序后显示单选对话框。
+     *
+     * @param context 上下文。
+     */
     public KeyboardDialog(Context context) {
         AlertDialog.Builder builder =
                 new AlertDialog.Builder(context, ThemeManager.getDialogTheme())
@@ -159,7 +188,12 @@ public class KeyboardDialog implements ResourceFinder {
     }
 
     /**
-     * 私有工具方法：从 main.lua 中提取 name 变量
+     * 从键盘 Lua 配置文件中提取 name 变量。
+     * 检查 lock 字段,如果未锁定则返回 null(不显示)。
+     *
+     * @param globals Lua 全局环境。
+     * @param keyboardId 键盘 ID(文件名,不含 .lua)。
+     * @return 键盘的显示名称,未锁定或出错则返回 null/ID。
      */
     private String getKeyboardNameFromLua(Globals globals, String keyboardId) {
         LuaTable env = new LuaTable();
@@ -185,11 +219,20 @@ public class KeyboardDialog implements ResourceFinder {
         return keyboardId;
     }
 
+    /**
+     * 显示对话框(无 Token)。
+     */
     public void show() {
         if (mDialog == null) return;
         mDialog.show();
     }
 
+    /**
+     * 显示对话框(带 Token,依附于输入法窗口)。
+     * 设置对话框类型为 TYPE_APPLICATION_ATTACHED_DIALOG,使其能依附于输入法窗口显示。
+     *
+     * @param token 窗口 Token。
+     */
     public void show(IBinder token) {
         if (mDialog == null) return;
         mWindowToken = token;

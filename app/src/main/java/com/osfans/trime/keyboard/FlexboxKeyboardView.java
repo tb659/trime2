@@ -26,10 +26,22 @@ import org.luaj.Globals;
 import org.luaj.LuaTable;
 import org.luaj.LuaValue;
 
+/**
+ * Flexbox 键盘视图类。
+ * 使用 FlexboxLayout 实现灵活的键盘布局,支持从 Lua 配置中递归解析嵌套容器和按键。
+ */
 public class FlexboxKeyboardView extends KeyboardView {
 
+    // ==================== 成员变量 ====================
+    /** Lua 全局环境 */
     private final Globals globals;
 
+    /**
+     * 构造函数。
+     *
+     * @param context 上下文。
+     * @param globals Lua 全局环境,包含键盘配置(style)。
+     */
     public FlexboxKeyboardView(@NonNull Context context, Globals globals) {
         super(context, globals);
         this.globals = globals;
@@ -40,6 +52,10 @@ public class FlexboxKeyboardView extends KeyboardView {
         Log.w("FlexboxKeyboardView", "init time: " + (System.currentTimeMillis() - time));
     }
 
+    /**
+     * 加载键盘行配置。
+     * 从 Lua 配置中读取 flex_box,创建根容器并递归解析所有子元素。
+     */
     private void loadRows() {
         LuaValue flexBoxConfig = globals.get("flex_box");
         if (!flexBoxConfig.istable()) return;
@@ -55,7 +71,11 @@ public class FlexboxKeyboardView extends KeyboardView {
     }
 
     /**
-     * 递归解析 Lua 结构
+     * 递归解析 Lua 结构。
+     * 遍历 Lua 表,识别嵌套容器和按键,并创建对应的 FlexboxLayout 或 KeyView。
+     *
+     * @param parent 父容器。
+     * @param table Lua 配置表。
      */
     private void parseRecursive(FlexboxLayout parent, LuaTable table) {
         int len = table.length();
@@ -85,6 +105,13 @@ public class FlexboxKeyboardView extends KeyboardView {
         }
     }
 
+    /**
+     * 解析按键列表。
+     * 遍历 Lua 表中的按键配置,创建 KeyView 并添加到父容器中。
+     *
+     * @param parent 父容器。
+     * @param keys Lua 按键配置表。
+     */
     private void parseKeys(FlexboxLayout parent, LuaTable keys) {
         int len = keys.length();
         int direction = parent.getFlexDirection();
@@ -96,7 +123,11 @@ public class FlexboxKeyboardView extends KeyboardView {
     }
 
     /**
-     * 根据 Lua 配置创建 FlexboxLayout
+     * 根据 Lua 配置创建 FlexboxLayout 容器。
+     * 解析方向、背景、阴影等样式属性。
+     *
+     * @param config Lua 配置表。
+     * @return 创建的 FlexboxLayout 实例。
      */
     private FlexboxLayout createFlexContainer(LuaTable config) {
         FlexboxLayout layout = new FlexboxLayout(getContext());
@@ -128,7 +159,12 @@ public class FlexboxKeyboardView extends KeyboardView {
     }
 
     /**
-     * 核心修复：根据父容器方向生成 LayoutParams
+     * 核心修复：根据父容器方向生成 LayoutParams。
+     * 横向布局时,未设固定宽度的项目靠权重分配空间;纵向布局时同理。
+     *
+     * @param parentDirection 父容器的方向(ROW 或 COLUMN)。
+     * @param config Lua 配置表,包含 width、height、grow 等属性。
+     * @return 创建的 LayoutParams 实例。
      */
     private FlexboxLayout.LayoutParams createLayoutParams(int parentDirection, LuaValue config) {
         // 获取 Lua 中定义的宽和高（假设单位是 dp，实际使用建议转换成 px）
@@ -156,7 +192,12 @@ public class FlexboxKeyboardView extends KeyboardView {
         return lp;
     }
 
-    // 辅助函数：DP 转 PX
+    /**
+     * 辅助函数：DP 转 PX。
+     *
+     * @param dp DP 值。
+     * @return 对应的像素值。
+     */
     private int dp2px(int dp) {
         return (int) (dp * getContext().getResources().getDisplayMetrics().density);
     }
