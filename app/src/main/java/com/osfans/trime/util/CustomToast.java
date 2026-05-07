@@ -32,13 +32,13 @@ public class CustomToast {
      * 短提示持续时间（毫秒）。
      * 对应 {@link android.widget.Toast#LENGTH_SHORT} 的实际显示时长。
      */
-    private static final int LENGTH_SHORT_DURATION = 2000;
+    private static final int LENGTH_SHORT_DURATION = 3000;
 
     /**
      * 长提示持续时间（毫秒）。
      * 对应 {@link android.widget.Toast#LENGTH_LONG} 的实际显示时长。
      */
-    private static final int LENGTH_LONG_DURATION = 3500;
+    private static final int LENGTH_LONG_DURATION = 5000;
 
     /**
      * 当前正在显示的 PopupWindow 的弱引用。
