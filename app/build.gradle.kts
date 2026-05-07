@@ -39,11 +39,11 @@ android {
         }
     }
     defaultConfig {
-        applicationId = "com.nirenr.trime"
+        applicationId = "com.tbagr.trime"
         minSdk = 21
         targetSdk = 35
         versionCode = 67
-        versionName = "0.6.7"
+        versionName = "0.0.1"
 
         multiDexEnabled = true
         buildConfigField("String", "BUILDER", "\"${project.builder}\"")

@@ -8,8 +8,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- 输入法平台名称  -->
-    <string name="app_name_release">中文输入法2</string>
-    <string name="app_name_debug">中文输入法2（调试）</string>
+    <string name="app_name_release">可乐输入法</string>
+    <string name="app_name_debug">可乐输入法（调试）</string>
     <string name="settings__help_title">寻求帮助</string>
     <string name="pref_wiki">维基教程</string>
     <string name="pref_issues">问题反馈</string>
@@ -91,7 +91,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
     <string name="about__support">支持</string>
     <string name="system_default">系统默认</string>
     <string name="keyboard__key_swipe_travel_title">触发按键滑动手势的距离</string>
-    <string name="trime_app_slogan">懂你的中文输入法2</string>
+    <string name="trime_app_slogan">爱澈到底</string>
     <string name="external_storage_permission_not_available">存储权限不可用</string>
     <string name="external_storage_permission_granted">已授予存储权限</string>
     <string name="external_storage_permission_denied">已拒绝授权存储权限，部署或读取方案和配置功能或不可用</string>

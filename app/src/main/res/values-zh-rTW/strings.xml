@@ -94,7 +94,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
     <string name="about__open_source_licenses">開放源代碼軟體許可</string>
     <string name="system_default">系統預設</string>
     <string name="keyboard__key_swipe_travel_title">觸發滑動手勢的最短距離</string>
-    <string name="trime_app_slogan">懂你的中文输入法2</string>
+    <string name="trime_app_slogan">懂你的可樂输入法</string>
     <string name="external_storage_permission_not_available">儲存許可權不可用</string>
     <string name="external_storage_permission_granted">已授予儲存許可權</string>
     <string name="external_storage_permission_denied">已拒絕授權儲存許可權，部署或讀取方案和配置功能或不可用</string>
