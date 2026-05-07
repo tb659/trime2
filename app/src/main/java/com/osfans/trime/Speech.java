@@ -38,6 +38,7 @@ import android.view.accessibility.AccessibilityManager;
 import android.widget.Toast;
 
 import com.osfans.trime.data.opencc.OpenCCDictManager;
+import com.osfans.trime.speech.BaiduRecognizer;
 import com.osfans.trime.speech.RecognizerListener;
 import com.osfans.trime.speech.VivoRecognizer;
 import com.osfans.trime.theme.ThemeManager;
@@ -68,11 +69,15 @@ class Speech implements RecognitionListener, RecognizerListener {
     public static final String NAME = "NAME";
     /** 配置键名 */
     public static final String config = "config";
+    /** 日志标签 */
+    private static final String TAG = "Speech";
 
     /** 音效池，用于播放语音识别相关的音效 */
     private final SoundPool mSoundPool;
     /** Vivo语音识别器实例（如果使用Vivo引擎） */
     private VivoRecognizer vSpeech;
+    /** 百度语音识别器实例（如果使用百度引擎） */
+    private BaiduRecognizer bSpeech;
     /** 取消音效ID */
     private int mSoundCancel;
     /** 错误音效ID */
@@ -91,8 +96,6 @@ class Speech implements RecognitionListener, RecognizerListener {
     private SpeechRecognizer speech = null;
     /** 语音识别意图，包含识别参数 */
     private Intent recognizerIntent;
-    /** 日志标签 */
-    private String TAG = "Speech";
     /** 上下文对象 */
     private Context context;
     /** 当前识别状态 */
@@ -125,6 +128,8 @@ class Speech implements RecognitionListener, RecognizerListener {
             // 单一名称：使用内置识别器或系统识别器
             if (name[0].equals("vivo")) {
                 vSpeech = new VivoRecognizer(context, this); // 使用Vivo识别器
+            } else if (name[0].equals("baidu")) {
+                bSpeech = new BaiduRecognizer(context, this); // 使用百度识别器
             } else {
                 speech = SpeechRecognizer.createSpeechRecognizer(context);
                 if (speech != null)
@@ -189,6 +194,10 @@ class Speech implements RecognitionListener, RecognizerListener {
      * @param id 音效ID（mSoundCancel/mSoundError等）
      */
     private void playSound(int id) {
+        if (mSoundPool == null) {
+            Log.w(TAG, "playSound: SoundPool is null, skip");
+            return;
+        }
         mSoundPool.play(id, 0.5f, 0.5f, 0, 0, 1); // 播放音效（左右声道各50%音量）
         vibrate(); // 同时触发震动
     }
@@ -208,7 +217,7 @@ class Speech implements RecognitionListener, RecognizerListener {
      * @param text 提示文本
      */
     private void alert(String text) {
-        CustomToast.show(context, text, Toast.LENGTH_SHORT, true);
+        CustomToast.show(context, text, Toast.LENGTH_LONG, true);
     }
 
     /**
@@ -216,7 +225,7 @@ class Speech implements RecognitionListener, RecognizerListener {
      * 根据当前状态决定是开始监听、取消还是停止。
      */
     public void start() {
-        if (speech == null && vSpeech == null) {
+        if (speech == null && vSpeech == null && bSpeech == null) {
             alert("未正确设置识别引擎");
             playSound(mSoundError);
             return;
@@ -244,6 +253,9 @@ class Speech implements RecognitionListener, RecognizerListener {
         if (vSpeech != null) {
             vSpeech.startInputting(); // Vivo识别器开始输入
             state = STATE_START;
+        } else if (bSpeech != null) {
+            bSpeech.startInputting(); // 百度识别器开始输入
+            state = STATE_START;
         } else if (speech != null) {
             // 配置系统识别意图
             recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -261,10 +273,9 @@ class Speech implements RecognitionListener, RecognizerListener {
         playSound(mSoundCancel);
         state = STATE_CANCEL;
         vibrate();
-        if (vSpeech != null)
-            vSpeech.cancel();
-        if (speech != null)
-            speech.cancel();
+        if (vSpeech != null) vSpeech.cancel();
+        if (bSpeech != null) bSpeech.cancel();
+        if (speech != null) speech.cancel();
     }
 
     /**
@@ -274,26 +285,27 @@ class Speech implements RecognitionListener, RecognizerListener {
     public void stop() {
         Log.i(TAG, "stop");
         vibrate();
-        if (vSpeech != null)
-            vSpeech.stop();
-        if (speech != null)
-            speech.stopListening();
+        if (vSpeech != null) vSpeech.stop();
+        if (bSpeech != null) bSpeech.stop();
+        if (speech != null) speech.stopListening();
     }
 
     /**
      * 销毁语音识别器，释放资源。
      */
     public void destroy() {
-        if (vSpeech != null)
+        if (vSpeech != null) {
             vSpeech.cancel();
-        if (speech != null)
+            vSpeech = null;
+        }
+        if (bSpeech != null) {
+            bSpeech.cancel();
+            bSpeech = null;
+        }
+        if (speech != null) {
             speech.cancel();
-        if (speech != null)
-            speech.destroy();
-        if (vSpeech != null)
-            vSpeech.destroy();
-        vSpeech = null;
-        speech = null;
+            speech = null;
+        }
     }
 
     // RecognitionListener 接口实现
@@ -449,7 +461,8 @@ class Speech implements RecognitionListener, RecognizerListener {
 
     @Override
     public void onResult(String result) {
-        if (vSpeech == null && speech == null)
+        Log.i(TAG, "onResult:" + result);
+        if (vSpeech == null && bSpeech == null && speech == null)
             return;
         playSound(mSoundSuccess);
         state = STATE_DONE;

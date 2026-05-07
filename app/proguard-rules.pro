@@ -27,6 +27,9 @@
 # 1. 仅保护类名不被混淆（不进入大括号指定成员）
 -keep class org.luaj.**
 -keep class com.vivo.speechsdk.**{*;}
+# 百度语音 SDK 混淆保留规则
+-keep class com.baidu.speech.**{*;}
+-keep class com.baidu.tts.**{*;}
 
 # 2. 显式保护公开（public）和受保护（protected）的成员
 # 这样私有（private）的方法和字段就会因为没有被匹配到而被混淆

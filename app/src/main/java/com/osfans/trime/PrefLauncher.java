@@ -39,6 +39,7 @@ import com.osfans.trime.dialog.KeyboardDialog; // 键盘选择对话框
 import com.osfans.trime.dialog.OptionsDialog; // 选项设置对话框
 import com.osfans.trime.dialog.SchemaDialog; // 输入方案管理对话框
 import com.osfans.trime.dialog.SchemaGroupDialog; // 方案组管理对话框
+import com.osfans.trime.dialog.SpeechDialog; // 语音识别设置对话框
 import com.osfans.trime.dialog.StyleDialog; // 样式选择对话框
 import com.osfans.trime.dialog.ThemeDialog; // 主题选择对话框
 import com.osfans.trime.util.CustomToast;
@@ -107,7 +108,8 @@ public class PrefLauncher extends Activity implements AdapterView.OnItemClickLis
                 "输入方案",     // 快速切换当前启用的方案
                 "键盘主题",     // 更换键盘皮肤
                 "颜色样式",     // 调整配色方案
-                "默认键盘"      // 设置不同场景下的默认键盘布局
+                "默认键盘",      // 设置不同场景下的默认键盘布局
+                "语音识别"       // 语音识别引擎设置
         });
         
         ListView mListView = new ListView(this); // 创建列表视图
@@ -255,6 +257,10 @@ public class PrefLauncher extends Activity implements AdapterView.OnItemClickLis
             case 6:
                 // 显示默认键盘布局设置对话框
                 new KeyboardDialog(this).show();
+                break;
+            case 7:
+                // 显示语音识别设置对话框
+                new SpeechDialog(this).show();
                 break;
         }
     }
