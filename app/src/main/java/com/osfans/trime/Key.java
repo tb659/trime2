@@ -18,6 +18,7 @@
 package com.osfans.trime;
 
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 
@@ -188,6 +189,8 @@ public class Key {
     private boolean mSwipeRepeatable;
     // 当前是否处于 ASCII 模式
     private boolean mAsciiMode;
+
+    private static final String TAG = "Key";
 
 
     /**
@@ -1023,6 +1026,24 @@ public class Key {
     }
 
     /**
+     * 根据 Shift 状态和 ASCII 模式动态获取长按事件的标签文本。
+     * 用于更新按键的助记显示，使其与实际输出保持一致。
+     *
+     * @param isShifted   Shift 键是否按下
+     * @param isAsciiMode 当前是否为 ASCII 模式
+     * @return 动态选择的长按事件标签，如果没有则返回 null
+     */
+    public String getDynamicLongClickLabel(boolean isShifted, boolean isAsciiMode) {
+        Event dynamicEvent = getDynamicLongClick(isShifted, isAsciiMode);
+        if (dynamicEvent == null)
+            return null;
+        // 优先使用 hint_long，其次使用事件的标签
+        if (hints[KeyEventType.LONG_CLICK.ordinal()] != null)
+            return hints[KeyEventType.LONG_CLICK.ordinal()];
+        return dynamicEvent.getLabel();
+    }
+
+    /**
      * 返回按键的字符串表示，用于调试。
      * 包含标签、键码、长按事件、ASCII 事件和位置尺寸信息。
      *
@@ -1144,5 +1165,51 @@ public class Key {
      */
     public boolean isSwipeRepeatable() {
         return mSwipeRepeatable;
+    }
+
+    /**
+     * 根据 Shift 状态和 ASCII 模式动态获取长按事件。
+     * 对于 q-p 键位（字母行），根据以下条件返回不同的事件：
+     * - 无 Shift + 中文模式：返回 swipe_up（数字 1-0）
+     * - 有 Shift + 英文/中文模式：返回 swipe_down（符号 !@#$ 等）
+     * - 其他键位：返回普通的 long_click
+     *
+     * @param isShifted   Shift 键是否按下
+     * @param isAsciiMode 当前是否为 ASCII 模式
+     * @return 动态选择的 Event 对象
+     */
+    public Event getDynamicLongClick(boolean isShifted, boolean isAsciiMode) {
+        // 检查是否是字母键位（单字母）
+        String label = getLabel();
+        if (label != null && label.length() == 1) {
+            char ch = label.charAt(0);
+
+            // 修正：支持小写(a-z)和大写(A-Z)字母键位
+            // Shift 状态下 label 会变成大写，所以需要同时检查两种情况
+            boolean isLetter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+            if (isLetter) {
+
+                Log.d(TAG, "isShifted: " + isShifted);
+                Log.d(TAG, "isAsciiMode: " + isAsciiMode);
+
+
+                // q-p 键位：根据 Shift 状态选择 swipe_up 或 swipe_down
+                if (!isShifted) {
+                    // 无 Shift：返回 swipe_up（数字）
+                    Event swipeUpEvent = getEvent(KeyEventType.SWIPE_UP.ordinal());
+                    if (swipeUpEvent != null) {
+                        return swipeUpEvent;
+                    }
+                } else {
+                    // 有 Shift：返回 swipe_down（符号）
+                    Event swipeDownEvent = getEvent(KeyEventType.SWIPE_DOWN.ordinal());
+                    if (swipeDownEvent != null) {
+                        return swipeDownEvent;
+                    }
+                }
+            }
+        }
+        // 其他键位或没有配置 swipe 事件时，返回普通的 long_click
+        return getLongClick();
     }
 }

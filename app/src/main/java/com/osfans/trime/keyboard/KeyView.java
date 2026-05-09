@@ -61,6 +61,8 @@ import java.util.List;
  */
 public class KeyView extends FrameLayout implements View.OnClickListener {
 
+    private static final String TAG = "KeyView";
+
     // --- 1. 静态常量 ---
     /** 快速进出缓动插值器 */
     private static final Interpolator FAST_OUT_SLOW_IN = new FastOutSlowInInterpolator();
@@ -787,6 +789,9 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             if (mKey.isShift()) {
                 setSelected(ModifierState.isShifted());
             }
+            
+            // 更新 q-p 键位的动态长按助记显示
+            updateDynamicLongClickHint();
         }
         if(Config.is_hide_key_hint()==_hide_key_hint)
             return;
@@ -801,6 +806,31 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
                 if(hint!=null)
                     hint.setVisibility(VISIBLE);
             }
+        }
+    }
+
+    /**
+     * 更新 q-p 键位的动态长按助记显示。
+     * 根据当前 Shift 状态和 ASCII 模式，动态更新长按助记文本。
+     */
+    private void updateDynamicLongClickHint() {
+        if (mKey == null || mLongClick == null) return;
+        
+        String label = mKey.getLabel();
+        if (label == null || label.length() != 1) return;
+        
+        char ch = label.charAt(0);
+        // 修正：支持小写(a-z)和大写(A-Z)字母键位
+        // Shift 状态下 label 会变成大写，所以需要同时检查两种情况
+        boolean isLetter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+        if (!isLetter) return;
+        
+        boolean isShifted = ModifierState.isShifted();
+        boolean isAsciiMode = Rime.isAsciiMode();
+        String dynamicLabel = mKey.getDynamicLongClickLabel(isShifted, isAsciiMode);
+        
+        if (!TextUtils.isEmpty(dynamicLabel)) {
+            setLongClickText(dynamicLabel);
         }
     }
 
@@ -1085,49 +1115,83 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     private final Runnable mLongClickRunnable = new Runnable() {
         @Override
         public void run() {
+            // 检查当前是否仍处于按下状态，如果已释放则直接返回，避免误触发长按逻辑
             if (!isPressed()) return;
+
+            // 1. 处理弹出键盘 (Popup Keyboard)
+            // 获取按键配置的弹出键列表（通常用于长按显示候选字或符号面板）
             List<String> popup = mKey.getPopupKeys();
+            Log.d(TAG, "popup: " + popup);
             if (popup != null) {
+                // 创建浮动键盘实例
                 popupKeyboard = new FloatKeyboard(getContext(), ThemeManager.getGlobals(), popup);
+                // 显示浮动键盘
                 showPopup();
+                // 取消当前按键的按下状态，因为焦点已转移到浮动键盘
                 setPressed(false);
                 return;
             }
+
+            // 2. 处理长按反馈 (振动与声音)
+            // 检查长按样式配置中是否启用了振动反馈
             if (mKeyStyle.getLongClickKeyStyle().isVibrationEnabled()) {
+                // 获取自定义振动效果
                 VibrationEffect ve = mKeyStyle.getLongClickKeyStyle().getVibrationEffect();
                 if (ve != null) {
+                    // 执行自定义振动
                     ThemeManager.vibrate(ve);
                 } else {
+                    // 执行系统默认的长按振动反馈
                     boolean ret = performHapticFeedback(
                             HapticFeedbackConstants.LONG_PRESS,
                             HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
                     );
                 }
             }
+            // 检查长按样式配置中是否启用了声音反馈
             if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled()) {
+                // 获取自定义音效ID
                 int sound = mKeyStyle.getLongClickKeyStyle().getSoundEffect();
                 if (sound > 0) {
+                    // 播放自定义音效
                     ThemeManager.play(sound);
                 } else {
+                    // 播放系统默认点击音效
                     playSoundEffect(SoundEffectConstants.CLICK);
                 }
             }
-            //performHapticFeedback(
-            //        HapticFeedbackConstants.LONG_PRESS,
-            //        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-            //);
+
+            // 标记长按事件已发生，防止抬起时触发单击事件
             mLongClicked = true;
+
+            // 3. 处理 Shift 键的特殊长按逻辑
             if (mKey.isShift()) {
+                // Shift 键长按通常意味着锁定大写 (Shift Lock)
                 ModifierState.setShiftLock(true);
                 mTrime.setShifted(true);
                 return;
             }
 
-            if (mKey.getLongClick() != null) {
-                showPreview(true, mKey.getLongClick().getLabel());
-                TrimeService.getInstance().onEvent(mKey.getLongClick());
+            // 4. 处理动态长按事件
+            // 获取当前的 Shift 状态和 ASCII 模式状态
+            boolean isShifted = ModifierState.isShifted();
+            boolean isAsciiMode = Rime.isAsciiMode();
+            // 根据当前状态获取动态定义的长按事件（例如不同模式下长按同一键产生不同字符）
+            Event dynamicLongClick = mKey.getDynamicLongClick(isShifted, isAsciiMode);
+
+            Log.d(TAG, "isShifted: " + isShifted);
+            Log.d(TAG, "isAsciiMode: " + isAsciiMode);
+            Log.d(TAG, "dynamicLongClick: " + dynamicLongClick);
+
+            if (dynamicLongClick != null) {
+                // 如果有动态长按事件，显示预览文本并发送事件
+                showPreview(true, dynamicLongClick.getLabel());
+                TrimeService.getInstance().onEvent(dynamicLongClick);
                 return;
             }
+
+            // 5. 启动重复按键任务
+            // 如果没有上述特殊处理，则启动重复按键 Runnable，实现长按连续输入
             postDelayed(mRepeatableRunnable, 200);
         }
     };
