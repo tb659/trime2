@@ -140,10 +140,10 @@ public class PrefLauncher extends Activity implements AdapterView.OnItemClickLis
         root.addView(mListView, new LinearLayout.LayoutParams(-1, -2)); // ListView 占据剩余空间
         root.addView(editText, new LinearLayout.LayoutParams(-1, -2)); // EditText 固定在底部
         
-        TextView tv = new TextView(this); // 创建提示信息的文本视图
-        tv.setAutoLinkMask(Linkify.ALL); // 开启自动识别网址、邮箱等链接
-        tv.setText("下载更多版本：https://github.com/nirenr/trime2/releases"); // 设置提示文本
-        root.addView(tv, new LinearLayout.LayoutParams(-1, -2)); // 添加到底部
+        // TextView tv = new TextView(this); // 创建提示信息的文本视图
+        // tv.setAutoLinkMask(Linkify.ALL); // 开启自动识别网址、邮箱等链接
+        // tv.setText("下载更多版本：https://github.com/nirenr/trime2/releases"); // 设置提示文本
+        // root.addView(tv, new LinearLayout.LayoutParams(-1, -2)); // 添加到底部
         
         setContentView(root); // 设置根布局
         mListView.setOnItemClickListener(this); // 注册列表项点击监听器
