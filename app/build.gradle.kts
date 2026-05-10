@@ -6,6 +6,7 @@
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
     id("com.osfans.trime.app-convention")
@@ -24,18 +25,33 @@ android {
     namespace = "com.osfans.trime"
     compileSdk = 35
     buildToolsVersion = "35.0.0"
+    
+    // Load local.properties
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(FileInputStream(localPropertiesFile))
+    }
+    
 // 1. 定义签名配置
     signingConfigs {
-        // 使用 findProperty 避免属性缺失时直接崩溃
-        val keyPath = project.findProperty("signKeyFile") as? String
+        // 从 localProperties 读取
+        val keyPath = localProperties.getProperty("signKeyFile")
+        
+        println("DEBUG: signKeyFile = $keyPath")
+        println("DEBUG: signKeyStorePwd = ${localProperties.getProperty("signKeyStorePwd")}")
+        println("DEBUG: signKeyAlias = ${localProperties.getProperty("signKeyAlias")}")
 
         if (!keyPath.isNullOrBlank()) {
             create("myCustomConfig") {
-                storeFile = file(keyPath) // 关键：必须用 file() 包裹路径
-                storePassword = project.findProperty("signKeyStorePwd") as? String
-                keyAlias = project.findProperty("signKeyAlias") as? String
-                keyPassword = project.findProperty("signKeyPwd") as? String
+                storeFile = file(keyPath)
+                storePassword = localProperties.getProperty("signKeyStorePwd")
+                keyAlias = localProperties.getProperty("signKeyAlias")
+                keyPassword = localProperties.getProperty("signKeyPwd")
+                println("DEBUG: Signing config created successfully")
             }
+        } else {
+            println("DEBUG: signKeyFile is null or blank, signing config will not be created")
         }
     }
     defaultConfig {
