@@ -185,6 +185,8 @@ public class Key {
     private boolean mHasSwipeEvent;
     // ASCII 模式专用的按键对象（可独立配置）
     private Key mAsciiKey;
+    // Shift 状态专用的按键对象（可独立配置）
+    private Key mShiftKey;
     // 滑动事件是否可重复触发
     private boolean mSwipeRepeatable;
     // 当前是否处于 ASCII 模式
@@ -266,6 +268,18 @@ public class Key {
                 mAsciiKey.setAsciiMode(true);
             } else {
                 ascii = new Event(a);
+            }
+        }
+        
+        // 解析 Shift 状态下的事件配置（可以是字符串或表）
+        LuaValue shift = mk.get("shift");
+        if (shift.isstring()) {
+            // shift 配置为字符串时，创建一个简单的事件
+            // 这种情况较少见，通常 shift 配置是一个表
+        } else if (shift.istable()) {
+            if (!shift.get("click").isnil()) {
+                // 如果 Shift 配置包含完整的按键定义，则创建独立的 Key 对象
+                mShiftKey = new Key(shift);
             }
         }
         // 确定按键样式名称，优先使用 style 字段，否则使用 click 事件
@@ -1159,6 +1173,15 @@ public class Key {
     }
 
     /**
+     * 获取 Shift 状态专用的按键对象。
+     *
+     * @return Shift 状态的 Key 对象，如果没有独立配置则返回 null。
+     */
+    public Key getShiftKey() {
+        return mShiftKey;
+    }
+
+    /**
      * 判断滑动事件是否可重复触发。
      *
      * @return true 如果可重复，false 否则。
@@ -1169,47 +1192,52 @@ public class Key {
 
     /**
      * 根据 Shift 状态和 ASCII 模式动态获取长按事件。
-     * 对于 q-p 键位（字母行），根据以下条件返回不同的事件：
-     * - 无 Shift + 中文模式：返回 swipe_up（数字 1-0）
-     * - 有 Shift + 英文/中文模式：返回 swipe_down（符号 !@#$ 等）
-     * - 其他键位：返回普通的 long_click
+     * 对于 q-p 键位(字母行),根据以下条件返回不同的事件:
+     * - 无 Shift + 中文模式:返回 long_click(数字 1-0)
+     * - 无 Shift + 英文模式:返回 ascii.long_click(可能是其他配置)
+     * - 有 Shift + 中文模式:返回 shift.long_click(符号 !@#$% 等)
+     * - 有 Shift + 英文模式:返回 shift.ascii.long_click(英文符号配置)
+     * - 其他键位:返回普通的 long_click
      *
      * @param isShifted   Shift 键是否按下
      * @param isAsciiMode 当前是否为 ASCII 模式
      * @return 动态选择的 Event 对象
      */
     public Event getDynamicLongClick(boolean isShifted, boolean isAsciiMode) {
-        // 检查是否是字母键位（单字母）
+        // 检查是否是字母键位(单字母)
         String label = getLabel();
         if (label != null && label.length() == 1) {
             char ch = label.charAt(0);
 
-            // 修正：支持小写(a-z)和大写(A-Z)字母键位
-            // Shift 状态下 label 会变成大写，所以需要同时检查两种情况
+            // 修正:支持小写(a-z)和大写(A-Z)字母键位
+            // Shift 状态下 label 会变成大写,所以需要同时检查两种情况
             boolean isLetter = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
             if (isLetter) {
-
-                Log.d(TAG, "isShifted: " + isShifted);
-                Log.d(TAG, "isAsciiMode: " + isAsciiMode);
-
-
-                // q-p 键位：根据 Shift 状态选择 swipe_up 或 swipe_down
                 if (!isShifted) {
-                    // 无 Shift：返回 swipe_up（数字）
-                    Event swipeUpEvent = getEvent(KeyEventType.SWIPE_UP.ordinal());
-                    if (swipeUpEvent != null) {
-                        return swipeUpEvent;
+                    // 无 Shift:根据 ASCII 模式返回基础 long_click
+                    if (isAsciiMode && mAsciiKey != null) {
+                        // ASCII 模式下使用 ascii 配置的 long_click
+                        return mAsciiKey.getLongClick();
+                    } else {
+                        // 中文模式使用默认 long_click
+                        return getLongClick();
                     }
                 } else {
-                    // 有 Shift：返回 swipe_down（符号）
-                    Event swipeDownEvent = getEvent(KeyEventType.SWIPE_DOWN.ordinal());
-                    if (swipeDownEvent != null) {
-                        return swipeDownEvent;
+                    // 有 Shift:根据 ASCII 模式返回 shift 配置的 long_click
+                    if (mShiftKey != null) {
+                        // 如果配置了独立的 shift key
+                        if (isAsciiMode && mShiftKey.mAsciiKey != null) {
+                            // Shift+ASCII 模式:优先使用 shift.ascii 配置
+                            return mShiftKey.mAsciiKey.getLongClick();
+                        } else {
+                            // Shift+中文模式:使用 shift 配置
+                            return mShiftKey.getLongClick();
+                        }
                     }
                 }
             }
         }
-        // 其他键位或没有配置 swipe 事件时，返回普通的 long_click
+        // 其他键位或没有配置 shift 事件时,返回普通的 long_click
         return getLongClick();
     }
 }
