@@ -52,6 +52,8 @@ import com.osfans.trime.theme.KeyStyle;
 import com.osfans.trime.theme.Style;
 import com.osfans.trime.theme.ThemeManager;
 
+import org.luaj.LuaValue;
+
 import java.util.List;
 
 /**
@@ -673,7 +675,18 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             // 初始化 LongClick TextView
             if (!mKeyStyle.hasKey("long_click"))
                 return;
-            KeyStyle mLongClickStyle = mKeyStyle.getLongClickKeyStyle();
+            
+            // 优先使用按键级别的 long_click 样式配置，其次使用主题全局的 key.long_click 配置
+            KeyStyle mLongClickStyle;
+            LuaValue keyLongClickStyle = mKey.getMk().get("style_long_click");
+            if (keyLongClickStyle.istable()) {
+                // 按键级别配置存在，基于主题 long_click 样式创建新的样式对象
+                mLongClickStyle = new KeyStyle(keyLongClickStyle, mKeyStyle.getLongClickKeyStyle());
+            } else {
+                // 使用主题全局的 key.long_click 配置
+                mLongClickStyle = mKeyStyle.getLongClickKeyStyle();
+            }
+            
             mHintStyles[HINT_LONG] = mLongClickStyle;
             if (!mLongClickStyle.isShow())
                 return;
@@ -718,7 +731,18 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             // 初始化 Hint TextView
             if (!mKeyStyle.hasKey("hint"))
                 return;
-            KeyStyle mHintStyle = mKeyStyle.getHintKeyStyle();
+            
+            // 优先使用按键级别的 hint 样式配置，其次使用主题全局的 key.hint 配置
+            KeyStyle mHintStyle;
+            LuaValue keyHintStyle = mKey.getMk().get("style_hint");
+            if (keyHintStyle.istable()) {
+                // 按键级别配置存在，基于主题 hint 样式创建新的样式对象
+                mHintStyle = new KeyStyle(keyHintStyle, mKeyStyle.getHintKeyStyle());
+            } else {
+                // 使用主题全局的 key.hint 配置
+                mHintStyle = mKeyStyle.getHintKeyStyle();
+            }
+            
             mHintStyles[HINT] = mHintStyle;
             if (!mHintStyle.isShow())
                 return;
@@ -996,55 +1020,90 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
         String ev = mKey.getHint(SWIPE_UP);
         if (ev != null) {
-            if (mHintKeyStyle.hasKey("up")) {
-                KeyStyle ht = mHintKeyStyle.getKeyStyle("up", mHintKeyStyle);
-                mHintStyles[SWIPE_UP] = ht;
-                if (mHints[SWIPE_UP] != null)
-                    mHints[SWIPE_UP].setText(ht.getSpan(ev));
-                else
-                    mHints[SWIPE_UP] = addHint(ev, Gravity.TOP, ht);
+            // 优先使用按键级别的 hint_up 配置，继承主题全局的 hint.up 配置
+            KeyStyle ht;
+            LuaValue keyHintUp = mKey.getMk().get("hint_up");
+            if (keyHintUp.istable()) {
+                // 按键级别配置存在，先获取主题的 hint.up 作为默认值
+                KeyStyle defaultUpStyle = mHintKeyStyle.hasKey("up") 
+                    ? mHintKeyStyle.getKeyStyle("up", mHintKeyStyle)
+                    : mHintKeyStyle;
+                // 基于主题的 hint.up 样式创建新的样式对象（实现继承覆盖）
+                ht = new KeyStyle(keyHintUp, defaultUpStyle);
+            } else if (mHintKeyStyle.hasKey("up")) {
+                // 没有按键级别配置，使用主题全局的 hint.up 配置
+                ht = mHintKeyStyle.getKeyStyle("up", mHintKeyStyle);
             } else {
-                mHintStyles[SWIPE_UP] = mHintKeyStyle;
+                ht = mHintKeyStyle;
             }
+            mHintStyles[SWIPE_UP] = ht;
+            if (mHints[SWIPE_UP] != null)
+                mHints[SWIPE_UP].setText(ht.getSpan(ev));
+            else
+                mHints[SWIPE_UP] = addHint(ev, Gravity.TOP, ht);
         }
         ev = mKey.getHint(SWIPE_DOWN);
         if (ev != null) {
-            if (mHintKeyStyle.hasKey("down")) {
-                KeyStyle ht = mHintKeyStyle.getKeyStyle("down", mHintKeyStyle);
-                mHintStyles[SWIPE_DOWN] = ht;
-                if (mHints[SWIPE_DOWN] != null)
-                    mHints[SWIPE_DOWN].setText(ht.getSpan(ev));
-                else
-                    mHints[SWIPE_DOWN] = addHint(ev, Gravity.BOTTOM, ht);
+            // 优先使用按键级别的 hint_down 配置，继承主题全局的 hint.down 配置
+            KeyStyle ht;
+            LuaValue keyHintDown = mKey.getMk().get("hint_down");
+            if (keyHintDown.istable()) {
+                KeyStyle defaultDownStyle = mHintKeyStyle.hasKey("down") 
+                    ? mHintKeyStyle.getKeyStyle("down", mHintKeyStyle)
+                    : mHintKeyStyle;
+                ht = new KeyStyle(keyHintDown, defaultDownStyle);
+            } else if (mHintKeyStyle.hasKey("down")) {
+                ht = mHintKeyStyle.getKeyStyle("down", mHintKeyStyle);
             } else {
-                mHintStyles[SWIPE_DOWN] = mHintKeyStyle;
+                ht = mHintKeyStyle;
             }
+            mHintStyles[SWIPE_DOWN] = ht;
+            if (mHints[SWIPE_DOWN] != null)
+                mHints[SWIPE_DOWN].setText(ht.getSpan(ev));
+            else
+                mHints[SWIPE_DOWN] = addHint(ev, Gravity.BOTTOM, ht);
         }
         ev = mKey.getHint(SWIPE_LEFT);
         if (ev != null) {
-            if (mHintKeyStyle.hasKey("left")) {
-                KeyStyle ht = mHintKeyStyle.getKeyStyle("left", mHintKeyStyle);
-                mHintStyles[SWIPE_LEFT] = ht;
-                if (mHints[SWIPE_LEFT] != null)
-                    mHints[SWIPE_LEFT].setText(ht.getSpan(ev));
-                else
-                    mHints[SWIPE_LEFT] = addHint(ev, Gravity.LEFT, ht);
+            // 优先使用按键级别的 hint_left 配置，继承主题全局的 hint.left 配置
+            KeyStyle ht;
+            LuaValue keyHintLeft = mKey.getMk().get("hint_left");
+            if (keyHintLeft.istable()) {
+                KeyStyle defaultLeftStyle = mHintKeyStyle.hasKey("left") 
+                    ? mHintKeyStyle.getKeyStyle("left", mHintKeyStyle)
+                    : mHintKeyStyle;
+                ht = new KeyStyle(keyHintLeft, defaultLeftStyle);
+            } else if (mHintKeyStyle.hasKey("left")) {
+                ht = mHintKeyStyle.getKeyStyle("left", mHintKeyStyle);
             } else {
-                mHintStyles[SWIPE_LEFT] = mHintKeyStyle;
+                ht = mHintKeyStyle;
             }
+            mHintStyles[SWIPE_LEFT] = ht;
+            if (mHints[SWIPE_LEFT] != null)
+                mHints[SWIPE_LEFT].setText(ht.getSpan(ev));
+            else
+                mHints[SWIPE_LEFT] = addHint(ev, Gravity.LEFT, ht);
         }
         ev = mKey.getHint(SWIPE_RIGHT);
         if (ev != null) {
-            if (mHintKeyStyle.hasKey("right")) {
-                KeyStyle ht = mHintKeyStyle.getKeyStyle("right", mHintKeyStyle);
-                mHintStyles[SWIPE_RIGHT] = ht;
-                if (mHints[SWIPE_RIGHT] != null)
-                    mHints[SWIPE_RIGHT].setText(ht.getSpan(ev));
-                else
-                    mHints[SWIPE_RIGHT] = addHint(ev, Gravity.RIGHT, ht);
+            // 优先使用按键级别的 hint_right 配置，继承主题全局的 hint.right 配置
+            KeyStyle ht;
+            LuaValue keyHintRight = mKey.getMk().get("hint_right");
+            if (keyHintRight.istable()) {
+                KeyStyle defaultRightStyle = mHintKeyStyle.hasKey("right") 
+                    ? mHintKeyStyle.getKeyStyle("right", mHintKeyStyle)
+                    : mHintKeyStyle;
+                ht = new KeyStyle(keyHintRight, defaultRightStyle);
+            } else if (mHintKeyStyle.hasKey("right")) {
+                ht = mHintKeyStyle.getKeyStyle("right", mHintKeyStyle);
             } else {
-                mHintStyles[SWIPE_RIGHT] = mHintKeyStyle;
+                ht = mHintKeyStyle;
             }
+            mHintStyles[SWIPE_RIGHT] = ht;
+            if (mHints[SWIPE_RIGHT] != null)
+                mHints[SWIPE_RIGHT].setText(ht.getSpan(ev));
+            else
+                mHints[SWIPE_RIGHT] = addHint(ev, Gravity.RIGHT, ht);
         }
     }
 

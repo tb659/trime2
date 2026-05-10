@@ -191,6 +191,8 @@ public class Key {
     private boolean mSwipeRepeatable;
     // 当前是否处于 ASCII 模式
     private boolean mAsciiMode;
+    // 原始 Lua 配置表（用于读取按键级别的样式覆盖）
+    private LuaValue mMk;
 
     private static final String TAG = "Key";
 
@@ -202,6 +204,8 @@ public class Key {
      * @param mk 从 YAML 配置中解析得到的 Lua 表，包含按键的所有配置项。
      */
     public Key(LuaValue mk) {
+        // 保存原始 Lua 配置表
+        mMk = mk;
         String s;
         // 事件类型名称数组，与 KeyEventType 枚举对应
         String[] eventTypes =
@@ -1188,6 +1192,16 @@ public class Key {
      */
     public boolean isSwipeRepeatable() {
         return mSwipeRepeatable;
+    }
+
+    /**
+     * 获取原始 Lua 配置表。
+     * 用于读取按键级别的样式覆盖配置（如 hint_up、hint_down 等）。
+     *
+     * @return 原始 LuaValue 对象。
+     */
+    public LuaValue getMk() {
+        return mMk;
     }
 
     /**

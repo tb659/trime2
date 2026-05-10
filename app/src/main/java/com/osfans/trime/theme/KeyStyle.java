@@ -122,6 +122,19 @@ public class KeyStyle extends Style {
         setStyle(def);
     }
 
+    /**
+     * 构造函数,带默认按键样式。
+     * 用于按键级别的样式覆盖，基于父级 KeyStyle 创建新的样式对象。
+     *
+     * @param t Lua 表,包含样式配置项。
+     * @param def 默认按键样式对象。
+     */
+    public KeyStyle(LuaValue t, KeyStyle def) {
+        this(t);
+        // 复制默认 KeyStyle 的所有属性
+        setStyle(def);
+    }
+
     // ==================== 核心属性获取(带缓存逻辑) ====================
 
     /**
