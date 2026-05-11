@@ -268,7 +268,7 @@ patch:
   - `ci`: CI 配置相关
 
 ### 行为准则
-项目遵循 [Contributor Covenant Code of Conduct](../../CODE_OF_CONDUCT.md)，要求：
+项目遵循 [Contributor Covenant Code of Conduct](../CODE_OF_CONDUCT.md)，要求：
 - 尊重所有社区成员
 - 不接受骚扰、歧视行为
 - 建设性地给予和接受反馈
@@ -323,7 +323,7 @@ SPDX-FileCopyrightText: 2015 - 2024 Rime community
 SPDX-License-Identifier: GPL-3.0-or-later
 ```
 
-完整许可证文本见 [LICENSE](../../LICENSE) 文件。
+完整许可证文本见 [LICENSE](../LICENSE) 文件。
 
 ## 致谢
 
