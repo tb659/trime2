@@ -106,7 +106,12 @@ public class SpeechDialog {
 
         mBaiduApiKeyInput = new EditText(context);
         mBaiduApiKeyInput.setHint("请输入百度 API Key");
-        mBaiduApiKeyInput.setText(mPref.getString(PREF_BAIDU_API_KEY, ""));
+        // 优先显示 BuildConfig 中的值(来自 local.properties),其次显示 SharedPreferences 中的值
+        String defaultApiKey = BuildConfig.API_KEY;
+        if (defaultApiKey == null || defaultApiKey.isEmpty()) {
+            defaultApiKey = mPref.getString(PREF_BAIDU_API_KEY, "");
+        }
+        mBaiduApiKeyInput.setText(defaultApiKey);
         mBaiduCredentialsLayout.addView(mBaiduApiKeyInput);
 
         // 百度 Secret Key 输入
@@ -118,7 +123,12 @@ public class SpeechDialog {
 
         mBaiduSecretKeyInput = new EditText(context);
         mBaiduSecretKeyInput.setHint("请输入百度 Secret Key");
-        mBaiduSecretKeyInput.setText(mPref.getString(PREF_BAIDU_SECRET_KEY, ""));
+        // 优先显示 BuildConfig 中的值(来自 local.properties),其次显示 SharedPreferences 中的值
+        String defaultSecretKey = BuildConfig.SECRET_KEY;
+        if (defaultSecretKey == null || defaultSecretKey.isEmpty()) {
+            defaultSecretKey = mPref.getString(PREF_BAIDU_SECRET_KEY, "");
+        }
+        mBaiduSecretKeyInput.setText(defaultSecretKey);
         mBaiduCredentialsLayout.addView(mBaiduSecretKeyInput);
 
         // 提示文本

@@ -73,13 +73,25 @@ public class BaiduRecognizer implements Recognizer {
 
     /**
      * 初始化百度语音识别器。
-     * 从 SharedPreferences 读取 API 凭证,创建 EventManager 实例。
+     * 优先从 BuildConfig 读取 API 凭证(来自 local.properties),其次从 SharedPreferences 读取。
      */
     private void init() {
         SharedPreferences pref = Function.getPref(mContext);
-        mApiKey = pref.getString(KEY_BAIDU_API_KEY, "");
-        mSecretKey = pref.getString(KEY_BAIDU_SECRET_KEY, "");
-        Log.e(TAG, "mApiKey: " + mApiKey + ", mSecretKey: " + mSecretKey);
+        
+        // 优先从 BuildConfig 获取(编译时从 local.properties 注入)
+        mApiKey = BuildConfig.API_KEY;
+        mSecretKey = BuildConfig.SECRET_KEY;
+        
+        // 如果 BuildConfig 中没有,则从 SharedPreferences 读取(用户手动配置)
+        if (mApiKey == null || mApiKey.isEmpty()) {
+            mApiKey = pref.getString(KEY_BAIDU_API_KEY, "");
+        }
+        if (mSecretKey == null || mSecretKey.isEmpty()) {
+            mSecretKey = pref.getString(KEY_BAIDU_SECRET_KEY, "");
+        }
+        
+        Log.i(TAG, "init: mApiKey=" + (mApiKey.isEmpty() ? "[empty]" : "[configured]") + 
+                   ", mSecretKey=" + (mSecretKey.isEmpty() ? "[empty]" : "[configured]"));
 
         if (mApiKey.isEmpty() || mSecretKey.isEmpty()) {
             Log.e(TAG, "init: Baidu API credentials not configured");

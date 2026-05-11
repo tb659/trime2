@@ -69,10 +69,14 @@ android {
         buildConfigField("String", "BUILD_VERSION_NAME", "\"${project.buildVersionName}\"")
 
         // --- 新增:注入 APP_KEY ---
-        // 从文件中获取,如果文件或 Key 不存在,提供一个默认空字符串,防止编译报错
-        val appKey = project.findProperty("API_KEY") as? String ?: ""
+        // 从 local.properties 文件中获取,如果 Key 不存在,提供默认空字符串
+        val appKey = localProperties.getProperty("API_KEY") ?: ""
         buildConfigField("String", "API_KEY", "\"$appKey\"")
-        val appId = project.findProperty("API_ID") as? String ?: ""
+        
+        val secretKey = localProperties.getProperty("SECRET_KEY") ?: ""
+        buildConfigField("String", "SECRET_KEY", "\"$secretKey\"")
+        
+        val appId = localProperties.getProperty("API_ID") ?: ""
         buildConfigField("String", "API_ID", "\"$appId\"")
         // -------------------------
     }
