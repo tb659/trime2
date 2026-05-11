@@ -25,7 +25,7 @@ import com.osfans.trime.util.Function;
 
 /**
  * 语音识别设置对话框。
- * 允许用户选择识别引擎（vivo/百度/系统）并配置百度 API 凭证。
+ * 允许用户配置百度 API 凭证。
  */
 public class SpeechDialog {
     /**
@@ -52,10 +52,6 @@ public class SpeechDialog {
      * SharedPreferences 实例
      */
     private final SharedPreferences mPref;
-    /**
-     * 引擎选择 Spinner
-     */
-    private Spinner mEngineSpinner;
     /**
      * 百度 API Key 输入框
      */
@@ -89,32 +85,17 @@ public class SpeechDialog {
 
         // 引擎选择标签
         TextView engineLabel = new TextView(context);
-        engineLabel.setText("语音识别引擎：");
+        engineLabel.setText("语音识别引擎：百度");
         engineLabel.setTextSize(16);
         mainLayout.addView(engineLabel);
 
-        // 引擎选择 Spinner
-        mEngineSpinner = new Spinner(context);
-        String[] engines = new String[]{"vivo", "baidu", "system"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, engines);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        mEngineSpinner.setAdapter(adapter);
+        // 固定使用百度引擎，无需选择
+        String currentEngine = "baidu";
 
-        // 设置当前选择的引擎
-        String currentEngine = mPref.getString("recognition_service", "vivo");
-        int engineIndex = 0;
-        if (currentEngine.equals("baidu")) {
-            engineIndex = 1;
-        } else if (!currentEngine.equals("vivo")) {
-            engineIndex = 2;
-        }
-        mEngineSpinner.setSelection(engineIndex);
-        mainLayout.addView(mEngineSpinner);
-
-        // 百度凭证区域（仅当选择百度时显示）
+        // 百度凭证区域（始终显示）
         mBaiduCredentialsLayout = new LinearLayout(context);
         mBaiduCredentialsLayout.setOrientation(LinearLayout.VERTICAL);
-        mBaiduCredentialsLayout.setVisibility(engineIndex == 1 ? LinearLayout.VISIBLE : LinearLayout.GONE);
+        mBaiduCredentialsLayout.setVisibility(LinearLayout.VISIBLE);
 
         // 百度 API Key 输入
         TextView apiKeyLabel = new TextView(context);
@@ -149,18 +130,6 @@ public class SpeechDialog {
         mBaiduCredentialsLayout.addView(hint);
 
         mainLayout.addView(mBaiduCredentialsLayout);
-
-        // 监听引擎选择变化
-        mEngineSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                mBaiduCredentialsLayout.setVisibility(position == 1 ? LinearLayout.VISIBLE : LinearLayout.GONE);
-            }
-
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {
-            }
-        });
 
         // 创建 AlertDialog
         AlertDialog.Builder builder = new AlertDialog.Builder(context, ThemeManager.getDialogTheme())
@@ -208,18 +177,12 @@ public class SpeechDialog {
      * 保存设置到 SharedPreferences。
      */
     private void saveSettings() {
-        String engine = (String) mEngineSpinner.getSelectedItem();
         SharedPreferences.Editor editor = mPref.edit();
-
-        if (engine.equals("baidu")) {
-            editor.putString("recognition_service", "baidu");
-            editor.putString(PREF_BAIDU_API_KEY, mBaiduApiKeyInput.getText().toString().trim());
-            editor.putString(PREF_BAIDU_SECRET_KEY, mBaiduSecretKeyInput.getText().toString().trim());
-        } else if (engine.equals("vivo")) {
-            editor.putString("recognition_service", "vivo");
-        } else {
-            editor.putString("recognition_service", "system");
-        }
+        
+        // 固定使用百度引擎
+        editor.putString("recognition_service", "baidu");
+        editor.putString(PREF_BAIDU_API_KEY, mBaiduApiKeyInput.getText().toString().trim());
+        editor.putString(PREF_BAIDU_SECRET_KEY, mBaiduSecretKeyInput.getText().toString().trim());
 
         editor.apply();
     }

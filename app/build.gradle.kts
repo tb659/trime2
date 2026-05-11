@@ -187,7 +187,6 @@ android.applicationVariants.all {
 }
 
 dependencies {
-    implementation(files("libs/com.vivo.speechsdk.asr_tts_5.2.4.00_external.aar"))
     // 百度语音识别 SDK（在线版）
     implementation(files("libs/com.baidu.speechSdk_V3_20250717_1e379e2.aar"))
     ksp(project(":codegen"))
