@@ -102,6 +102,18 @@ public class InputView extends FrameLayout implements ResourceFinder {
         ModifierState.setShiftLock(false);
         // 添加新键盘视图到容器最底层
         addView(keyboardView, 0, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // 更新容器高度以匹配键盘高度
+        int computedHeight = keyboardView.getComputedKeyboardHeight();
+        if (computedHeight > 0) {
+            ThemeManager.setComputedKeyboardHeight(computedHeight);
+        } else {
+            computedHeight = ThemeManager.getKeyboardHeight();
+        }
+        ViewGroup.LayoutParams lp = getLayoutParams();
+        if (lp != null) {
+            lp.height = computedHeight;
+            setLayoutParams(lp);
+        }
         if (oldView != null) {
             // 旧键盘执行淡出动画，动画结束后移除
             oldView.animate()

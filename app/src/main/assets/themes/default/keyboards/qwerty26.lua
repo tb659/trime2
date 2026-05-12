@@ -1,7 +1,7 @@
 name = "26键"
 author = "nirenr"
 key_width = 10
-key_height = 25
+key_height = 60
 lock = true
 --rows行键盘，宽度和高度为键盘总宽度的百分比
 rows = {

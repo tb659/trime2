@@ -1,12 +1,11 @@
 name = "36键"
 author = "nirenr"
 key_width = 10
-key_height = 21
+key_height = 54
 lock = true
 rows = {
     --第一行
     {
-        height = 17,
         keys = {
             { click = "1" },
             { click = "2" },
@@ -66,7 +65,6 @@ rows = {
     },
     --第五行
     {
-        height = 20,
         keys = {
             { click = "Keyboard_symbols", long_click = "F4", style = "functional", width = 15 },
             { click = "Keyboard_number", long_click = "Theme_settings", popup = {"Theme_settings", "Color_switch"}, style = "functional" },

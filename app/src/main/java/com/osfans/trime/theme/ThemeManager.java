@@ -57,6 +57,7 @@ import java.util.regex.Pattern;
  * 提供 Lua 环境初始化、主题切换、样式管理、震动/音效控制等功能。
  */
 public class ThemeManager {
+    private static final String TAG = "ThemeManager";
 
     // 默认候选词栏高度(dp)
     private static final int mCandidateHeight = 48;
@@ -269,7 +270,7 @@ public class ThemeManager {
      * @return 高度值(px)。
      */
     public static int getHeight() {
-        if(Rime.getRimeOption("_hide_candidate"))
+        if (Rime.getRimeOption("_hide_candidate"))
             return getStyle().getSize("height", mCandidateHeight + mKeyboardHeight) - getStyle().getStyle("keyboard").getSize("height", mKeyboardHeight) - getStyle().getStyle("candidate").getSize("height", mCandidateHeight) + getKeyboardHeight();
         return getStyle().getSize("height", mCandidateHeight + mKeyboardHeight) - getStyle().getStyle("keyboard").getSize("height", mKeyboardHeight) - getStyle().getStyle("candidate").getSize("height", mCandidateHeight) + getKeyboardHeight() + getCandidateHeight();
     }
@@ -280,7 +281,7 @@ public class ThemeManager {
      * @return 高度值(px)。
      */
     public static int getContentHeight() {
-        if(Rime.getRimeOption("_hide_candidate"))
+        if (Rime.getRimeOption("_hide_candidate"))
             return getCandidateHeight();
         return getCandidateHeight() + getKeyboardHeight();
     }
@@ -291,9 +292,15 @@ public class ThemeManager {
      * @return 高度值(px)。
      */
     public static int getRawContentHeight() {
-        if(Rime.getRimeOption("_hide_candidate"))
-            return getStyle().getStyle("keyboard").getSize("height", mKeyboardHeight);
-        return getStyle().getStyle("keyboard").getSize("height", mKeyboardHeight) + getStyle().getStyle("candidate").getSize("height", mCandidateHeight);
+        int kbHeight;
+        if (sComputedKeyboardHeight > 0) {
+            kbHeight = sComputedKeyboardHeight;
+        } else {
+            kbHeight = getStyle().getStyle("keyboard").getSize("height", mKeyboardHeight);
+        }
+        // 如果隐藏候选词栏,则返回键盘高度
+        if (Rime.getRimeOption("_hide_candidate")) return kbHeight;
+        return kbHeight + getStyle().getStyle("candidate").getSize("height", mCandidateHeight);
     }
 
     /**
@@ -310,7 +317,39 @@ public class ThemeManager {
      *
      * @return 高度值(px)。
      */
+    private static int sComputedKeyboardHeight = 0;
+
+    public static void setComputedKeyboardHeight(int height) {
+        sComputedKeyboardHeight = height;
+    }
+
+    /**
+     * 获取键盘 Lua 中 key_height 的 dp 值。
+     * 优先级: Lua key_height → 主题 key.height。
+     * 返回 0 表示无 dp 配置,应使用百分比模式(旧行为)。
+     */
+    public static double keyRowHeight(Globals globals) {
+        // 优先级1: Lua 中的 key_height (dp)
+        double h = globals.get("key_height").optdouble(0);
+        Log.d(TAG, "key_height:" + h);
+        if (h > 0) return h;
+        
+        // 优先级2: 主题 key.height (dp)
+        // Style.getSize() 返回的是 px,需要转回 dp
+        int px = getStyle().getStyle("key").getSize("height", 0);
+        if (px > 0) {
+            h = px2dp(px);
+            Log.d(TAG, "key.height(px->dp):" + h);
+            return h;
+        }
+        
+        return 0;
+    }
+
     public static int getKeyboardHeight() {
+        if (sComputedKeyboardHeight > 0) {
+            return (int) (sComputedKeyboardHeight * Config.getKeyboardHeightScale());
+        }
         return (int) (getStyle().getStyle("keyboard").getSize("height", mKeyboardHeight) * Config.getKeyboardHeightScale());
     }
 
@@ -320,12 +359,22 @@ public class ThemeManager {
     /**
      * dp 转 px。
      *
-     * @param f dp 值。
+     * @param dp dp 值。
      * @return px 值。
      */
-    public static int dp2px(float f) {
+    public static int dp2px(float dp) {
         return (int) (TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP, f, mDisplayMetrics));
+                TypedValue.COMPLEX_UNIT_DIP, dp, mDisplayMetrics));
+    }
+
+    /**
+     * px 转 dp。
+     *
+     * @param px px 值。
+     * @return dp 值。
+     */
+    public static double px2dp(int px) {
+        return px / ((double) mDisplayMetrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT);
     }
 
 
@@ -454,7 +503,7 @@ public class ThemeManager {
             mSoundPool.setOnLoadCompleteListener(new SoundPool.OnLoadCompleteListener() {
                 @Override
                 public void onLoadComplete(SoundPool soundPool, int sampleId, int status) {
-                    //if (status != 0) {
+                    // if (status != 0) {
                     // status 为 0 表示成功，非 0 表示失败
                     Log.e("SoundHelper", "加载失败！ID: " + sampleId + " 状态码: " + status);
                     //}
@@ -495,15 +544,15 @@ public class ThemeManager {
     /**
      * 调用 Lua 全局函数。
      *
-     * @param s 函数名。
+     * @param s    函数名。
      * @param args 函数参数。
      * @return 函数返回值。
      */
     public static Object callFunction(String s, Object... args) {
-        if(mGlobals==null)
+        if (mGlobals == null)
             return null;
         LuaValue f = mGlobals.get(s);
-        if(f.isfunction()){
+        if (f.isfunction()) {
             return f.jcall(args);
         }
         return null;

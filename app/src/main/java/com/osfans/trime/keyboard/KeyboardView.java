@@ -45,6 +45,13 @@ public class KeyboardView extends FrameLayout {
     private boolean mAsciiModeLock;
     /** 键盘锁定状态 */
     private boolean mLock;
+    /** 动态计算的键盘高度(px) */
+    private int mComputedKeyboardHeight = 0;
+    public int getComputedKeyboardHeight() { return mComputedKeyboardHeight; }
+    public void setComputedKeyboardHeight(int height) {
+        mComputedKeyboardHeight = height;
+    }
+
 
     /**
      * 检查是否启用触摸探索(无障碍模式)。

@@ -266,6 +266,9 @@ public class RootInputView extends FrameLayout {
         }
 
 
+        // 先创建 InputView,触发键盘视图创建和高度计算,使 ThemeManager 获得动态高度
+        mInputView = new InputView(context);
+
         // 创建中心布局容器，用于放置键盘和候选词栏
         mCenterLayout = new FrameLayout(context);
         mCenterLayout.setClipChildren(false);
@@ -283,9 +286,8 @@ public class RootInputView extends FrameLayout {
         mInputViewRoot.setClipToPadding(false);
         mInputViewRoot.setOrientation(LinearLayout.VERTICAL);
         mCenterLayout.addView(mInputViewRoot, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        // 创建候选词视图和键盘输入视图
+        // 创建候选词视图
         mCandidateView = new CandidateView(context);
-        mInputView = new InputView(context);
         mInputViewRoot.addView(mCandidateView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ThemeManager.getCandidateHeight()));
         mInputViewRoot.addView(mInputView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ThemeManager.getKeyboardHeight()));
         // 设置根布局的背景
@@ -834,6 +836,12 @@ public class RootInputView extends FrameLayout {
                 default:
                     showSymbolsView(false);
                     mInputView.setKeyboard(id);
+                    // 更新 mCenterLayout 高度以匹配新键盘的动态高度
+                    ViewGroup.LayoutParams lp = mCenterLayout.getLayoutParams();
+                    if (lp != null) {
+                        lp.height = ThemeManager.getContentHeight();
+                        mCenterLayout.setLayoutParams(lp);
+                    }
                     return;
             }
         });

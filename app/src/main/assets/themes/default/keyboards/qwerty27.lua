@@ -1,7 +1,7 @@
 name = "27键"
 author = "nirenr"
 key_width = 10
-key_height = 25
+key_height = 60
 lock=true
 rows = {
     --第一行

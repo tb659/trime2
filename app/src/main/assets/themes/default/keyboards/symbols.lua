@@ -1,7 +1,7 @@
 name = "符号键盘"
 author = "nirenr"
 key_width = 10
-key_height = 20
+key_height = 54
 rows = {
     -- Row 1
     {

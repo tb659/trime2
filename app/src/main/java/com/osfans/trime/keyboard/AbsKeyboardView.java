@@ -12,6 +12,7 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 
+import com.osfans.trime.Config;
 import com.osfans.trime.Key;
 import com.osfans.trime.TrimeService;
 import com.osfans.trime.theme.ThemeManager;
@@ -26,8 +27,8 @@ import org.luaj.LuaTable;
 public class AbsKeyboardView extends KeyboardView{
 
     // ==================== 成员变量 ====================
-    /** 行高百分比 */
-    private final double mRowHeight;
+    /** 行高(dp) */
+    private final double mRowHeightDp;
     /** 键宽百分比 */
     private final double mKeyWidth;
     /** 键盘高度(像素) */
@@ -38,6 +39,8 @@ public class AbsKeyboardView extends KeyboardView{
     private LuaTable mKeys;
     /** 布局配置(Lua 表) */
     private LuaTable mLayout;
+    /** 是否为 dp 高度模式 */
+    private boolean mIsDpMode;
 
     /**
      * 构造函数。
@@ -51,7 +54,7 @@ public class AbsKeyboardView extends KeyboardView{
         String style = globals.get("style").optjstring("keyboard");
         long time=System.currentTimeMillis();
         setBackground(ThemeManager.getStyle().getStyle(style).getBackground(0xffdddddd));
-        mRowHeight = globals.get("key_height").optdouble(10);
+        mRowHeightDp = globals.get("key_height").optdouble(50);
         mKeyWidth = globals.get("key_width").optdouble(20);
         loadRows();
         Log.w("RowKeyboardView", "init time: "+(System.currentTimeMillis()-time) );
@@ -59,42 +62,69 @@ public class AbsKeyboardView extends KeyboardView{
 
     /**
      * 加载键盘行配置。
-     * 从 Lua 表中读取按键列表,并逐个创建按键视图。
+     * 从 Lua 表中读取按键列表,计算总高度后逐个创建按键视图。
+     * 支持 dp/百分比双模式。
      */
     private void loadRows() {
         TrimeService mTrime= TrimeService.getInstance();
-        mHeight = ThemeManager.getKeyboardHeight();
         mWidth = mTrime.getWidth();
 
         mLayout = globals.get("layout").opttable(null);
         mKeys = globals.get("keys").checktable();
         int len = mKeys.length();
-        for (int i = 0; i < len; i++) {
-            loadKey(mKeys.get(i + 1).checktable());
+
+        mIsDpMode = ThemeManager.keyRowHeight(globals) > 0;
+
+        if (mIsDpMode) {
+            // === dp 模式: y、height 为 dp 值 ===
+            double totalDp = 0;
+            for (int i = 0; i < len; i++) {
+                LuaTable key = mKeys.get(i + 1).checktable();
+                double y = key.get("y").optdouble(0);
+                double h = key.get("height").optdouble(mRowHeightDp);
+                totalDp = Math.max(totalDp, y + h);
+            }
+            mHeight = ThemeManager.dp2px((float) (totalDp * Config.getKeyboardHeightScale()));
+            setComputedKeyboardHeight((int) mHeight);
+            ThemeManager.setComputedKeyboardHeight((int) mHeight);
+
+            for (int i = 0; i < len; i++) {
+                loadKey(mKeys.get(i + 1).checktable());
+            }
+        } else {
+            // === 百分比模式(旧行为) ===
+            setComputedKeyboardHeight(0);
+            ThemeManager.setComputedKeyboardHeight(0);
+            mHeight = ThemeManager.getKeyboardHeight();
+            for (int i = 0; i < len; i++) {
+                loadKey(mKeys.get(i + 1).checktable());
+            }
         }
     }
 
     /**
      * 加载单个按键。
-     * 根据 Lua 配置创建 KeyView,并设置位置和大小。
+     * dp 模式下 y、height 为 dp 值(width、x 保持百分比)。
+     * 百分比模式下 y、height 为百分比(旧行为)。
      *
      * @param key Lua 表,包含按键的配置信息(width、height、x、y)。
      */
     private void loadKey(LuaTable key) {
-        //LuaTable layout=key.get("layout").opttable(mLayout);
-        // 计算按键宽度(百分比转换为像素)
-        int width = (int) (mWidth*key.get("width").optdouble(mKeyWidth)/100);
-        // 计算按键高度(百分比转换为像素)
-        int height = (int) (mHeight*key.get("height").optdouble(mRowHeight)/100);
-        // 计算 X 坐标(百分比转换为像素)
-        int x = (int) (mWidth*key.get("x").optdouble(0)/100);
-        // 计算 Y 坐标(百分比转换为像素)
-        int y = (int) (mHeight*key.get("y").optdouble(0)/100);
-        KeyView keyView = new KeyView(getContext(),new Key(key));
+        int width = (int) (mWidth * key.get("width").optdouble(mKeyWidth) / 100);
+        int x = (int) (mWidth * key.get("x").optdouble(0) / 100);
+        int height, y;
+        if (mIsDpMode) {
+            height = ThemeManager.dp2px((float) key.get("height").optdouble(mRowHeightDp));
+            y = ThemeManager.dp2px((float) key.get("y").optdouble(0));
+        } else {
+            height = (int) (mHeight * key.get("height").optdouble(mRowHeightDp) / 100);
+            y = (int) (mHeight * key.get("y").optdouble(0) / 100);
+        }
+        KeyView keyView = new KeyView(getContext(), new Key(key));
         keyView.setShapeDetectionEnabled(true);
-        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(width, height, Gravity.TOP| Gravity.LEFT);
-        layoutParams.leftMargin=x;
-        layoutParams.topMargin=y;
-        addView(keyView,layoutParams);
+        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(width, height, Gravity.TOP | Gravity.LEFT);
+        layoutParams.leftMargin = x;
+        layoutParams.topMargin = y;
+        addView(keyView, layoutParams);
     }
 }
