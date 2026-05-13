@@ -9,6 +9,7 @@ import static com.osfans.trime.core.RimeKeyMap.RimeKey_VoidSymbol;
 
 import android.app.AlertDialog;
 import android.content.ClipboardManager;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -47,16 +48,15 @@ import com.osfans.trime.core.CandidateItem;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.core.RimeMessage;
 import com.osfans.trime.core.RimeProto;
+import com.osfans.trime.dialog.DeployDialog;
 import com.osfans.trime.dialog.OptionsDialog;
 import com.osfans.trime.dialog.SchemaGroupDialog;
 import com.osfans.trime.dialog.StyleDialog;
 import com.osfans.trime.dialog.ThemeDialog;
 import com.osfans.trime.enums.InlineModeType;
-import com.osfans.trime.keyboard.FloatKeyboard;
 import com.osfans.trime.keyboard.ModifierState;
 import com.osfans.trime.theme.ThemeManager;
 import com.osfans.trime.util.Function;
-import com.osfans.trime.util.HttpUtil;
 import com.osfans.trime.util.CustomToast;
 
 import org.luaj.Globals;
@@ -782,6 +782,11 @@ public class TrimeService extends InputMethodService {
                                 getActiveText(4)
                         );
                     }
+                    // 处理部署命令
+                    else if ("deploy".equals(command)) {
+                        // 显示部署弹窗
+                        showDeployDialog();
+                    }
                     // 如果命令执行后返回了文本，则提交该文本
                     if (textToSend != null) {
                         commitText(textToSend);
@@ -833,6 +838,17 @@ public class TrimeService extends InputMethodService {
                                 restart(); // 重启服务以应用更改
                             } else {
                                 showSchemaGroupDialog();
+                            }
+                            break;
+                        case "app":
+                            try {
+                                Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
+                                if (intent != null) {
+                                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_HISTORY);
+                                    startActivity(intent);
+                                }
+                            } catch (Exception ex) {
+                                Log.e(TAG, "Start App Exception: " + ex);
                             }
                             break;
                         default:
@@ -1789,6 +1805,13 @@ public class TrimeService extends InputMethodService {
             e.printStackTrace();
         }
         return dialog;
+    }
+
+    /**
+     * 显示部署对话框。
+     */
+    private void showDeployDialog() {
+        new DeployDialog(this).show(getToken());
     }
 
     /**
