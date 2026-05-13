@@ -6,22 +6,16 @@
 package com.osfans.trime.util;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-import com.osfans.trime.util.CustomToast;
-import static android.content.res.Configuration.UI_MODE_NIGHT_MASK;
-import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
 
 import android.annotation.TargetApi;
-import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.app.SearchManager;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.hardware.display.DisplayManager;
+import android.icu.text.DateFormat;
 import android.icu.util.Calendar;
 import android.icu.util.ULocale;
 import android.net.Uri;
@@ -30,21 +24,12 @@ import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
-import android.view.ActionMode;
-import android.view.Display;
 import android.view.KeyEvent;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.Window;
-import android.view.WindowManager;
-import android.widget.EditText;
 import android.widget.Toast;
 
-import com.androlua.LuaApplication;
 import com.osfans.trime.BuildConfig;
 import com.osfans.trime.Config;
 import com.osfans.trime.TrimeService;
-import com.osfans.trime.VivoGpt;
 import com.osfans.trime.core.DataManager;
 import com.osfans.trime.dialog.DeployDialog;
 
@@ -201,9 +186,9 @@ public class Function {
         if (VERSION.SDK_INT >= VERSION_CODES.N && !TextUtils.isEmpty(locale)) {
             ULocale ul = new ULocale(locale);
             Calendar cc = Calendar.getInstance(ul);
-            android.icu.text.DateFormat df;
+            DateFormat df;
             if (TextUtils.isEmpty(option)) {
-                df = android.icu.text.DateFormat.getDateInstance(android.icu.text.DateFormat.LONG, ul);
+                df = DateFormat.getDateInstance(DateFormat.LONG, ul);
             } else {
                 df = new android.icu.text.SimpleDateFormat(option, ul);
             }
@@ -389,215 +374,6 @@ public class Function {
         }
         // 执行内置命令
         switch (command) {
-             // ==================== GPT AI 文本生成(交互式) ====================
-             case "gpt": {
-                if (TextUtils.isEmpty(option)) {
-                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
-                    return null;
-                }
-                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
-                 // 获取当前服务所在的屏幕或默认屏幕
-                 DisplayManager displayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
-                 Display defaultDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
-
-// 为特定屏幕创建 Context
-                 Context displayContext = context.createDisplayContext(defaultDisplay);
-                 EditText tv = new EditText(displayContext);
-                if ((LuaApplication.getInstance().getResources().getConfiguration().uiMode & UI_MODE_NIGHT_MASK) == UI_MODE_NIGHT_YES) {
-                    tv.setTextColor(0xffffffff);
-                } else {
-                    tv.setTextColor(0xff000000);
-                }
-                // 显示对话框,用户可以在其中查看和编辑生成的文本
-                AlertDialog dlg = context.showWidthDialog(new AlertDialog.Builder(context, Config.getDialogTheme())
-                        .setTitle(option)
-                        .setView(tv)
-                        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                if (!option.startsWith("根据以下内容续写"))
-                                    context.getCurrentInputConnection().deleteSurroundingText(option.length(), 0);
-                                context.commitText(tv.getText());
-                            }
-                        })
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .setNeutralButton("重新生成", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                dialog.dismiss();
-                                handle(context, command, option);
-                            }
-                        }).create());
-                dlg.getButton(DialogInterface.BUTTON1).setEnabled(false);
-                // 调用 Vivo GPT API 生成文本
-                VivoGpt.gpt(option, new HttpUtil.HttpCallback() {
-                    @Override
-                    public void onDone(HttpUtil.HttpResult result) {
-                        context.getHandler().post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (result == null) {
-                                    dlg.getButton(DialogInterface.BUTTON1).setEnabled(true);
-                                    return;
-                                }
-                                tv.append(result.text);
-                            }
-                        });
-                    }
-                });
-                break;
-            }
-            // ==================== GPT AI 文本生成(带进度对话框) ====================
-             case "gpt1": {
-                if (TextUtils.isEmpty(option)) {
-                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
-                    return null;
-                }
-                final ProgressDialog mProgressDialog = new ProgressDialog(context);
-                mProgressDialog.setMessage("正在生成，请稍后...");
-                mProgressDialog.setCancelable(false);
-                mProgressDialog.setButton("后台运行", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                });
-                TrimeService.getInstance().showWidthDialog(mProgressDialog);
-                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
-
-                VivoGpt.gpt1(option, new HttpUtil.HttpCallback() {
-                    @Override
-                    public void onDone(HttpUtil.HttpResult result) {
-                        context.getHandler().post(new Runnable() {
-                            @Override
-                            public void run() {
-                                mProgressDialog.dismiss();
-                                DisplayManager displayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
-                                Display defaultDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
-
-// 为特定屏幕创建 Context
-                                Context displayContext = context.createDisplayContext(defaultDisplay);
-                                EditText tv = new EditText(displayContext);
-                                if ((LuaApplication.getInstance().getResources().getConfiguration().uiMode & UI_MODE_NIGHT_MASK) == UI_MODE_NIGHT_YES) {
-                                    tv.setTextColor(0xffffffff);
-                                } else {
-                                    tv.setTextColor(0xff000000);
-                                }
-                                tv.setText(result.text);
-                                tv.setShowSoftInputOnFocus(false);
-                                // 显示编辑对话框
-                                context.showWidthDialog(new AlertDialog.Builder(context, Config.getDialogTheme())
-                                        .setTitle(option)
-                                        .setView(tv)
-                                        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                                            @Override
-                                            public void onClick(DialogInterface dialog, int which) {
-                                                if (!option.startsWith("根据以下内容续写"))
-                                                    context.getCurrentInputConnection().deleteSurroundingText(option.length(), 0);
-                                                context.commitText(tv.getText());
-                                            }
-                                        })
-                                        .setNegativeButton(android.R.string.cancel, null)
-                                        .setNeutralButton("重新生成", new DialogInterface.OnClickListener() {
-                                            @Override
-                                            public void onClick(DialogInterface dialog, int which) {
-                                                dialog.dismiss();
-                                                handle(context, command, option);
-                                            }
-                                        }).create());
-                            }
-                        });
-                    }
-                });
-                break;
-            }
-            // ==================== GPT AI 文本生成(直接提交) ====================
-            case "gpt2": {
-                if (TextUtils.isEmpty(option)) {
-                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
-                    return null;
-                }
-                final ProgressDialog mProgressDialog = new ProgressDialog(context);
-                mProgressDialog.setMessage("正在生成，请稍后...");
-                mProgressDialog.setCancelable(false);
-                mProgressDialog.setButton("后台运行", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                });
-                TrimeService.getInstance().showWidthDialog(mProgressDialog);
-                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
-                VivoGpt.gpt1(option, new HttpUtil.HttpCallback() {
-                    @Override
-                    public void onDone(HttpUtil.HttpResult result) {
-                        // 如果进度对话框仍在显示,则直接提交文本
-                        if (mProgressDialog.isShowing()) {
-                            mProgressDialog.dismiss();
-                            context.commitText(result.text);
-                            return;
-                        }
-                        DisplayManager displayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
-                        Display defaultDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
-
-// 为特定屏幕创建 Context
-                        Context displayContext = context.createDisplayContext(defaultDisplay);
-                        EditText tv = new EditText(displayContext);
-                        if ((LuaApplication.getInstance().getResources().getConfiguration().uiMode & UI_MODE_NIGHT_MASK) == UI_MODE_NIGHT_YES) {
-                            tv.setTextColor(0xffffffff);
-                        } else {
-                            tv.setTextColor(0xff000000);
-                        }
-                        tv.setText(result.text);
-                        tv.setShowSoftInputOnFocus(false);
-
-                        context.showWidthDialog(new AlertDialog.Builder(context, Config.getDialogTheme())
-                                .setTitle(option)
-                                .setView(tv)
-                                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        context.commitText(result.text);
-                                    }
-                                })
-                                .setNegativeButton(android.R.string.cancel, null)
-                                .setNeutralButton("重新生成", new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        dialog.dismiss();
-                                        handle(context, command, option);
-                                    }
-                                }).create());
-                    }
-                });
-                break;
-            }
-            // ==================== GPT AI 文本生成(后台直接提交) ====================
-            case "gpt3": {
-                if (TextUtils.isEmpty(option)) {
-                    CustomToast.show(context, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
-                    return null;
-                }
-                CustomToast.show(context, "正在生成，请稍后...", Toast.LENGTH_SHORT, true);
-                VivoGpt.gpt(option, new HttpUtil.HttpCallback() {
-                    @Override
-                    public void onDone(HttpUtil.HttpResult result) {
-                        context.getHandler().post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (result == null) {
-                                    CustomToast.show(context, "生成完成。", Toast.LENGTH_SHORT, true);
-                                    return;
-                                }
-                                if (!context.isInputViewShown())
-                                    return;
-                                context.commitText(result.text);
-                            }
-                        });
-                    }
-                });
-                break;
-            }
             // ==================== 日期格式化 ====================
             case "date":
                 s = getDate(option);
@@ -649,7 +425,7 @@ public class Function {
      * 显示偏好设置对话框(启动 PrefLauncher Activity)。
      * 用于从输入法服务中打开设置界面。
      *
-     * @param Context TimeService。
+     * @param TrimeService TimeService。
      */
     public static void showPrefDialog(Context TrimeService) {}
 

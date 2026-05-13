@@ -781,31 +781,7 @@ public class TrimeService extends InputMethodService {
                                 getActiveText(3), 
                                 getActiveText(4)
                         );
-                    } 
-                    // 处理其他通用命令（如 GPT 集成等）
-                    else {
-                        // 格式化参数字符串
-                        String arg = String.format(option, 
-                                getActiveText(1), 
-                                getActiveText(2), 
-                                getActiveText(3), 
-                                getActiveText(4)
-                        );
-                        
-                        // 特殊处理 GPT 相关命令，检查输入是否为空
-                        if (("gpt".equals(command) || "gpt2".equals(command)) 
-                                && (TextUtils.isEmpty(arg) || (option.contains("%") && option.equals(arg)))) {
-                            CustomToast.show(this, "输入内容不能为空，请输入一些文字后重试", Toast.LENGTH_SHORT, true);
-                            return;
-                        }
-                        
-                        Log.w(TAG, "onEvent command option: " + option);
-                        Log.w(TAG, "onEvent formatted arg: " + arg);
-
-                        // 执行命令处理函数
-                        textToSend = Function.handle(this, command, arg);
                     }
-                    
                     // 如果命令执行后返回了文本，则提交该文本
                     if (textToSend != null) {
                         commitText(textToSend);
