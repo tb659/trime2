@@ -120,6 +120,8 @@ public class AbsKeyboardView extends KeyboardView{
             height = (int) (mHeight * key.get("height").optdouble(mRowHeightDp) / 100);
             y = (int) (mHeight * key.get("y").optdouble(0) / 100);
         }
+        LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(key, null, globals);
+        key.set("__style", styleDefaults);
         KeyView keyView = new KeyView(getContext(), new Key(key));
         keyView.setShapeDetectionEnabled(true);
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(width, height, Gravity.TOP | Gravity.LEFT);

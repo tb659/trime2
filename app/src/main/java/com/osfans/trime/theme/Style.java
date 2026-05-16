@@ -377,7 +377,7 @@ public class Style {
      * @return 是否存在。
      */
     public boolean hasKey(String key) {
-        return !mTable.rawget(key).isnil();
+        return !mTable.get(key).isnil();
     }
 
     /**

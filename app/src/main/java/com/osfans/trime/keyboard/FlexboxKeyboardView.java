@@ -117,6 +117,10 @@ public class FlexboxKeyboardView extends KeyboardView {
         int direction = parent.getFlexDirection();
         for (int i = 1; i <= len; i++) {
             LuaValue keyConfig = keys.get(i);
+            if (keyConfig.istable()) {
+                LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(keyConfig.checktable(), null, globals);
+                keyConfig.checktable().set("__style", styleDefaults);
+            }
             KeyView keyView = new KeyView(getContext(), new Key(keyConfig));
             parent.addView(keyView, createLayoutParams(direction, keyConfig));
         }

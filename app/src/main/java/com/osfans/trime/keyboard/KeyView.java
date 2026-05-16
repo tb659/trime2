@@ -52,6 +52,7 @@ import com.osfans.trime.theme.KeyStyle;
 import com.osfans.trime.theme.Style;
 import com.osfans.trime.theme.ThemeManager;
 
+import org.luaj.LuaTable;
 import org.luaj.LuaValue;
 
 import java.util.List;
@@ -215,8 +216,18 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         // 从当前按键配置中获取 ASCII 模式下的专用按键配置
         mAsciiKey = mKey.getAsciiKey();
         // 根据按键配置中的样式名称和主题默认的 key 样式，合并生成最终的按键样式
-        mKeyStyle = ThemeManager.getStyle().getKeyStyle(v.getStyle(), ThemeManager.getStyle().getKeyStyle("key"));
-        // 基于生成的按键样式，获取其对应的“按下”状态样式，若未定义则回退到原样式
+        // 优先级: key 级字段 → row 级默认值 → keyboard 级默认值 → 命名样式 → 主题 key 样式
+        KeyStyle themeKeyStyle = ThemeManager.getStyle().getKeyStyle("key");
+        KeyStyle namedStyle = ThemeManager.getStyle().getKeyStyle(v.getStyle(), themeKeyStyle);
+        LuaValue mk = v.getMk();
+        if (mk != null && mk.istable()) {
+            LuaValue styleTable = mk.checktable().get("__style");
+            if (styleTable.istable()) {
+                namedStyle = new KeyStyle(styleTable.checktable(), namedStyle);
+            }
+        }
+        mKeyStyle = namedStyle;
+        // 基于生成的按键样式，获取其对应的"按下"状态样式，若未定义则回退到原样式
         mPressedStyle = mKeyStyle.getKeyStyle("pressed", mKeyStyle);
         // 初始化视图结构，包括创建根布局、主文本 TextView、背景及预览窗口等 UI 组件
         initView();
@@ -243,8 +254,17 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         // 从当前按键配置中获取 ASCII 模式下的专用按键配置
         mAsciiKey = mKey.getAsciiKey();
         // 根据按键配置中的样式名称和传入的基础样式 s，合并生成最终的按键样式
-        mKeyStyle = ThemeManager.getStyle().getKeyStyle(v.getStyle(), s);
-        // 基于生成的按键样式，获取其对应的“按下”状态样式，若未定义则回退到原样式
+        // 优先使用 key 表上的 __style 字段，作为 style 解析的基准
+        KeyStyle effectiveBase = s;
+        LuaValue mk2 = v.getMk();
+        if (mk2 != null && mk2.istable()) {
+            LuaValue styleTable = mk2.checktable().get("__style");
+            if (styleTable.istable()) {
+                effectiveBase = new KeyStyle(styleTable.checktable(), s);
+            }
+        }
+        mKeyStyle = ThemeManager.getStyle().getKeyStyle(v.getStyle(), effectiveBase);
+        // 基于生成的按键样式，获取其对应的"按下"状态样式，若未定义则回退到原样式
         mPressedStyle = mKeyStyle.getKeyStyle("pressed", mKeyStyle);
         // 初始化视图结构，包括创建根布局、主文本 TextView、背景及预览窗口等 UI 组件
         initView();

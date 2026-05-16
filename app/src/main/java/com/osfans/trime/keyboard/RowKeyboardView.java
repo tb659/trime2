@@ -50,6 +50,8 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
     private double mLeft;
     /** 是否为 dp 高度模式 */
     private boolean mIsDpMode;
+    /** 当前正在加载的行（用于 resolveKeyStyleDefaults） */
+    private LuaTable mCurrentRow;
 
     /**
      * 构造函数。
@@ -132,6 +134,7 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
         LuaTable keys = row.get("keys").checktable();
         int len = keys.length();
         mLeft=0;
+        mCurrentRow = row;
         for (int i = 0; i < len; i++) {
             loadKey(keys.get(i+1).checktable(), width);
         }
@@ -156,6 +159,8 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
         } else {
             height = mHeight * key.get("height").optdouble(mRowHeight) / 100;
         }
+        LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(key, mCurrentRow, globals);
+        key.set("__style", styleDefaults);
         KeyView keyView = new KeyView(getContext(), new Key(key));
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams((int) width, (int) height, Gravity.TOP| Gravity.LEFT);
         layoutParams.leftMargin = (int) mLeft;

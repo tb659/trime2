@@ -346,10 +346,130 @@ public class ThemeManager {
         return 0;
     }
 
+    /**
+     * 为按键解析样式默认值，遵循 key → row → keyboard → theme 的多级优先级。
+     * 返回一个包含已解析样式字段（text_color, text_size, background, padding, margin）的 LuaTable。
+     * key 级的字段具有最高优先级，其次为 row 级，最后为 keyboard 级（key_text_xxx 等全局变量）。
+     * 不覆盖已在 key 上直接设置的字段。
+     *
+     * @param key 按键级别的 Lua 表。
+     * @param row 行级别的 Lua 表。
+     * @param globals Lua 全局环境。
+     * @return 解析后的样式 LuaTable。
+     */
+    public static LuaTable resolveKeyStyleDefaults(LuaTable key, LuaTable row, Globals globals) {
+        // 创建用于存储最终样式的 LuaTable
+        LuaTable style = new LuaTable();
+        // Level 1: Key-level 处理按键级别的配置，优先级最高
+        copyFieldIfPresent(style, key, "text_color"); // 复制文本颜色
+        copyFieldIfPresent(style, key, "text_size"); // 复制文本大小
+        copyFieldIfPresent(style, key, "background"); // 复制背景
+        copyFieldIfPresent(style, key, "padding"); // 复制内边距
+        copyFieldMapped(style, key, "margin", "margins"); // 复制外边距，将源键 "margin" 映射为目标键 "margins"
+        // Level 2: Row-level defaults - 处理行级别的默认配置，优先级次之
+        if (row != null) {
+            applyDefault(style, row, "text_color"); // 如果样式中未设置文本颜色，则应用行级别的默认值
+            applyDefault(style, row, "text_size"); // 如果样式中未设置文本大小，则应用行级别的默认值
+            applyDefault(style, row, "background"); // 如果样式中未设置背景，则应用行级别的默认值
+            applyDefault(style, row, "padding"); // 如果样式中未设置内边距，则应用行级别的默认值
+            applyDefaultMapped(style, row, "margin", "margins"); // 如果样式中未设置外边距，则应用行级别的默认值，并进行键名映射
+        }
+        // Level 3: Keyboard-level defaults 处理键盘级别的全局默认配置，优先级最低
+        applyDefaultFrom(style, globals, "key_text_color", "text_color"); // 从全局变量获取默认文本颜色
+        applyDefaultFrom(style, globals, "key_text_size", "text_size"); // 从全局变量获取默认文本大小
+        applyDefaultFrom(style, globals, "key_background", "background"); // 从全局变量获取默认背景
+        applyDefaultFrom(style, globals, "key_padding", "padding"); // 从全局变量获取默认内边距
+        applyDefaultFromMapped(style, globals, "key_margin", "margins"); // 从全局变量获取默认外边距，并进行键名映射
+        return style; // 返回解析完成的样式表
+    }
+
+    /**
+     * 如果源表中存在指定键且值不为 nil，则将其复制到目标表中。
+     *
+     * @param target 目标 LuaTable。
+     * @param source 源 LuaTable。
+     * @param key 要复制的键名。
+     */
+    private static void copyFieldIfPresent(LuaTable target, LuaTable source, String key) {
+        LuaValue v = source.get(key); // 从源表获取值
+        if (!v.isnil()) target.set(key, v); // 如果值不为 nil，则设置到目标表
+    }
+
+    /**
+     * 如果源表中存在指定源键且值不为 nil，则将其复制到目标表中，并使用不同的目标键名。
+     *
+     * @param target 目标 LuaTable。
+     * @param source 源 LuaTable。
+     * @param sourceKey 源键名。
+     * @param targetKey 目标键名。
+     */
+    private static void copyFieldMapped(LuaTable target, LuaTable source, String sourceKey, String targetKey) {
+        LuaValue v = source.get(sourceKey); // 从源表获取源键对应的值
+        if (!v.isnil()) target.set(targetKey, v); // 如果值不为 nil，则以目标键名设置到目标表
+    }
+
+    /**
+     * 如果目标表中指定键的值为 nil，且源表中该键的值不为 nil，则将源表的值应用到目标表。
+     *
+     * @param target 目标 LuaTable。
+     * @param source 源 LuaTable。
+     * @param key 键名。
+     */
+    private static void applyDefault(LuaTable target, LuaTable source, String key) {
+        LuaValue v = source.get(key); // 从源表获取值
+        if (!v.isnil() && target.get(key).isnil()) target.set(key, v); // 如果源值不为 nil 且目标值为 nil，则设置
+    }
+
+    /**
+     * 如果目标表中指定目标键的值为 nil，且源表中指定源键的值不为 nil，则将源表的值应用到目标表，并使用不同的键名。
+     *
+     * @param target 目标 LuaTable。
+     * @param source 源 LuaTable。
+     * @param sourceKey 源键名。
+     * @param targetKey 目标键名。
+     */
+    private static void applyDefaultMapped(LuaTable target, LuaTable source, String sourceKey, String targetKey) {
+        LuaValue v = source.get(sourceKey); // 从源表获取源键对应的值
+        if (!v.isnil() && target.get(targetKey).isnil()) target.set(targetKey, v); // 如果源值不为 nil 且目标值为 nil，则设置
+    }
+
+    /**
+     * 如果目标表中指定目标键的值为 nil，且全局环境中指定源键的值不为 nil，则将全局环境的值应用到目标表。
+     *
+     * @param target 目标 LuaTable。
+     * @param globals Lua 全局环境。
+     * @param sourceKey 全局环境中的源键名。
+     * @param targetKey 目标表中的目标键名。
+     */
+    private static void applyDefaultFrom(LuaTable target, Globals globals, String sourceKey, String targetKey) {
+        LuaValue v = globals.get(sourceKey); // 从全局环境获取值
+        if (!v.isnil() && target.get(targetKey).isnil()) target.set(targetKey, v); // 如果全局值不为 nil 且目标值为 nil，则设置
+    }
+
+    /**
+     * 如果目标表中指定目标键的值为 nil，且全局环境中指定源键的值不为 nil，则将全局环境的值应用到目标表，并使用不同的键名。
+     *
+     * @param target 目标 LuaTable。
+     * @param globals Lua 全局环境。
+     * @param sourceKey 全局环境中的源键名。
+     * @param targetKey 目标表中的目标键名。
+     */
+    private static void applyDefaultFromMapped(LuaTable target, Globals globals, String sourceKey, String targetKey) {
+        LuaValue v = globals.get(sourceKey); // 从全局环境获取源键对应的值
+        if (!v.isnil() && target.get(targetKey).isnil()) target.set(targetKey, v); // 如果全局值不为 nil 且目标值为 nil，则设置
+    }
+
+    /**
+     * 获取键盘高度(考虑缩放比例)。
+     *
+     * @return 高度值(px)。
+     */
     public static int getKeyboardHeight() {
         if (sComputedKeyboardHeight > 0) {
+            // 如果已计算过键盘高度，则使用计算值并应用缩放比例
             return (int) (sComputedKeyboardHeight * Config.getKeyboardHeightScale());
         }
+        // 否则从样式配置中获取键盘高度默认值，并应用缩放比例
         return (int) (getStyle().getStyle("keyboard").getSize("height", mKeyboardHeight) * Config.getKeyboardHeightScale());
     }
 
