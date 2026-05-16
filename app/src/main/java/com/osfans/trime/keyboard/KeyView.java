@@ -65,43 +65,79 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     private static final String TAG = "KeyView";
 
     // --- 1. 静态常量 ---
-    /** 快速进出缓动插值器 */
+    /**
+     * 快速进出缓动插值器
+     */
     private static final Interpolator FAST_OUT_SLOW_IN = new FastOutSlowInInterpolator();
 
     // --- 2. 成员变量 ---
-    /** TrimeService 实例 */
+    /**
+     * TrimeService 实例
+     */
     private final TrimeService mTrime;
-    /** 按键样式 */
+    /**
+     * 按键样式
+     */
     private final KeyStyle mKeyStyle;
-    /** 按下状态样式 */
+    /**
+     * 按下状态样式
+     */
     private final KeyStyle mPressedStyle;
-    /** ASCII 模式专用的按键对象 */
+    /**
+     * ASCII 模式专用的按键对象
+     */
     private final Key mAsciiKey;
-    /** 默认按键对象 */
+    /**
+     * 默认按键对象
+     */
     private final Key mDefKey;
-    /** 当前按键对象(可能在 ASCII 模式和默认模式之间切换) */
+    /**
+     * 当前按键对象(可能在 ASCII 模式和默认模式之间切换)
+     */
     private Key mKey;
-    /** 主文本 TextView */
+    /**
+     * 主文本 TextView
+     */
     private TextView mClick;
-    /** 提示文本 TextView */
+    /**
+     * 提示文本 TextView
+     */
     private TextView mHint;
-    /** 长按文本 TextView */
+    /**
+     * 长按文本 TextView
+     */
     private TextView mLongClick;
-    /** 按键根布局容器 */
+    /**
+     * 按键根布局容器
+     */
     private FrameLayout keyRoot;
-    /** 点击文本内容 */
+    /**
+     * 点击文本内容
+     */
     private String mClickText;
-    /** 背景过渡动画(正常状态 -> 按下状态) */
+    /**
+     * 背景过渡动画(正常状态 -> 按下状态)
+     */
     private TransitionDrawable transition;
-    /** 是否处于按下状态 */
+    /**
+     * 是否处于按下状态
+     */
     private boolean mPressed;
-    /** 命中矩形是否失效(需要重新计算) */
+    /**
+     * 命中矩形是否失效(需要重新计算)
+     */
     private boolean mRectInvalidated;
-    /** 是否处于选中状态 */
+    /**
+     * 是否处于选中状态
+     */
     private boolean mSelected;
-    /** 预览窗口 TextView(长按或滑动时显示) */
+    /**
+     * 预览窗口 TextView(长按或滑动时显示)
+     */
     private TextView keyPreview;
-    /** 动画监听器(暂未使用) */
+    /**
+     * 动画监听器(暂未使用)
+     */
     private Animator.AnimatorListener mAnimatorListener;
     // private TextView mHintUp;
     // private TextView mHintDown;
@@ -140,6 +176,28 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
     /**
+     * 构造函数(带按键样式)。
+     *
+     * @param context 上下文。
+     * @param v       按键样式对象。
+     */
+    public KeyView(@NonNull Context context, KeyStyle v) {
+        // 调用父类 FrameLayout 的构造函数，初始化视图层级
+        super(context);
+        // 由于未传入 Key 配置，将默认按键和 ASCII 按键设为 null
+        mDefKey = null;
+        mAsciiKey = null;
+        // 获取 TrimeService 的单例实例，用于处理输入法事件
+        mTrime = TrimeService.getInstance();
+        // 直接使用传入的 KeyStyle 对象作为当前按键样式
+        mKeyStyle = v;
+        // 基于当前按键样式，获取其对应的“按下”状态样式，若未定义则回退到原样式
+        mPressedStyle = mKeyStyle.getKeyStyle("pressed", mKeyStyle);
+        // 初始化视图结构，包括创建根布局、主文本 TextView、背景及预览窗口等 UI 组件
+        initView();
+    }
+
+    /**
      * 构造函数(带按键配置)。
      *
      * @param context 上下文。
@@ -164,28 +222,6 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         initView();
         // 初始化按键的具体内容，如设置主文本、长按文本、提示文本及滑动方向的事件绑定
         initKey();
-    }
-
-    /**
-     * 构造函数(带按键样式)。
-     *
-     * @param context 上下文。
-     * @param v       按键样式对象。
-     */
-    public KeyView(@NonNull Context context, KeyStyle v) {
-        // 调用父类 FrameLayout 的构造函数，初始化视图层级
-        super(context);
-        // 由于未传入 Key 配置，将默认按键和 ASCII 按键设为 null
-        mDefKey = null;
-        mAsciiKey = null;
-        // 获取 TrimeService 的单例实例，用于处理输入法事件
-        mTrime = TrimeService.getInstance();
-        // 直接使用传入的 KeyStyle 对象作为当前按键样式
-        mKeyStyle = v;
-        // 基于当前按键样式，获取其对应的“按下”状态样式，若未定义则回退到原样式
-        mPressedStyle = mKeyStyle.getKeyStyle("pressed", mKeyStyle);
-        // 初始化视图结构，包括创建根布局、主文本 TextView、背景及预览窗口等 UI 组件
-        initView();
     }
 
     /**
@@ -1117,8 +1153,8 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         // 计算并设置 keyRoot 在 KeyView 中的边距 (Margins)
         Style margins = mKeyStyle.getStyle("margins");
         LayoutParams params = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        // 左右上边距为 elevation/3，下边距为 elevation/3*2，营造立体感
-        params.setMargins(margins.getSize("left", elevation / 3), margins.getSize("top", elevation / 3), margins.getSize("right", elevation / 3), margins.getSize("bottom", elevation / 3 * 2));
+        // 左右上下边距为 elevation/3
+        params.setMargins(margins.getSize("left", elevation / 3), margins.getSize("top", elevation / 3), margins.getSize("right", elevation / 3), margins.getSize("bottom", elevation / 3));
 
         // 设置按键内部文本的内边距
         Style paddings = mKeyStyle.getStyle("paddings");
@@ -1143,7 +1179,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             // 设置轮廓提供者以支持阴影绘制
             keyPreview.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
             // 允许阴影溢出边界绘制，避免被裁剪
-            keyPreview.setClipToOutline(false); 
+            keyPreview.setClipToOutline(false);
 
             // 设置预览窗口的背景 Drawable
             keyPreview.setBackground(previewStyle.getBackground());
@@ -1782,25 +1818,45 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     }
 
     // 1. 定义方向常量
-    /** 无滑动 */
+    /**
+     * 无滑动
+     */
     public static final int SWIPE_NONE = 0;
-    /** 提示文本索引 */
+    /**
+     * 提示文本索引
+     */
     public static final int HINT = KeyEventType.CLICK.ordinal();
-    /** 长按文本索引 */
+    /**
+     * 长按文本索引
+     */
     public static final int HINT_LONG = KeyEventType.LONG_CLICK.ordinal();
-    /** 上滑索引 */
+    /**
+     * 上滑索引
+     */
     public static final int SWIPE_UP = KeyEventType.SWIPE_UP.ordinal();
-    /** 下滑索引 */
+    /**
+     * 下滑索引
+     */
     public static final int SWIPE_DOWN = KeyEventType.SWIPE_DOWN.ordinal();
-    /** 左滑索引 */
+    /**
+     * 左滑索引
+     */
     public static final int SWIPE_LEFT = KeyEventType.SWIPE_LEFT.ordinal();
-    /** 右滑索引 */
+    /**
+     * 右滑索引
+     */
     public static final int SWIPE_RIGHT = KeyEventType.SWIPE_RIGHT.ordinal();
-    /** 当前滑动方向 */
+    /**
+     * 当前滑动方向
+     */
     private int direction = 0;
-    /** 上一次滑动方向 */
+    /**
+     * 上一次滑动方向
+     */
     private int lastDirection = 0;
-    /** 8个方向的提示样式数组 */
+    /**
+     * 8个方向的提示样式数组
+     */
     private final KeyStyle[] mHintStyles = new KeyStyle[8];
 
     /**
