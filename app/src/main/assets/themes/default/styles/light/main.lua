@@ -30,10 +30,18 @@ key = {
     --按键长按超时
     long_click_time = 1000,
     --按键重复执行间隔
-    repeat_click_time = 200
+    repeat_click_time = 200,
     --按键字体
     --font="b.ttf"
     --font={"a.ttf","b.ttf"}
+    
+    -- ==================== 音效配置 ====================
+    -- 音效开关（默认启用）
+    sound_enabled = true,
+    -- 单个音效文件
+    -- sound_effect = "click.ogg",
+    -- 或者随机播放多个音效中的一个
+    -- sound_effect = { "click1.ogg", "click2.ogg", "click3.ogg" }
 }
 --按键四周留白
 key.margins = {

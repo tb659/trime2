@@ -120,8 +120,20 @@ public class AbsKeyboardView extends KeyboardView{
             height = (int) (mHeight * key.get("height").optdouble(mRowHeightDp) / 100);
             y = (int) (mHeight * key.get("y").optdouble(0) / 100);
         }
+        // 解析主样式的默认值
         LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(key, null, globals);
         key.set("__style", styleDefaults);
+        
+        // 为子样式（hint、long_click、pressed、preview、popup）解析默认值
+        String[] subStyleNames = {"hint", "long_click", "pressed", "preview", "popup"};
+        for (String subStyleName : subStyleNames) {
+            LuaTable resolvedSubStyle = ThemeManager.resolveSubKeyStyleDefaults(key, null, globals, subStyleName);
+            if (resolvedSubStyle != null) {
+                // 将解析后的子样式设置回原 key 表的对应字段
+                key.set(subStyleName, resolvedSubStyle);
+            }
+        }
+        
         KeyView keyView = new KeyView(getContext(), new Key(key));
         keyView.setShapeDetectionEnabled(true);
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(width, height, Gravity.TOP | Gravity.LEFT);

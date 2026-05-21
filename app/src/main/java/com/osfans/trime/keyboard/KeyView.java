@@ -293,6 +293,19 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             mLongClicked = false;
             return;
         }
+        
+        // 处理点击音效反馈
+        if (mKeyStyle.isSoundEnabled()) {
+            int sound = mKeyStyle.getSoundEffect();
+            if (sound > 0) {
+                // 播放自定义音效
+                ThemeManager.play(sound);
+            } else {
+                // 播放系统默认点击音效
+                playSoundEffect(SoundEffectConstants.CLICK);
+            }
+        }
+        
         // 如果当前按键配置对象不为空
         if (mKey != null) {
             // 判断当前按键是否为 Shift 键
@@ -1177,11 +1190,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         params.setMargins(margins.getSize("left", elevation / 3), margins.getSize("top", elevation / 3), margins.getSize("right", elevation / 3), margins.getSize("bottom", elevation / 3));
 
         // 设置按键内部文本的内边距
-        Style paddings = mKeyStyle.getStyle("paddings");
-        mClick.setPadding(paddings.getSize("left", 0), paddings.getSize("top", 0), paddings.getSize("right", 0), paddings.getSize("bottom", 0));
+        Style padding = mKeyStyle.getStyle("padding");
+        mClick.setPadding(padding.getSize("left", 0), padding.getSize("top", 0), padding.getSize("right", 0), padding.getSize("bottom", 0));
 
         // 设置 keyRoot 自身的内边距 (Padding)
-        Style padding = mKeyStyle.getStyle("padding");
         keyRoot.setPadding(padding.getSize("left", 0), padding.getSize("top", 0), padding.getSize("right", 0), padding.getSize("bottom", 0));
 
         // 将 keyRoot 添加到 KeyView 中

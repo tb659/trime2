@@ -118,8 +118,20 @@ public class FlexboxKeyboardView extends KeyboardView {
         for (int i = 1; i <= len; i++) {
             LuaValue keyConfig = keys.get(i);
             if (keyConfig.istable()) {
-                LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(keyConfig.checktable(), null, globals);
-                keyConfig.checktable().set("__style", styleDefaults);
+                LuaTable keyTable = keyConfig.checktable();
+                // 解析主样式的默认值
+                LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(keyTable, null, globals);
+                keyTable.set("__style", styleDefaults);
+                
+                // 为子样式（hint、long_click、pressed、preview、popup）解析默认值
+                String[] subStyleNames = {"hint", "long_click", "pressed", "preview", "popup"};
+                for (String subStyleName : subStyleNames) {
+                    LuaTable resolvedSubStyle = ThemeManager.resolveSubKeyStyleDefaults(keyTable, null, globals, subStyleName);
+                    if (resolvedSubStyle != null) {
+                        // 将解析后的子样式设置回原 key 表的对应字段
+                        keyTable.set(subStyleName, resolvedSubStyle);
+                    }
+                }
             }
             KeyView keyView = new KeyView(getContext(), new Key(keyConfig));
             parent.addView(keyView, createLayoutParams(direction, keyConfig));

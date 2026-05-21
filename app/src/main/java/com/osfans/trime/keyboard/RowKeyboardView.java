@@ -159,8 +159,20 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
         } else {
             height = mHeight * key.get("height").optdouble(mRowHeight) / 100;
         }
+        // 解析主样式的默认值
         LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(key, mCurrentRow, globals);
         key.set("__style", styleDefaults);
+        
+        // 为子样式（hint、long_click、pressed、preview、popup）解析默认值
+        String[] subStyleNames = {"hint", "long_click", "pressed", "preview", "popup"};
+        for (String subStyleName : subStyleNames) {
+            LuaTable resolvedSubStyle = ThemeManager.resolveSubKeyStyleDefaults(key, mCurrentRow, globals, subStyleName);
+            if (resolvedSubStyle != null) {
+                // 将解析后的子样式设置回原 key 表的对应字段
+                key.set(subStyleName, resolvedSubStyle);
+            }
+        }
+        
         KeyView keyView = new KeyView(getContext(), new Key(key));
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams((int) width, (int) height, Gravity.TOP| Gravity.LEFT);
         layoutParams.leftMargin = (int) mLeft;
