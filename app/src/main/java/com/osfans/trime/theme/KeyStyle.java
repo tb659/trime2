@@ -24,15 +24,12 @@ import android.text.style.DynamicDrawableSpan;
 import android.text.style.ImageSpan;
 import android.view.Gravity;
 
-import com.androlua.LuaApplication;
 import com.androlua.LuaBitmap;
-import com.androlua.LuaBitmapDrawable;
 import com.osfans.trime.Config;
 
 import org.luaj.LuaValue;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 
 /**
@@ -120,6 +117,9 @@ public class KeyStyle extends Style {
     public KeyStyle(LuaValue t, Style def) {
         this(t);
         setStyle(def);
+        // setStyle 设置了元表继承链，需要重置音效缓存以便重新查找
+        mHasCachedSoundEffect = false;
+        mSoundEffect = -1;
     }
 
     /**
@@ -133,6 +133,9 @@ public class KeyStyle extends Style {
         this(t);
         // 复制默认 KeyStyle 的所有属性
         setStyle(def);
+        // setStyle 设置了元表继承链，需要重置音效缓存以便重新查找
+        mHasCachedSoundEffect = false;
+        mSoundEffect = -1;
     }
 
     // ==================== 核心属性获取(带缓存逻辑) ====================
