@@ -1267,6 +1267,9 @@ public class TrimeService extends InputMethodService {
             } else if ("float_mode".equals(optionName)) {
                 // 切换悬浮键盘模式
                 mRootInputView.setFloatMode(optionValue);
+            } else if ("_hide_key_sound".equals(optionName)) {
+                // 切换按键音效，需在主线程刷新 UI
+                mHandler.post(mRimeOptionRunnable);
             } else {
                 // 其他未明确处理的选项变更，统一触发刷新逻辑
                 updateRimeOption();

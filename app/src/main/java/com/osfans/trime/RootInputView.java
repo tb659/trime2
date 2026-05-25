@@ -550,6 +550,7 @@ public class RootInputView extends FrameLayout {
         // 根据 Rime 选项决定是否隐藏按键提示和候选词注释
         Config.set_hide_comment(Rime.getRimeOption("_hide_comment"));
         Config.set_hide_key_hint(Rime.getRimeOption("_hide_key_hint"));
+        Config.set_hide_key_sound(Rime.getRimeOption("_hide_key_sound"));
 
     }
 
@@ -872,6 +873,7 @@ public class RootInputView extends FrameLayout {
     public void invalidateAllKeys() {
          Config.set_hide_comment(Rime.getRimeOption("_hide_comment"));
         Config.set_hide_key_hint(Rime.getRimeOption("_hide_key_hint"));
+        Config.set_hide_key_sound(Rime.getRimeOption("_hide_key_sound"));
         if (mInputView != null) mInputView.invalidateAllKeys();
         if (mCandidateView != null){
             if(Rime.getRimeOption("_hide_candidate"))

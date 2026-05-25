@@ -111,6 +111,7 @@ preset_keys = {
     Candidate_switch = { toggle = "_hide_candidate", send = "Mode_switch", states = { "有候选", "无候选" } },
     Comment_switch = { toggle = "_hide_comment", send = "Mode_switch", states = { "有注释", "无注释" } },
     Hint_switch = { toggle = "_hide_key_hint", send = "Mode_switch", states = { "有助記", "無助記" } },
+    Sound_switch = { toggle = "_hide_key_sound", send = "Mode_switch", states = { "有音效", "無音效" } },
 
     --候选过滤
     Filter_h = { label = "一", command = "filter", option = "h" },

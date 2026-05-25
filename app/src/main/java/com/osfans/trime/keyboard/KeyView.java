@@ -295,7 +295,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         }
         
         // 处理点击音效反馈
-        if (mKeyStyle.isSoundEnabled()) {
+        if (mKeyStyle.isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
             int sound = mKeyStyle.getSoundEffect();
             if (sound > 0) {
                 // 播放自定义音效
@@ -1516,7 +1516,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
                 }
             }
             // 检查长按样式配置中是否启用了声音反馈
-            if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled()) {
+            if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
                 // 获取自定义音效ID
                 int sound = mKeyStyle.getLongClickKeyStyle().getSoundEffect();
                 if (sound > 0) {
@@ -1628,7 +1628,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             }
 
             // 2. 处理声音反馈
-            if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled()) {
+            if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
                 int sound = mKeyStyle.getLongClickKeyStyle().getSoundEffect();
                 if (sound > 0) {
                     // 播放自定义音效
@@ -1673,7 +1673,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             }
 
             // 处理声音反馈
-            if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled()) {
+            if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
                 int sound = mKeyStyle.getLongClickKeyStyle().getSoundEffect();
                 if (sound > 0) {
                     // 播放自定义音效
@@ -1769,7 +1769,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
                 }
             }
             // 检查是否启用声音反馈
-            if (mKeyStyle.isSoundEnabled()) {
+            if (mKeyStyle.isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
                 int sound = mKeyStyle.getSoundEffect();
                 if (sound > 0) {
                     // 播放自定义音效

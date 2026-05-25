@@ -486,4 +486,15 @@ public class Config {
         return _hide_key_hint; // 返回标记值
     }
 
+    // 是否关闭按键音效的标记（true=静音，false=播放）
+    private static boolean _hide_key_sound;
+    // 设置按键音效开关
+    public static void set_hide_key_sound(boolean b) {
+        _hide_key_sound = b; // 更新内存中的标记
+    }
+    // 检查按键音效是否关闭
+    public static boolean is_key_sound() {
+        return _hide_key_sound; // 返回标记值
+    }
+
 } // 类结束
