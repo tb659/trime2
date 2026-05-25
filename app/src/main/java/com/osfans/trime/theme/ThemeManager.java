@@ -74,6 +74,8 @@ public class ThemeManager {
     private static Vibrator vibrator;
     // 音效池对象
     private static SoundPool mSoundPool;
+    // 音效文件路径到 ID 的缓存，避免同一文件重复加载
+    private static final HashMap<String, Integer> mSoundCache = new HashMap<>();
 
     /**
      * 获取资源查找器。
@@ -716,35 +718,42 @@ public class ThemeManager {
      * @return 音效 ID,失败返回 -1。
      */
     public static int loadSound(String soundPath) {
-        Log.w("theme", "loadSound: " + soundPath);
-        if (mSoundPool == null) {
-            // 创建音频属性
-            AudioAttributes attributes = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA) // 提示音类型
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build();
-            // 创建 SoundPool,允许同时播放5个声音(防止连打时截断)
-            mSoundPool = new SoundPool.Builder()
-                    .setMaxStreams(5) // 允许同时播放 5 个声音（防止连打时截断）
-                    .setAudioAttributes(attributes)
-                    .build();
-            mSoundPool.setOnLoadCompleteListener(new SoundPool.OnLoadCompleteListener() {
-                @Override
-                public void onLoadComplete(SoundPool soundPool, int sampleId, int status) {
-                    // if (status != 0) {
-                    // status 为 0 表示成功，非 0 表示失败
-                    Log.e("SoundHelper", "加载失败！ID: " + sampleId + " 状态码: " + status);
-                    //}
-                }
-            });
+        // 检查缓存中是否已加载该音效文件
+        Integer cachedId = mSoundCache.get(soundPath);
+        if (cachedId != null) {
+            return cachedId;
         }
         // 检查文件是否存在
         java.io.File file = new java.io.File(soundPath);
         if (!file.exists()) {
-            Log.e("SoundHelper", "文件根本不存在: " + soundPath);
             return -1;
         }
-        return mSoundPool.load(soundPath, 1);
+        if (mSoundPool == null) {
+            // 创建音频属性
+            AudioAttributes attributes = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build();
+            mSoundPool = new SoundPool.Builder()
+                    .setMaxStreams(5)
+                    .setAudioAttributes(attributes)
+                    .build();
+            mSoundPool.setOnLoadCompleteListener((soundPool, sampleId, status) -> {
+                if (status != 0) {
+                    Log.e("SoundHelper", "加载失败！ID: " + sampleId + " 状态码: " + status);
+                }
+            });
+        }
+        try {
+            int id = mSoundPool.load(soundPath, 1);
+            if (id > 0) {
+                mSoundCache.put(soundPath, id);
+            }
+            return id;
+        } catch (Exception e) {
+            Log.e("SoundHelper", "loadSound error: " + soundPath + " " + e.getMessage());
+            return -1;
+        }
     }
 
     /**
@@ -767,6 +776,7 @@ public class ThemeManager {
             mSoundPool.release();
             mSoundPool = null;
         }
+        mSoundCache.clear();
     }
 
     /**

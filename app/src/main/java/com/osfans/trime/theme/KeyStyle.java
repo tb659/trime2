@@ -30,7 +30,9 @@ import com.osfans.trime.Config;
 import org.luaj.LuaValue;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Random;
 
 /**
  * 按键样式类,继承自 Style,提供缓存优化的按键外观配置。
@@ -80,8 +82,9 @@ public class KeyStyle extends Style {
     private boolean mHasCachedVibrationEnabled;
     private boolean mVibrationEnabled;
     // 音效缓存
-    private int mSoundEffect=-1;
+    private int[] mSoundEffectIDs;
     private boolean mHasCachedSoundEffect;
+    private final Random mSoundRandom = new Random();
     // 音效开关缓存
     private boolean mHasCachedSoundEnabled;
     private boolean mSoundEnabled;
@@ -104,8 +107,6 @@ public class KeyStyle extends Style {
      */
     public KeyStyle(LuaValue t) {
         super(t);
-        // 预加载音效ID
-        getSoundEffect();
     }
 
     /**
@@ -119,7 +120,7 @@ public class KeyStyle extends Style {
         setStyle(def);
         // setStyle 设置了元表继承链，需要重置音效缓存以便重新查找
         mHasCachedSoundEffect = false;
-        mSoundEffect = -1;
+        mSoundEffectIDs = null;
     }
 
     /**
@@ -135,7 +136,7 @@ public class KeyStyle extends Style {
         setStyle(def);
         // setStyle 设置了元表继承链，需要重置音效缓存以便重新查找
         mHasCachedSoundEffect = false;
-        mSoundEffect = -1;
+        mSoundEffectIDs = null;
     }
 
     // ==================== 核心属性获取(带缓存逻辑) ====================
@@ -377,9 +378,18 @@ public class KeyStyle extends Style {
         return mVibrationEnabled;
     }
 
+    private int loadSingleSound(String name) {
+        String path = Config.getStylePath(name);
+        if (new File(path).exists()) return ThemeManager.loadSound(path);
+        path = Config.getSoundPath(name);
+        if (new File(path).exists()) return ThemeManager.loadSound(path);
+        return -1;
+    }
+
     /**
      * 获取音效 ID。
      * 从样式目录或音效目录中查找音效文件并加载。
+     * 支持单个字符串或字符串数组（随机播放）。
      *
      * @return 音效 ID,如果未找到则返回 -1。
      */
@@ -388,20 +398,31 @@ public class KeyStyle extends Style {
             mHasCachedSoundEffect = true;
             LuaValue ve = get("sound_effect");
             if (ve.isstring()) {
-                String s = ve.tojstring();
-                // 先尝试从样式目录查找
-                String path = Config.getStylePath(s);
-                if(new File(path).exists()){
-                    mSoundEffect = ThemeManager.loadSound(path);
-                } else {
-                    // 再尝试从音效目录查找
-                    path = Config.getSoundPath(s);
-                    if(new File(path).exists())
-                        mSoundEffect = ThemeManager.loadSound(path);
+                int id = loadSingleSound(ve.tojstring());
+                if (id > 0) mSoundEffectIDs = new int[]{id};
+            } else if (ve.istable()) {
+                int len = ve.length();
+                if (len > 0) {
+                    ArrayList<Integer> ids = new ArrayList<>();
+                    for (int i = 1; i <= len; i++) {
+                        LuaValue item = ve.get(i);
+                        if (item.isstring()) {
+                            int id = loadSingleSound(item.tojstring());
+                            if (id > 0) ids.add(id);
+                        }
+                    }
+                    if (!ids.isEmpty()) {
+                        mSoundEffectIDs = new int[ids.size()];
+                        for (int i = 0; i < ids.size(); i++)
+                            mSoundEffectIDs[i] = ids.get(i);
+                    }
                 }
             }
         }
-        return mSoundEffect;
+        if (mSoundEffectIDs != null && mSoundEffectIDs.length > 0) {
+            return mSoundEffectIDs[mSoundRandom.nextInt(mSoundEffectIDs.length)];
+        }
+        return -1;
     }
 
     /**
