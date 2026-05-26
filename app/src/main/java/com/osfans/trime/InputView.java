@@ -8,15 +8,11 @@ package com.osfans.trime;
 import android.content.Context;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
-import android.widget.TextView;
-import android.widget.Toast;
 
-import com.androlua.LuaUtil;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.keyboard.AbsKeyboardView;
 import com.osfans.trime.keyboard.FlexboxKeyboardView;
@@ -31,6 +27,7 @@ import androidx.annotation.NonNull;
 
 import org.luaj.Globals;
 import org.luaj.LuaValue;
+import org.luaj.Varargs;
 import org.luaj.lib.ResourceFinder;
 import org.luaj.lib.jse.JsePlatform;
 
@@ -46,6 +43,8 @@ import java.util.Map;
  * 支持根据Rime输入法方案（Schema）动态切换键盘布局，并缓存已加载的键盘视图以提高性能。
  */
 public class InputView extends FrameLayout implements ResourceFinder {
+
+    final private String TAG = "InputView";
 
     /** 当前显示的键盘视图实例 */
     private View mKeyboardView;
@@ -167,7 +166,7 @@ public class InputView extends FrameLayout implements ResourceFinder {
      * @param id 目标Rime方案ID，若为".last"则切换到上一个键盘
      */
     public void setKeyboard(String id) {
-        Log.w("TAG", "setKeyboard:s " + id);
+        Log.w(TAG, "setKeyboard:s " + id);
         if(".last".equals(id)){
             if(oldView!=null)
                 setKeyboardView(oldView); // 切换到上一个键盘
@@ -176,7 +175,7 @@ public class InputView extends FrameLayout implements ResourceFinder {
         if (id == null || id.equals(mCurrentSchemaId)) return; // 相同方案无需重复加载
         mCurrentSchemaId = id;
         id=getKeyboardId(id); // 解析实际的键盘ID
-        Log.w("TAG", "setKeyboard:e " + id);
+        Log.w(TAG, "setKeyboard:e " + id);
         // 优先从缓存获取键盘视图
         KeyboardView targetView = mViewCache.get(id);
         if (targetView == null) {
@@ -186,10 +185,13 @@ public class InputView extends FrameLayout implements ResourceFinder {
             LuaValue func = globals.loadfilex(id + ".lua"); // 加载对应方案的Lua脚本
             try {
                 if (func.isfunction()) {
+                    Log.w(TAG, "setKeyboard:Log 1");
                     LuaValue ret = func.call(); // 执行Lua脚本
                     if (ret.isuserdata(View.class)) {
+                        Log.w(TAG, "setKeyboard:Log 2");
                         // 如果Lua返回自定义View，直接设置
                         setKeyboardView(ret.touserdata(View.class));
+                        Log.w(TAG, "setKeyboard:Log 3");
                         return;
                     }
                 } else {
@@ -198,6 +200,21 @@ public class InputView extends FrameLayout implements ResourceFinder {
                 }
             } catch (Exception e) {
                 ThemeManager.sendMsg("setKeyboard " + e); // 捕获Lua执行异常并通知主题管理器
+            }
+            Log.w(TAG, "setKeyboard:Log 4");
+            // 如果键盘指定了 base，先加载 base 键盘的布局，再应用 key_overrides 覆盖
+            String base = globals.get("base").optjstring("");
+            if (!TextUtils.isEmpty(base)) {
+                LuaValue baseFunc = globals.loadfilex(base + ".lua");
+                Log.w(TAG, "setKeyboard:Log 5");
+                if (baseFunc.isfunction()) {
+                    baseFunc.call(); // base 键盘的 rows 等配置被设置到同一 globals
+                }
+                // 应用按键覆盖配置
+                LuaValue overrides = globals.get("key_overrides");
+                if (overrides.istable()) {
+                    applyKeyOverrides(globals, overrides);
+                }
             }
             // 根据Lua配置创建对应的键盘视图类型
             if (globals.get("rows").istable()) {
@@ -252,14 +269,14 @@ public class InputView extends FrameLayout implements ResourceFinder {
             if(TextUtils.isEmpty(id))
                 id = Function.getPref(getContext()).getString("select_schema_id","");
         }
-        Log.w("TAG", "setKeyboard:2 " + id);
+        Log.w(TAG, "setKeyboard:2 " + id);
         if(mViewCache.containsKey(id))
             return id; // 缓存中已有，直接返回
         if (new File(findFile(id + ".lua")).exists())
             return id; // 键盘文件存在，返回
 
         id = ThemeManager.getKeyboard(id); // 通过主题管理器解析键盘ID
-        Log.w("TAG", "setKeyboard:4 " + id);
+        Log.w(TAG, "setKeyboard:4 " + id);
         if(mViewCache.containsKey(id))
             return id;
         if (new File(findFile(id + ".lua")).exists())
@@ -268,20 +285,76 @@ public class InputView extends FrameLayout implements ResourceFinder {
         id = Rime.getRimeStatus().getSchemaId(); // 再次回退到当前Rime方案
         if(TextUtils.isEmpty(id))
             id = Function.getPref(getContext()).getString("select_schema_id","");
-        Log.w("TAG", "setKeyboard:5 " + id);
+        Log.w(TAG, "setKeyboard:5 " + id);
         if(mViewCache.containsKey(id))
             return id;
         if (new File(findFile(id + ".lua")).exists())
             return id;
 
         id = ThemeManager.getKeyboard(id); // 再次通过主题管理器解析
-        Log.w("TAG", "setKeyboard:6 " + id);
+        Log.w(TAG, "setKeyboard:6 " + id);
         if(mViewCache.containsKey(id))
             return id;
         if (new File(findFile(id + ".lua")).exists())
             return id;
 
         return "qwerty36"; // 所有回退都失败，返回固定默认键盘
+    }
+
+    /**
+     * 将 key_overrides 表中的字段覆盖应用到 rows 表的对应按键上。
+     * key_overrides 格式：{ [行号] = { [列号] = { 字段名 = 值, ... }, ... }, 行级字段 = 值, ... }
+     * 行内的数字索引为按键覆盖，字符串索引为行级覆盖（直接写入 row 表）。
+     *
+     * @param globals  Lua 全局环境，包含 rows 表
+     * @param overrides key_overrides 配置表
+     */
+    private void applyKeyOverrides(Globals globals, LuaValue overrides) {
+        LuaValue rowsValue = globals.get("rows");
+        if (!rowsValue.istable()) return;
+
+        LuaValue rowKey = LuaValue.NIL;
+        while (true) {
+            Varargs next = overrides.next(rowKey);
+            rowKey = next.arg1();
+            if (rowKey.isnil()) break;
+
+            LuaValue rowOverrides = next.arg(2);
+            if (!rowOverrides.istable()) continue;
+
+            LuaValue row = rowsValue.get(rowKey);
+            if (!row.istable()) continue;
+
+            LuaValue innerKey = LuaValue.NIL;
+            while (true) {
+                Varargs innerNext = rowOverrides.next(innerKey);
+                innerKey = innerNext.arg1();
+                if (innerKey.isnil()) break;
+
+                if (innerKey.isnumber()) {
+                    // 数字索引 → 按键级别覆盖
+                    LuaValue keyOverrides = innerNext.arg(2);
+                    if (!keyOverrides.istable()) continue;
+
+                    LuaValue keys = row.get("keys");
+                    if (!keys.istable()) continue;
+
+                    LuaValue key = keys.get(innerKey);
+                    if (!key.istable()) continue;
+
+                    LuaValue fieldKey = LuaValue.NIL;
+                    while (true) {
+                        Varargs fieldNext = keyOverrides.next(fieldKey);
+                        fieldKey = fieldNext.arg1();
+                        if (fieldKey.isnil()) break;
+                        key.set(fieldKey, fieldNext.arg(2));
+                    }
+                } else {
+                    // 字符串索引 → 行级别覆盖，直接写入 row 表
+                    row.set(innerKey, innerNext.arg(2));
+                }
+            }
+        }
     }
 
     /**
