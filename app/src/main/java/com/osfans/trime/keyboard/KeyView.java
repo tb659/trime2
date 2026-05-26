@@ -294,18 +294,6 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             return;
         }
         
-        // 处理点击音效反馈
-        if (mKeyStyle.isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
-            int sound = mKeyStyle.getSoundEffect();
-            if (sound > 0) {
-                // 播放自定义音效
-                ThemeManager.play(sound);
-            } else {
-                // 播放系统默认点击音效
-                playSoundEffect(SoundEffectConstants.CLICK);
-            }
-        }
-        
         // 如果当前按键配置对象不为空
         if (mKey != null) {
             // 判断当前按键是否为 Shift 键
