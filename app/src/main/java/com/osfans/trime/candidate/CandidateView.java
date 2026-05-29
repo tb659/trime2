@@ -282,12 +282,21 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
 
     /**
      * 刷新所有按键视图。
-     * 如果工具栏存在,则调用其刷新方法。
+     * 更新工具栏和候选列表容器高度,以响应 _hide_comment 等选项变更。
      */
     public void invalidateAllKeys() {
         if (mToolbarView != null) {
-            mToolbarView.invalidateAllKeys(); // 刷新工具栏按键
+            mToolbarView.invalidateAllKeys();
         }
+        int elevation = mCandidateStyle.getSize("elevation", 2);
+        int height = ThemeManager.getCandidateHeight() - elevation;
+        ViewGroup.LayoutParams lp = mListView.getLayoutParams();
+        lp.height = height;
+        mListView.setLayoutParams(lp);
+        mHide.setMinimumWidth(height);
+        ViewGroup.LayoutParams hideLp = mHide.getLayoutParams();
+        hideLp.height = height;
+        mHide.setLayoutParams(hideLp);
     }
 
     /**
@@ -387,5 +396,9 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
      */
     public ToolbarView getToolbar() {
         return mToolbarView;
+    }
+
+    public boolean isToolbarVisible() {
+        return mToolbarView != null && mToolbarView.getVisibility() == VISIBLE;
     }
 }

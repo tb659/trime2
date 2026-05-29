@@ -871,7 +871,8 @@ public class RootInputView extends FrameLayout {
      * 包括键盘按键和候选词栏，同时更新 Rime 选项配置。
      */
     public void invalidateAllKeys() {
-         Config.set_hide_comment(Rime.getRimeOption("_hide_comment"));
+        boolean hideCommentChanged = Config.is_hide_comment() != Rime.getRimeOption("_hide_comment");
+        Config.set_hide_comment(Rime.getRimeOption("_hide_comment"));
         Config.set_hide_key_hint(Rime.getRimeOption("_hide_key_hint"));
         Config.set_hide_key_sound(Rime.getRimeOption("_hide_key_sound"));
         if (mInputView != null) mInputView.invalidateAllKeys();
@@ -882,6 +883,19 @@ public class RootInputView extends FrameLayout {
                 mCandidateView.setVisibility(VISIBLE);
             mCandidateView.invalidateAllKeys();
             mRoot.requestApplyInsets();
+        }
+        if (hideCommentChanged) {
+            int candidateAreaHeight = ThemeManager.getCandidateHeight();
+            ViewGroup.LayoutParams clp = mCenterLayout.getLayoutParams();
+            if (clp != null) {
+                clp.height = ThemeManager.getKeyboardHeight() + candidateAreaHeight;
+                mCenterLayout.setLayoutParams(clp);
+            }
+            ViewGroup.LayoutParams cvlp = mCandidateView.getLayoutParams();
+            if (cvlp != null) {
+                cvlp.height = candidateAreaHeight;
+                mCandidateView.setLayoutParams(cvlp);
+            }
         }
     }
 

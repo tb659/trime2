@@ -186,14 +186,18 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
     @Override
     public void onBindViewHolder(@NonNull CandidateAdapter.CandidateViewHolder holder, int position) {
         final CandidateItem data = mData.get(position);
+        boolean hideComment = Config.is_hide_comment();
         // 处理注释为空的情况，隐藏 View 节省空间
-        if (TextUtils.isEmpty(data.getComment())|| Config.is_hide_comment()) {
+        if (TextUtils.isEmpty(data.getComment())|| hideComment) {
             holder.tvComment.setVisibility(View.GONE);
         } else {
             holder.tvComment.setVisibility(View.VISIBLE);
             holder.tvComment.setText(data.getComment());
         }
         holder.tvText.setText(data.getText());
+        int pl = holder.itemView.getPaddingLeft();
+        int pr = holder.itemView.getPaddingRight();
+        holder.itemView.setPadding(pl, hideComment ? 0 : ThemeManager.dp2px(1), pr, hideComment ? 0 : ThemeManager.dp2px(1));
         if(data.getText().length()>32){
             holder.tvText.setMaxWidth(TrimeService.getInstance().getWidth());
             holder.tvText.setEllipsize(TextUtils.TruncateAt.MARQUEE);

@@ -311,7 +311,9 @@ public class ThemeManager {
      * @return 高度值(px)。
      */
     public static int getCandidateHeight() {
-        return (int) (getStyle().getStyle("candidate").getSize("height", mCandidateHeight) * Math.min(1, Config.getKeyboardHeightScale()));
+        int h = (int) (getStyle().getStyle("candidate").getSize("height", mCandidateHeight) * Math.min(1, Config.getKeyboardHeightScale()));
+        if (Config.is_hide_comment()) h /= 2;
+        return h;
     }
 
     /**

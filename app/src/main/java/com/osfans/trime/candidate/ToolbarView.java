@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 
+import com.osfans.trime.Config;
 import com.osfans.trime.Event;
 import com.osfans.trime.Key;
 import com.osfans.trime.TrimeService;
@@ -34,17 +35,21 @@ import java.util.List;
  * 显示方案切换开关和自定义功能按键,支持横向滚动。
  */
 public class ToolbarView extends LinearLayout implements View.OnClickListener {
-    
+
     // ==================== 成员变量 ====================
-    
+
     /** Trime 服务实例 */
     private final TrimeService mTrime;
     /** 工具栏样式配置 */
     private final Style mToolbarStyle;
     /** 按键样式配置 */
     private final KeyStyle mKeyStyle;
-    /** 按键列表 */
-    private ArrayList<KeyView> mKeys = new ArrayList<>();
+    /** 横向滚动容器 */
+    private HorizontalScrollView mListView;
+    /** 上行按键列表（switch 未选中状态） */
+    private ArrayList<KeyView> mTopKeys = new ArrayList<>();
+    /** 下行按键列表（switch 当前状态 + 自定义按键） */
+    private ArrayList<KeyView> mBottomKeys = new ArrayList<>();
     /** 隐藏按钮 */
     private KeyView mHide;
 
@@ -65,13 +70,16 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
 
     /**
      * 初始化视图结构。
-     * 创建横向滚动视图、隐藏按钮和方案切换开关。
+     * 每个 switch 为一列（上：未选中，有注释时显示；下：当前选中，始终显示），自定义按键占整列高度。
      */
     private void initView() {
+        int elevation = mToolbarStyle.getSize("elevation", 2);
+        int toolbarHeight = ThemeManager.getCandidateHeight();
+        boolean showTwoRows = !Config.is_hide_comment();
+
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(HORIZONTAL);
         root.setBackground(mToolbarStyle.getBackground(0xffdddddd));
-        int elevation = mToolbarStyle.getSize("elevation", 2);
         root.setElevation(elevation);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             int dShadowColor = mToolbarStyle.getColor("shadow_color", 0);
@@ -80,23 +88,23 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
                 root.setOutlineSpotShadowColor(dShadowColor);
             }
         }
-        // 设置 CandidateView 自身的高度，防止输入法界面闪烁
-        int height = ThemeManager.getCandidateHeight() - elevation;
+        int height = toolbarHeight - elevation;
         LayoutParams lp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         lp.setMargins(0, 0, 0, elevation);
         addView(root, lp);
 
-        // 创建 HorizontalScrollView 支持横向滚动
-        HorizontalScrollView mListView = new HorizontalScrollView(getContext());
-        mListView.setHorizontalScrollBarEnabled(false); // 禁止水平滚动条
-        mListView.setVerticalScrollBarEnabled(false); // 禁止垂直滚动条
+        // 创建横向滚动容器
+        mListView = new HorizontalScrollView(getContext());
+        mListView.setHorizontalScrollBarEnabled(false);
+        mListView.setVerticalScrollBarEnabled(false);
         LinearLayout itemsLayout = new LinearLayout(getContext());
-        itemsLayout.setGravity(Gravity.CENTER); // 居中对齐
+        itemsLayout.setGravity(Gravity.CENTER);
         mListView.addView(itemsLayout, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
         LuaValue hide = mToolbarStyle.get("hide");
-         mHide = new KeyView(getContext(), hide.istable()?mToolbarStyle.getKeyStyle("hide", mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key"))):mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key")));
-         if (hide.istable()) {
-            mHide.setText(hide.get("text").optjstring("▽"));
+        mHide = new KeyView(getContext(), hide.istable()?mToolbarStyle.getKeyStyle("hide", mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key"))):mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key")));
+        if (hide.istable()) {
+            mHide.setText(hide.get("text").optjstring(""));
         } else {
             mHide.setText(hide.optjstring("▽"));
         }
@@ -106,30 +114,57 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
 
         root.addView(mListView, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height, 1));
         root.addView(mHide, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, height));
+
+        mTopKeys.clear();
+        mBottomKeys.clear();
+
+        // 上行（未选中）用 comment 样式，下行（当前）用 key 样式
+        KeyStyle topStyle = mToolbarStyle.getKeyStyle("comment", mKeyStyle);
+
         try {
-            if(mToolbarStyle.get("schema_switches").optboolean(false)&&!Rime.getCurrentRimeSchema().equals(".default")) {
+            if (mToolbarStyle.get("schema_switches").optboolean(false) && !Rime.getCurrentRimeSchema().equals(".default")) {
                 RimeSchema currentRimeSchema = new RimeSchema(Rime.getCurrentRimeSchema());
                 List<RimeSchema.Switch> switches = currentRimeSchema.getSwitches();
                 for (RimeSchema.Switch aSwitch : switches) {
-                    if (aSwitch.getStates().isEmpty())
-                        continue;
-                    KeyView key = new KeyView(getContext(), mKeyStyle) {
+                    if (aSwitch.getStates().isEmpty()) continue;
+
+                    LinearLayout column = new LinearLayout(getContext());
+                    column.setOrientation(VERTICAL);
+
+                    int rowHeight = height / 2;
+
+                    // 上：未选中选项（comment 样式，有注释时显示）
+                    KeyView topKey = new KeyView(getContext(), topStyle) {
+                        @Override
+                        public void invalidateKey() {
+                            super.invalidateKey();
+                            setText(aSwitch.getUnState());
+                        }
+                    };
+                    topKey.setOnClickListener(v -> aSwitch.toggleOption());
+                    topKey.setText(aSwitch.getUnState());
+                    topKey.setMinimumWidth(rowHeight);
+                    topKey.setVisibility(showTwoRows ? VISIBLE : GONE);
+
+                    // 下：当前选中选项（key 样式，始终显示）
+                    KeyView bottomKey = new KeyView(getContext(), mKeyStyle) {
                         @Override
                         public void invalidateKey() {
                             super.invalidateKey();
                             setText(aSwitch.getState());
                         }
                     };
-                    key.setOnClickListener(new OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            aSwitch.toggleOption();
-                        }
-                    });
-                    key.setText(aSwitch.getState());
-                    itemsLayout.addView(key, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-                    key.setMinimumWidth(height);
-                    mKeys.add(key);
+                    bottomKey.setOnClickListener(v -> aSwitch.toggleOption());
+                    bottomKey.setText(aSwitch.getState());
+                    bottomKey.setMinimumWidth(rowHeight);
+
+                    column.addView(topKey, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, showTwoRows ? rowHeight : 0));
+                    column.addView(bottomKey, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, showTwoRows ? rowHeight : height));
+                    itemsLayout.addView(column, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+                    mTopKeys.add(topKey);
+                    mBottomKeys.add(bottomKey);
+
                     Rime.setRimeOption(aSwitch.getName(), aSwitch.getReset() != 0);
                 }
             }
@@ -137,28 +172,26 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
             e.printStackTrace();
         }
 
-        // 根据配置添加工具栏按键
+        // 自定义按键（占整列高度）
         LuaValue keys = mToolbarStyle.get("keys").opttable(new LuaTable());
         int len = keys.length();
         for (int i = 0; i < len; i++) {
             LuaValue o = keys.get(i + 1);
             if (o.istable()) {
-                // 表格类型,可以自定义样式
                 LuaValue s = o.get("style");
-                KeyStyle style=mKeyStyle;
-                if(s.isstring()){
-                    style=ThemeManager.getStyle().getKeyStyle(s.tojstring(),mKeyStyle); // 获取自定义样式
+                KeyStyle style = mKeyStyle;
+                if (s.isstring()) {
+                    style = ThemeManager.getStyle().getKeyStyle(s.tojstring(), mKeyStyle);
                 }
                 KeyView key = new KeyView(getContext(), o.get("click").isnil() ? new Key(new Event(o)) : new Key(o), style);
                 itemsLayout.addView(key, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 key.setMinimumWidth(height);
-                mKeys.add(key);
+                mBottomKeys.add(key);
             } else if (o.isstring()) {
-                // 字符串类型,使用默认样式
                 KeyView key = new KeyView(getContext(), new Key(o.tojstring()), mKeyStyle);
                 itemsLayout.addView(key, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 key.setMinimumWidth(height);
-                mKeys.add(key);
+                mBottomKeys.add(key);
             }
         }
     }
@@ -176,11 +209,38 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
 
     /**
      * 刷新所有按键视图。
-     * 遍历按键列表,调用每个按键的 invalidateKey 方法。
+     * 更新列中行高可见性和全部按键文本。
      */
     public void invalidateAllKeys() {
-        for (KeyView key : mKeys) {
-            key.invalidateKey(); // 刷新按键
+        boolean showTwoRows = !Config.is_hide_comment();
+        int toolbarHeight = ThemeManager.getCandidateHeight();
+        int elevation = (int) mToolbarStyle.getSize("elevation", 2);
+        int height = toolbarHeight - elevation;
+        int rowHeight = height / 2;
+
+        ViewGroup.LayoutParams lvLp = mListView.getLayoutParams();
+        lvLp.height = height;
+        mListView.setLayoutParams(lvLp);
+        ViewGroup.LayoutParams hideLp = mHide.getLayoutParams();
+        hideLp.height = height;
+        mHide.setLayoutParams(hideLp);
+
+        int switchCount = mTopKeys.size();
+        for (int i = 0; i < switchCount; i++) {
+            View topKey = mTopKeys.get(i);
+            View bottomKey = mBottomKeys.get(i);
+            ViewGroup.LayoutParams topLp = topKey.getLayoutParams();
+            topLp.height = showTwoRows ? rowHeight : 0;
+            topKey.setLayoutParams(topLp);
+            topKey.setVisibility(showTwoRows ? VISIBLE : GONE);
+            ViewGroup.LayoutParams bottomLp = bottomKey.getLayoutParams();
+            bottomLp.height = showTwoRows ? rowHeight : height;
+            bottomKey.setLayoutParams(bottomLp);
+            mTopKeys.get(i).invalidateKey();
+            mBottomKeys.get(i).invalidateKey();
+        }
+        for (int i = switchCount; i < mBottomKeys.size(); i++) {
+            mBottomKeys.get(i).invalidateKey();
         }
     }
 
@@ -191,8 +251,8 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
      * @param id 方案 ID。
      */
     public void setSchema(String id) {
-        removeAllViews(); // 移除所有视图
-        initView(); // 重新初始化
+        removeAllViews();
+        initView();
     }
 
     /**
