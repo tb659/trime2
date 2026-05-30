@@ -1,9 +1,9 @@
 name = "符号键盘"
-author = "nirenr"
+author = "tbagr"
 key_width = 10
-key_height = 54
+key_height = 50
 rows = {
-    -- Row 1
+    -- 第一行
     {
         keys = {
             { click = "·", ascii = "`" },
@@ -19,10 +19,10 @@ rows = {
         }
     },
 
-    -- Row 2
+    -- 第二行
     {
         keys = {
-            { click = "……", ascii = "^" },
+            { click = "……", ascii = "^", style = "text_size_14" },
             { click = "&", ascii = "&" },
             { click = "*", ascii = "*" },
             { click = "（", ascii = "(" },
@@ -35,10 +35,10 @@ rows = {
         }
     },
 
-    -- Row 3
+    -- 第三行
     {
         keys = {
-            { click = "——", ascii = "_" },
+            { click = "——", ascii = "_", style = "text_size_14" },
             { click = "+", ascii = "+" },
             { click = "【", ascii = "[" },
             { click = "】", ascii = "]" },
@@ -51,7 +51,7 @@ rows = {
         }
     },
 
-    -- Row 4
+    -- 第四行
     {
         keys = {
             { click = "“", ascii = "\"" },
@@ -67,16 +67,17 @@ rows = {
         }
     },
 
-    -- Bottom Row
+    -- 第五行
     {
+        height = 56,
         keys = {
-            { click = "Keyboard_default" , width = 15 },
-            { click = "Keyboard_symbols_ext" },
+            { click = "Keyboard_default", swipe_up = "Keyboard_symbols_ext", width = 15, text_size = 16 },
+            { click = "Mode_switch", width = 15, text_size = 16 },
             { click = "，", ascii = "," },
-            { click = "space1", width = 30},
+            { click = "space1", width = 25 },
             { click = "。", ascii = "." },
             { click = "/", ascii = "/" },
-            { click = "Mode_switch", width = 15 },
+            { click = "Return", style = "enter2", label = "Enter", width = 15 }
         }
     }
 }

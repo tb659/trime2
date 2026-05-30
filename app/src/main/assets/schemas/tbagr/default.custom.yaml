@@ -1,0 +1,13 @@
+customization:
+  distribution_code_name: trime
+  distribution_version: "0.6.7-19-g4787b15a"
+  generator: "Rime::SwitcherSettings"
+  modified_time: "Fri May 15 18:05:52 2026"
+  rime_version: 1.16.0
+patch:
+  schema_list:
+    - {schema: tigress}
+    - {schema: tiger}
+    - {schema: pinyin_simp}
+    - {schema: stroke}
+    - {schema: easy_english}

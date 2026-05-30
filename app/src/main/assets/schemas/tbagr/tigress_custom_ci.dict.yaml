@@ -1,0 +1,23 @@
+name: tigress_custom_ci
+version: "2025.11.11"
+sort: by_weight
+use_preset_vocabulary: false
+columns:
+  - text
+  - weight
+  - code
+  - stem
+encoder:
+  rules:
+    - length_equal: 2
+      formula: "AaAbBaBb"
+    - length_equal: 3
+      formula: "AaBaCaCb"
+    - length_in_range: [4, 99]
+      formula: "AaBaCaZa"
+
+...
+
+猎月人	1122	mvjr
+芙宁娜	1122	lwba
+芙宁娜西妲	1122	lwbb

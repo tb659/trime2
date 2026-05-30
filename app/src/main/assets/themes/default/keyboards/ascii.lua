@@ -1,12 +1,12 @@
 name = "36键密码"
-author = "nirenr"
+author = "tbagr"
+ascii_mode = true
+lock = true
 key_width = 10
-key_height = 54
-ascii_mode=true
-lock=true
 rows = {
-    --第一行
+    -- 第一行
     {
+        height = 50,
         keys = {
             { click = "1" },
             { click = "2" },
@@ -20,7 +20,7 @@ rows = {
             { click = "0" },
         }
     },
-    --第二行
+    -- 第二行
     {
         keys = {
             { click = "q" },
@@ -35,7 +35,7 @@ rows = {
             { click = "p" },
         }
     },
-    --第三行
+    -- 第三行
     {
         keys = {
             { width = 5 },
@@ -50,7 +50,7 @@ rows = {
             { click = "l" },
         }
     },
-    --第四行
+    -- 第四行
     {
         keys = {
             { click = "Shift_L", style = "functional", width = 15},
@@ -61,11 +61,12 @@ rows = {
             { click = "b" },
             { click = "n" },
             { click = "m" },
-            { click = "BackSpace", style = "functional", label = " ⌫", width = 15 },
+            { click = "BackSpace", style = "functional", label = "⌫", width = 15 },
         }
     },
-    --第五行
+    -- 第五行
     {
+        -- height = 50,
         keys = {
             { click="Keyboard_symbols", style = "functional", width = 15 },
             { click="Keyboard_number", style = "functional" },
@@ -73,7 +74,7 @@ rows = {
             { click = "space", width = 30, swipe_repeatable=true, swipe_left="Left",swipe_right="Right",swipe_up="Up",swipe_down="Down"},
             { click = "." },
             { click="@", style = "functional" },
-            { click = "Return", style = "enter", label = "Enter", width = 15 },
+            { click = "Return", style = "enter", label = "Enter", width = 15 }
         }
     },
 }
