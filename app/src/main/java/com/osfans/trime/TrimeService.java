@@ -2264,6 +2264,15 @@ public class TrimeService extends InputMethodService {
      */
     public void restart() {
         mRime.restart();
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                String schema = Rime.getCurrentRimeSchema();
+                if (!TextUtils.isEmpty(schema)) {
+                    mRootInputView.setSchema(schema);
+                }
+            }
+        });
     }
 
     // 对话框引用
