@@ -284,7 +284,7 @@ public class ThemeManager {
      */
     public static int getContentHeight() {
         if (Rime.getRimeOption("_hide_candidate"))
-            return getCandidateHeight();
+            return getKeyboardHeight();
         return getCandidateHeight() + getKeyboardHeight();
     }
 

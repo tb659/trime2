@@ -843,7 +843,13 @@ public class RootInputView extends FrameLayout {
                         lp.height = ThemeManager.getContentHeight();
                         mCenterLayout.setLayoutParams(lp);
                     }
-                    return;
+                    // 更新 mRoot 高度以匹配新键盘的动态高度，并触发窗口插入区重算
+                    ViewGroup.LayoutParams rlp = mRoot.getLayoutParams();
+                    if (rlp != null) {
+                        rlp.height = ThemeManager.getHeight();
+                        mRoot.setLayoutParams(rlp);
+                    }
+                    mRoot.requestApplyInsets();
             }
         });
     }
@@ -882,15 +888,21 @@ public class RootInputView extends FrameLayout {
             else
                 mCandidateView.setVisibility(VISIBLE);
             mCandidateView.invalidateAllKeys();
-            mRoot.requestApplyInsets();
         }
+        // 更新容器高度以匹配候选栏和键盘的最新动态高度
+        ViewGroup.LayoutParams clp = mCenterLayout.getLayoutParams();
+        if (clp != null) {
+            clp.height = ThemeManager.getContentHeight();
+            mCenterLayout.setLayoutParams(clp);
+        }
+        ViewGroup.LayoutParams rlp = mRoot.getLayoutParams();
+        if (rlp != null) {
+            rlp.height = ThemeManager.getHeight();
+            mRoot.setLayoutParams(rlp);
+        }
+        mRoot.requestApplyInsets();
         if (hideCommentChanged) {
             int candidateAreaHeight = ThemeManager.getCandidateHeight();
-            ViewGroup.LayoutParams clp = mCenterLayout.getLayoutParams();
-            if (clp != null) {
-                clp.height = ThemeManager.getKeyboardHeight() + candidateAreaHeight;
-                mCenterLayout.setLayoutParams(clp);
-            }
             ViewGroup.LayoutParams cvlp = mCandidateView.getLayoutParams();
             if (cvlp != null) {
                 cvlp.height = candidateAreaHeight;
