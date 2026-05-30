@@ -293,8 +293,8 @@ key_binder:
     - { when: composing, toggle: pinyin, accept: "#" } # 拼音开关
     - { when: composing, toggle: pinyin, accept: "Control+w" } # 拼音开关
 
-    - { when: always, toggle: ascii_punct, accept: "$" } # 中英标点切换
-    - { when: always, toggle: ascii_punct, accept: "Control+e" } # 中英标点切换
+    - { when: composing, toggle: ascii_punct, accept: "$" } # 中英标点切换
+    - { when: composing, toggle: ascii_punct, accept: "Control+e" } # 中英标点切换
 
     - { when: composing, toggle: chaifen, accept: "%" } # 拆分滤镜开关
     - { when: composing, toggle: chaifen, accept: "Control+r" } # 拆分滤镜开关
@@ -306,8 +306,8 @@ key_binder:
     - { when: composing, toggle: simplification, accept: "Control+y" } # 简繁开关
     # - when: composing, toggle: fanjian, { accept: "Control+Shift+y" }  # 繁简开关
 
-    - { when: always, toggle: full_shape, accept: "*" } # 全半角切换
-    - { when: always, toggle: full_shape, accept: "Control+u" } # 全半角切换
+    - { when: composing, toggle: full_shape, accept: "*" } # 全半角切换
+    - { when: composing, toggle: full_shape, accept: "Control+u" } # 全半角切换
 
     - { when: composing, toggle: charset_comment_filter, accept: "(" } # Unicode分区开关
     - { when: composing, toggle: charset_comment_filter, accept: "Control+i" } # Unicode分区开关
