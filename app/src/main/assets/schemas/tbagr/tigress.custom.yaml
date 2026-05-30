@@ -13,3 +13,6 @@ patch:
   style/preedit_type: preview # 嵌入首选项内容(字词)。有4个选项可设：input 嵌入输入码 | composition 嵌入编码 | preview 嵌入首选项 | preview_all 嵌入全部内容
   #style/layout/margin_y : -1 # 启用后可隐藏候选框(盲打)，建议配合上面的嵌入首选项，一起使用
   #style/inline_preedit: false # 嵌入编码模式，默认是true开启，若想关闭，取消注释即可（删除前面的#号）
+
+  punctuator/half_shape:                                                                                                                                                                                                                                            LSPs are disabled
+    "'": { commit: "‘" }
