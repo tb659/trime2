@@ -55,7 +55,7 @@ rows = {
     -- 第四行
     {
         keys = {
-            { click = "Keyboard_symbols", swipe_up = "Schema_settings", hint_up = "", long_click = "Keyboard_settings", style = "functional", width = 15, ascii = { click = "Keyboard_symbols", label = "符号", swipe_up = "Schema_settings", hint_up = "", long_click = "Schema_settings" } },
+            { click = "Keyboard_symbols", swipe_right = "Schema_settings", hint_right = "", long_click = "Keyboard_settings", style = "functional", width = 15, ascii = { click = "Keyboard_symbols", label = "符号", swipe_up = "Schema_settings", hint_up = "", long_click = "Schema_settings" } },
             { click = "Keyboard_number", swipe_up = "Keyboard_default_zhuji", hint_up = "", long_click = "Theme_settings", composing = "Select_five", popup = {"Theme_settings", "Color_switch"}, style = "functional" },
             { click = "，", ascii = ",", long_click = "<", composing = "Select_four", style = "text_size_14" },
             { click = "space", label = "schema_name", long_click="VOICE_ASSIST", width = 30, swipe_repeatable = true, swipe_left = "Left", swipe_right = "Right", swipe_up = "Up", swipe_down = "Down", repeat_click_time = 100 },

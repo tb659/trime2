@@ -46,6 +46,7 @@ import com.androlua.LuaUtil;
 import com.osfans.trime.candidate.CandidatesManager;
 import com.osfans.trime.core.CandidateItem;
 import com.osfans.trime.core.Rime;
+import com.osfans.trime.core.RimeConfig;
 import com.osfans.trime.core.RimeMessage;
 import com.osfans.trime.core.RimeProto;
 import com.osfans.trime.dialog.DeployDialog;
@@ -182,6 +183,7 @@ public class TrimeService extends InputMethodService {
                         String id = Function.getPref(TrimeService.this).getString("select_schema_id", "");
                         if (!TextUtils.isEmpty(id))
                             Rime.selectRimeSchema(id);
+                        initInlinePreedit();
                     }
                 });
             }
@@ -1206,6 +1208,7 @@ public class TrimeService extends InputMethodService {
         else if (message instanceof RimeMessage.SchemaMessage) {
             // 获取新方案的 ID，并通知根视图更新键盘布局和状态显示
             mRootInputView.setSchema(((RimeMessage.SchemaMessage) message).getData().getId());
+            initInlinePreedit();
         }
         // 3. 处理部署（同步/编译配置）完成消息
         // 当用户执行“部署”操作，Rime 重新加载配置文件后触发
@@ -1231,6 +1234,7 @@ public class TrimeService extends InputMethodService {
                         } else {
                             // 获取到方案 ID 后，更新根视图的键盘布局
                             mRootInputView.setSchema(Rime.getCurrentRimeSchema());
+                            initInlinePreedit();
                         }
                     }
                 }, 10);
@@ -1317,8 +1321,32 @@ public class TrimeService extends InputMethodService {
 
     private void updateComposing(RimeProto.Context.Composition data) {
         setComposingText(data.getPreedit());
+        mHandler.post(this::updateComposing);
     }
 
+    private void initInlinePreedit() {
+        String schemaId = Rime.getCurrentRimeSchema();
+        if (TextUtils.isEmpty(schemaId)) return;
+        try (RimeConfig config = RimeConfig.openSchema(schemaId)) {
+            String preeditType = config.getString("style/preedit_type");
+            if (TextUtils.isEmpty(preeditType)) return;
+            switch (preeditType) {
+                case "preview":
+                    inlinePreedit = InlineModeType.INLINE_PREVIEW;
+                    break;
+                case "composition":
+                    inlinePreedit = InlineModeType.INLINE_COMPOSITION;
+                    break;
+                case "input":
+                    inlinePreedit = InlineModeType.INLINE_INPUT;
+                    break;
+                default:
+                    inlinePreedit = InlineModeType.INLINE_NONE;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "initInlinePreedit: " + e.getMessage());
+        }
+    }
 
     public void updateComposing() {
         InputConnection ic = getCurrentInputConnection();

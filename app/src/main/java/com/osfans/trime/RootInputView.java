@@ -129,8 +129,10 @@ public class RootInputView extends FrameLayout {
         setClipChildren(false);
         setClipToPadding(false);
         // 从主题配置中读取是否有编码区配置和最小长度过滤条件
+        Style compositionStyle = ThemeManager.getStyle().getStyle("composition");
         mHasComposition = ThemeManager.getStyle().hasKey("composition");
-        mCompositionMinLength = ThemeManager.getStyle().getStyle("composition").getInt("min_length");
+        mHideComposition = "hide".equals(compositionStyle.getString("position"));
+        mCompositionMinLength = compositionStyle.getInt("min_length");
 
         // 初始化各个视图引用为空
         mShowExtractedCandidatesView = false;
@@ -711,13 +713,14 @@ public class RootInputView extends FrameLayout {
     private String mLastComposingText = "";
 
     private boolean mHasComposition;
+    private boolean mHideComposition;
     // 2. 复用 Runnable，避免频繁 GC 产生内存抖动
     private final Runnable mComposingRunnable = new Runnable() {
         @Override
         public void run() {
             String s = mLastComposingText;
 
-            if (TextUtils.isEmpty(s)) {
+            if (TextUtils.isEmpty(s) || mHideComposition) {
                 mPreedit.setVisibility(View.INVISIBLE);
             } else {
                 mPreedit.setVisibility(View.VISIBLE);

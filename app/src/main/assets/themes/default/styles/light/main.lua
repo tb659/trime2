@@ -147,6 +147,7 @@ key = {
         shadow_color = 0xff00ffff,
         -- 背景按键颜色或图片
         background = 0xff888888,
+        -- 文字颜色
         text_color = 0xffffffff,
         -- 助记文字颜色
         hint = {
@@ -542,8 +543,8 @@ composition = {
     text_color = 0xff222222,
     -- 背景颜色或图
     background = 0xaaffffff,
-    -- 位置：left|right|left_up|right_up|fixed|bottom_left|bottom_right|top_left|top_right(left、right需要>=Android5.0)
-    position = "fixed",
+    -- 位置：left|right|left_up|right_up|fixed|bottom_left|bottom_right|top_left|top_right|hide(left、right需要>=Android5.0)
+    position = "hide",
     -- 所有满足条件的词语都显示在窗口
     all_phrases = false,
     -- 边框宽度
@@ -592,11 +593,6 @@ composition = {
     },
     window = {
         --  悬浮窗口组件
-        {
-            start = "",
-            move = "✎ ",
-            ["end"] = ""
-        },
         {
             start = "",
             composition = "%s",
