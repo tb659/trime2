@@ -22,7 +22,7 @@ keyboard = {
     -- 键盘背景颜色或图片
     background = 0xffdddddd,
     -- 指定样式全局字体或字体集
-    -- font="b.ttf",
+    font = "kafei.ttf",
 }
 
 -- 默认按键样式
@@ -50,7 +50,7 @@ key = {
     -- font={"a.ttf","b.ttf"}
     -- font = "JetBrainsMono-Medium.ttf",
     -- font = "kafei.ttf",
-    font = {"xr.ttf", "TumanPUA.ttf", "TH-Feon.ttf", "simsung.ttf", "simsunb.ttf", "simsun.ttc", "LXGWWenKaiGBScreenR.ttf", "kafei.ttf"},
+    -- font = {"xr.ttf", "TumanPUA.ttf", "TH-Feon.ttf", "simsung.ttf", "simsunb.ttf", "simsun.ttc", "LXGWWenKaiGBScreenR.ttf", "kafei.ttf"},
     -- 震动开关
     vibration_enabled = true,
     vibration_effect = {

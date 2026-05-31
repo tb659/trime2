@@ -71,7 +71,7 @@ rows = {
     {
         height = 56,
         keys = {
-            { click = "Keyboard_default", swipe_up = "Keyboard_symbols_ext", width = 15, text_size = 16 },
+            { click = "Keyboard_back", swipe_up = "Keyboard_symbols_ext", width = 15, text_size = 16 },
             { click = "Mode_switch", width = 15, text_size = 16 },
             { click = "，", ascii = "," },
             { click = "space1", width = 25 },

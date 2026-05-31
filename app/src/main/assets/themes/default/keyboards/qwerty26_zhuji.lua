@@ -46,6 +46,6 @@ key_overrides = {
         [9] = { margins = { left = 2, top = 0, right = 2, bottom = 5 } },
     },
     [4] = {
-        [2] = { swipe_up = { send = "Eisu_toggle", select = "qwerty26_custom" } }
+        [2] = { swipe_up = { send = "Eisu_toggle", select = "qwerty26" } }
     },
 }

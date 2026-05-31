@@ -67,7 +67,7 @@ flex_box = {
         direction = "column",
         width = 64,
         keys = {
-            { click = "Keyboard_default", style = "functional"},
+            { click = "Keyboard_back", style = "functional"},
             { click = "BackSpace", style = "functional", label = "⌫"},
             { click = "space1" },
             { click = "Return", style = "enter2", label = "Enter" }

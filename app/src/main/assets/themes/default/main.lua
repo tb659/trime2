@@ -97,6 +97,7 @@ preset_keys = {
     Keyboard_number = { label = "数字", send = "Eisu_toggle", select = "number" },
     Keyboard_letter = { label = "字母", send = "Eisu_toggle", select = "default" },
     Keyboard_default = { label = "返回", send = "Eisu_toggle", select = ".default" },
+    Keyboard_back = { label = "返回", send = "Eisu_toggle", select = ".last" },
     Keyboard_switch = { label = "键盘", send = "Eisu_toggle", select = ".next" },
     Keyboard_clipboard = { label = "剪贴板", send = "Eisu_toggle", select = "clipboard" },
     Keyboard_phrase = { label = "短语", send = "Eisu_toggle", select = "phrase" },

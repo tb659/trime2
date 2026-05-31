@@ -60,7 +60,7 @@ flex_box = {
             keys = {
                 { click = "="},
                 { click = "KP_0"},
-                { click = "Keyboard_default"},
+                { click = "Keyboard_back"},
             }
         },
     },

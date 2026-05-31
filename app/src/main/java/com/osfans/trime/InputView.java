@@ -132,6 +132,10 @@ public class InputView extends FrameLayout implements ResourceFinder {
      * @param keyboardView 要设置的键盘视图实例
      */
     private void setKeyboardView(View keyboardView) {
+        if (keyboardView instanceof KeyboardView) {
+            setKeyboardView((KeyboardView) keyboardView);
+            return;
+        }
         oldView = mKeyboardView;
         mKeyboardView = keyboardView;
         ViewParent parent = keyboardView.getParent();
@@ -168,9 +172,12 @@ public class InputView extends FrameLayout implements ResourceFinder {
     public void setKeyboard(String id) {
         Log.w(TAG, "setKeyboard:s " + id);
         if(".last".equals(id)){
-            if(oldView!=null)
+            if(oldView!=null) {
                 setKeyboardView(oldView); // 切换到上一个键盘
-            return;
+                mCurrentSchemaId = null; // 清除当前方案ID，允许下次正常切换键盘
+                return;
+            }
+            id = ".default"; // 没有上一个键盘时，回退到默认键盘
         }
         if (id == null || id.equals(mCurrentSchemaId)) return; // 相同方案无需重复加载
         mCurrentSchemaId = id;
