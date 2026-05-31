@@ -100,17 +100,60 @@ public class TrimeApplication extends Application {
                 } catch (NullPointerException ignored) {
                 }
                 // 解压文件：从APK读取并写入外部存储
-                FileOutputStream out = new FileOutputStream(extDir + File.separator + path);
-                InputStream in = zip.getInputStream(entry);
-                byte[] buf = new byte[40960]; // 40KB缓冲区
-                int count = 0;
-                while ((count = in.read(buf)) != -1) {
-                    out.write(buf, 0, count); // 写入数据
+                String fpath = extDir + File.separator + path;
+                try {
+                    FileOutputStream out = new FileOutputStream(fpath);
+                    InputStream in = zip.getInputStream(entry);
+                    byte[] buf = new byte[40960]; // 40KB缓冲区
+                    int count = 0;
+                    while ((count = in.read(buf)) != -1) {
+                        out.write(buf, 0, count); // 写入数据
+                    }
+                    out.close();
+                    in.close();
+                } catch (java.io.IOException e) {
+                    // EEXIST: 删除冲突项后重试
+                    if (e.getMessage() != null && e.getMessage().contains("EEXIST")) {
+                        File conflict = new File(fpath);
+                        if (conflict.exists()) {
+                            if (conflict.isDirectory()) {
+                                deleteDir(conflict);
+                            } else {
+                                conflict.delete();
+                            }
+                        }
+                        // 父目录可能被删除，确保重建
+                        File parent = conflict.getParentFile();
+                        if (parent != null && !parent.exists()) parent.mkdirs();
+                        FileOutputStream out = new FileOutputStream(fpath);
+                        InputStream in = zip.getInputStream(entry);
+                        byte[] buf = new byte[40960];
+                        int count = 0;
+                        while ((count = in.read(buf)) != -1) {
+                            out.write(buf, 0, count);
+                        }
+                        out.close();
+                        in.close();
+                    } else {
+                        throw e;
+                    }
                 }
-                out.close();
-                in.close();
             }
         }
         zip.close(); // 关闭ZIP文件
+    }
+
+    private void deleteDir(File dir) {
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    deleteDir(file);
+                } else {
+                    file.delete();
+                }
+            }
+        }
+        dir.delete();
     }
 }

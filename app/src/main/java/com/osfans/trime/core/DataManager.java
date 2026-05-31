@@ -187,18 +187,31 @@ public class DataManager {
     public static void sync() {
         try {
             LuaApplication.getInstance().unApk("assets/shared",getSharedDataDir().getAbsolutePath());
-            File f = new File(Config.getUserDataDir(), DEFAULT_CUSTOM_FILE_NAME);
-            if(!f.exists()&&Config.getTheme().equals("default")){
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        File f = new File(Config.getUserDataDir(), DEFAULT_CUSTOM_FILE_NAME);
+        if(!f.exists()&&Config.getTheme().equals("default")){
+            try {
                 LuaUtil.save(f.getAbsolutePath(),
-                        "      patch:\n" +
-                        "        schema_list:\n" +
-                        "          - schema: luna_pinyin\n"
+                        "patch:\n" +
+                        "  schema_list:\n" +
+                        "    - schema: pinyin_simp\n" +
+                        "    - schema: easy_english\n" +
+                        "    - schema: tiger\n" +
+                        "    - schema: tigress\n" +
+                        "    - schema: stroke\n"
                 );
-            }
-            //if (BuildConfig.DEBUG || Config.getThemes().length==0) {
-                LuaApplication.getInstance().unApk("assets/themes", Config.getThemeDir());
+            } catch (Exception ignored) {}
+        }
+        //if (BuildConfig.DEBUG || Config.getThemes().length==0) {
+        try {
+            LuaApplication.getInstance().unApk("assets/themes", Config.getThemeDir());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
             LuaApplication.getInstance().unApk("assets/scripts", Config.getScriptsDir());
-            //}
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -45,6 +45,7 @@ import com.androlua.LuaDialog;
 import com.androlua.LuaUtil;
 import com.osfans.trime.candidate.CandidatesManager;
 import com.osfans.trime.core.CandidateItem;
+import com.osfans.trime.core.DataManager;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.core.RimeConfig;
 import com.osfans.trime.core.RimeMessage;
@@ -160,6 +161,8 @@ public class TrimeService extends InputMethodService {
     @Override
     public void onCreate() {
         super.onCreate();
+        // 同步数据：确保主题、脚本等资源已解压
+        DataManager.sync();
         // 初始化笔画候选词管理器
         CandidatesManager.initStroke(this);
         sInstance = this;
@@ -421,9 +424,9 @@ public class TrimeService extends InputMethodService {
             // 设置可触摸区域为根视图的实际矩形区域
             // 这样只有点击在悬浮键盘上时，事件才会被输入法捕获
             outInsets.touchableRegion.set(
-                    lc[0], 
-                    lc[1], 
-                    lc[0] + mRoot.getWidth(), 
+                    lc[0],
+                    lc[1],
+                    lc[0] + mRoot.getWidth(),
                     lc[1] + mRoot.getHeight()
             );
 
@@ -436,9 +439,9 @@ public class TrimeService extends InputMethodService {
                 // 注意：原代码此处可能存在笔误，使用了 mPreedit.getWidth/Height，但变量名是 plc
                 outInsets.touchableRegion.union(
                         new Rect(
-                                plc[0], 
-                                plc[1], 
-                                plc[0] + mPreedit.getWidth(), 
+                                plc[0],
+                                plc[1],
+                                plc[0] + mPreedit.getWidth(),
                                 plc[1] + mPreedit.getHeight()
                         )
                 );
@@ -454,8 +457,8 @@ public class TrimeService extends InputMethodService {
                 // 为了保持与原逻辑一致（即使是潜在的bug），这里暂时保留原意，但建议修复为 mCloud.getWidth/Height
                 outInsets.touchableRegion.union(
                         new Rect(
-                                plc[0], 
-                                plc[1], 
+                                plc[0],
+                                plc[1],
                                 plc[0] + mPreedit.getWidth(), // 潜在Bug: 应为 mCloud.getWidth()
                                 plc[1] + mPreedit.getHeight() // 潜在Bug: 应为 mCloud.getHeight()
                         )
@@ -471,9 +474,9 @@ public class TrimeService extends InputMethodService {
             // 设置可触摸区域为从屏幕左侧开始，覆盖整个输入法宽度和高度的矩形
             // 这确保了输入法区域内的所有触摸事件都被输入法捕获
             outInsets.touchableRegion.set(
-                    0, 
-                    lc[1], 
-                    mRoot.getWidth(), 
+                    0,
+                    lc[1],
+                    mRoot.getWidth(),
                     lc[1] + mRoot.getHeight()
             );
 
@@ -485,9 +488,9 @@ public class TrimeService extends InputMethodService {
                 // 将预编辑视图的区域合并到可触摸区域中
                 outInsets.touchableRegion.union(
                         new Rect(
-                                plc[0], 
-                                plc[1], 
-                                plc[0] + mPreedit.getWidth(), 
+                                plc[0],
+                                plc[1],
+                                plc[0] + mPreedit.getWidth(),
                                 plc[1] + mPreedit.getHeight()
                         )
                 );
@@ -502,8 +505,8 @@ public class TrimeService extends InputMethodService {
                 // 注意：原代码此处存在明显笔误，宽高度使用的是 mPreedit 而非 mCloud
                 outInsets.touchableRegion.union(
                         new Rect(
-                                plc[0], 
-                                plc[1], 
+                                plc[0],
+                                plc[1],
                                 plc[0] + mPreedit.getWidth(), // 潜在Bug: 应为 mCloud.getWidth()
                                 plc[1] + mPreedit.getHeight() // 潜在Bug: 应为 mCloud.getHeight()
                         )
@@ -712,7 +715,7 @@ public class TrimeService extends InputMethodService {
         if (!TextUtils.isEmpty(textToSend)) {
             // 调用 onText 方法处理文本输入，该方法支持解析特殊字符和转义序列
             onText(textToSend);
-        } 
+        }
         // 3. 处理按键代码事件
         else if (event.getCode() > 0) {
             int keyCode = event.getCode();
@@ -751,7 +754,7 @@ public class TrimeService extends InputMethodService {
                 case KeyEvent.KEYCODE_FUNCTION:
                     String command = event.getCommand();
                     String option = event.getOption();
-                    
+
                     // 处理候选词过滤命令
                     if ("filter".equals(command)) {
                         if ("char".equals(option)) {
@@ -763,24 +766,24 @@ public class TrimeService extends InputMethodService {
                         }
                         // 刷新候选词显示
                         filterCandidate();
-                    } 
+                    }
                     // 处理 Lua 脚本调用（无参数情况）
                     else if (command.endsWith(".lua") && TextUtils.isEmpty(option)) {
                         // 获取上下文文本作为参数传递给 Lua 函数
-                        textToSend = Function.handle(this, command, 
+                        textToSend = Function.handle(this, command,
                                 getActiveText(1), // 选中文本或最后提交文本
                                 getActiveText(2), // Rime 原始输入
                                 getActiveText(3), // 光标前1个字符
                                 getActiveText(4)  // 光标前1024个字符
                         );
-                    } 
+                    }
                     // 处理格式化提交命令
                     else if ("commit".equals(command)) {
                         // 将选项字符串格式化后作为文本提交
-                        textToSend = String.format(option, 
-                                getActiveText(1), 
-                                getActiveText(2), 
-                                getActiveText(3), 
+                        textToSend = String.format(option,
+                                getActiveText(1),
+                                getActiveText(2),
+                                getActiveText(3),
                                 getActiveText(4)
                         );
                     }
@@ -807,7 +810,7 @@ public class TrimeService extends InputMethodService {
                 case KeyEvent.KEYCODE_SETTINGS:
                     String settingsOption = event.getOption();
                     if (settingsOption == null) settingsOption = "";
-                    
+
                     switch (settingsOption) {
                         case "theme":
                             // 切换主题
@@ -1226,7 +1229,7 @@ public class TrimeService extends InputMethodService {
                         // 如果重试次数超过 20 次（约 200ms），则放弃等待，防止死循环
                         if (idx++ > 20)
                             return;
-                        
+
                         // 检查当前是否已获取到有效的方案 ID
                         if (TextUtils.isEmpty(Rime.getCurrentRimeSchema())) {
                             // 如果为空，继续延迟 10ms 后再次尝试
@@ -1733,7 +1736,7 @@ public class TrimeService extends InputMethodService {
         }
         return false;
     }
- 
+
     /**
      * 处理返回键或 Escape 键。
      * 隐藏输入法窗口。
