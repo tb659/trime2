@@ -37,18 +37,12 @@ switches: # 0 默认关，1 默认开
   - name: full_shape
     reset: 0
     states: [半角, 全角]
-  - options: [_keyboard_default, _keyboard_defaultbk, _keyboard_defaultwk]
-    reset: 0
-    states: [有刻, 半刻, 无刻]
   - name: charset_comment_filter #字符集提示
     reset: 0
     states: [U区关, U区开]
   - name: udpf_switch
     reset: 0
     states: [U编关, U编开]
-  - options: [_keyboard_default, _keyboard_defaultzj]
-    reset: 0
-    states: [助记关, 助记开]
 
 engine:
   processors: # 组件处理按键消息
@@ -309,10 +303,8 @@ key_binder:
     - { when: composing, toggle: full_shape, accept: "*" } # 全半角切换
     - { when: composing, toggle: full_shape, accept: "Control+u" } # 全半角切换
 
-    - { when: composing, toggle: charset_comment_filter, accept: "(" } # Unicode分区开关
     - { when: composing, toggle: charset_comment_filter, accept: "Control+i" } # Unicode分区开关
 
-    - { when: composing, toggle: udpf_switch, accept: "=" } # Unicode编码开关
     - { when: composing, toggle: udpf_switch, accept: "Control+o" } # Unicode编码开关
 
     - { when: composing, accept: Tab, send: Escape } # tab清屏

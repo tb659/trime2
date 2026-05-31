@@ -2,13 +2,11 @@
 # encoding: utf-8
 
 ---
-name: tigress.extended
+name: tiger.extended
 version: "2.0"
 sort: by_weight
 import_tables:
-  - tigress
-  - tigress_ci
-  - tigress_simp_ci  # 在-前面加上#号，即可关闭简词
+  - tiger
 
 columns:
   - text

@@ -20,7 +20,7 @@ rows = {
             { click = "u", swipe_up = "7", long_click = "&", hint_up = { offset_x = -10 }, style_long_click = { offset_x = 10 } },
             { click = "i", swipe_up = "8", long_click = "*", hint_up = { offset_x = -10 }, style_long_click = { offset_x = 10 } },
             { click = "o", swipe_up = "9", long_click = "(){Left}", hint_up = { offset_x = -10 }, style_long_click = { offset_x = 10 } },
-            { click = "p", swipe_up = "0", long_click = "=", hint_up = { offset_x = -10 }, style_long_click = { offset_x = 10 } },
+            { click = "p", swipe_up = "0", long_click = "~", hint_up = { offset_x = -10 }, style_long_click = { offset_x = 10 } },
         }
     },
     -- 第二行
@@ -42,7 +42,7 @@ rows = {
     {
         keys = {
             { click = "Shift_L", swipe_up = "Candidate_switch", swipe_down = "", hint_up = "", style = "functional", width = 15, composing = "delimiter" },
-            { click = "z", swipe_up = "`", long_click = "~", hint_up = { offset_x = -10 }, style_long_click = { offset_x = 10 } },
+            { click = "z", swipe_up = "`", hint_up = { offset_x = -10 } },
             { click = "x", long_click = "cut" },
             { click = "c", long_click = "copy" },
             { click = "v", long_click = "paste" },
