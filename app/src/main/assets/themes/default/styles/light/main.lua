@@ -519,9 +519,9 @@ toolbar = table.merge(candidate, {
         text_size = 16,
         -- 工具栏边距
         margins = {
-            left = 8,
-            top = 0,
-            right = 8,
+            left = 5,
+            top = 2,
+            right = 5,
             bottom = 0
         }
     })

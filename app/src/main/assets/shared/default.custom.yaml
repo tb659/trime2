@@ -6,8 +6,8 @@ customization:
   rime_version: 1.16.0
 patch:
   schema_list:
-    - {schema: tigress}
-    - {schema: tiger}
     - {schema: pinyin_simp}
-    - {schema: stroke}
     - {schema: easy_english}
+    - {schema: tiger}
+    - {schema: tigress}
+    - {schema: stroke}

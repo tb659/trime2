@@ -1,1 +1,125 @@
-../../../../data/rime/prelude/key_bindings.yaml
+# Rime key bindings
+# encoding: utf-8
+
+# - { when: has_menu, accept: space, send: space } # 有候选时空格上屏首选
+- { when: has_menu, accept: semicolon, send: 2 } # 分号次选
+- { when: has_menu, accept: apostrophe, send: 3 } # 引号三选
+- { when: has_menu, accept: minus, send: Page_Up } # - 向后翻页
+- { when: has_menu, accept: equal, send: Page_Down } # = 向前翻页
+- { when: has_menu, accept: Right, send: Down } # 右方向键 向后移动焦点
+- { when: has_menu, accept: Left, send: Up } # 左方向键 向前移动焦点
+
+- { when: composing, toggle: extended_char, accept: "!" } # 自定字集开关
+- { when: composing, toggle: extended_char, accept: "Control+q" } # 自定字集开关
+
+- { when: composing, toggle: pinyin, accept: "#" } # 拼音开关
+- { when: composing, toggle: pinyin, accept: "Control+w" } # 拼音开关
+
+- { when: composing, toggle: ascii_punct, accept: "$" } # 中英标点切换
+- { when: composing, toggle: ascii_punct, accept: "Control+e" } # 中英标点切换
+
+- { when: composing, toggle: chaifen, accept: "%" } # 拆分滤镜开关
+- { when: composing, toggle: chaifen, accept: "Control+r" } # 拆分滤镜开关
+
+- { when: composing, toggle: emoji_cn, accept: "^" } # emoji开关
+- { when: composing, toggle: emoji_cn, accept: "Control+t" } # emoji开关
+
+- { when: composing, toggle: simplification, accept: "&" } # 繁简开关
+- { when: composing, toggle: simplification, accept: "Control+y" } # 简繁开关
+# - when: composing, toggle: fanjian, { accept: "Control+Shift+y" }  # 繁简开关
+
+- { when: composing, toggle: full_shape, accept: "*" } # 全半角切换
+- { when: composing, toggle: full_shape, accept: "Control+u" } # 全半角切换
+
+- { when: composing, toggle: charset_comment_filter, accept: "Control+i" } # Unicode分区开关
+
+- { when: composing, toggle: udpf_switch, accept: "Control+o" } # Unicode编码开关
+
+- { when: composing, accept: Tab, send: Escape } # tab清屏
+- { when: composing, accept: bracketleft, send: Page_Up } # [ 后翻
+- { when: composing, accept: bracketright, send: Page_Down } # ] 前翻
+# - { when: composing, accept: space, send: Escape } # 无候选时(空码)空格清屏
+# - { when: composing, accept: Return, send: Escape } # 无候选时(空码)回车清屏
+
+
+# when: 状态  paging: 翻页用  has_menu: 操作候选项用   composing: 操作輸入码用  always: 全域
+
+
+# accept和send可用字段除A-Za-z0-9外，还包含以下键 上面实际有的键：
+
+# Caps_Lock 大写锁           space                 KP_Space 小键盘空格
+# Shift_Lock 上档锁          exclam	!             KP_Tab 小键盘水平定位符
+# Scroll_Lock 滚动锁         quotedbl "            KP_Enter 小键盘回车
+# Num_Lock 小键盘锁          numbersign #           KP_Delete 小键盘删除
+# Select 选定               dollar $               KP_Home 小键盘原位
+# Print 打印                percent %              KP_Left 小键盘左箭头
+# Execute 执行              ampersand &            KP_Up 小键盘上箭头
+# Insert 插入               apostrophe '           KP_Right 小键盘右箭头
+# Undo 还原                 parenleft (            KP_Down 小键盘下箭头
+# Redo 重做                 parenright )           KP_Prior、KP_Page_Up 小键盘上翻
+# Menu 菜单                 asterisk *             KP_Next、KP_Page_Down 小键盘下翻
+# Find 搜索                 plus +                 KP_End 小键盘末位
+# Cancel 取消               comma ,                KP_Begin 小键盘始位
+# Help 帮助                 minus -                KP_Insert 小键盘插入
+# Break 中断                period .               KP_Equal 小键盘等于
+# BackSpace 退格            slash /                KP_Multiply 小键盘乘号
+# Tab 水平定位符             colon :                KP_Add 小键盘加号
+# Linefeed 换行             semicolon ;            KP_Subtract 小键盘减号
+# Clear 清除                less <                 KP_Divide 小键盘除号
+# Return 回车               equal =                KP_Decimal 小键盘小数点
+# Pause 暂停                greater >              KP_0 小键盘0
+# Sys_Req 印屏              question ?             KP_1 小键盘1
+# Escape 退出               at @                   KP_2 小键盘2
+# Delete 删除               bracketleft [          KP_3 小键盘3
+# Home 原位                 backslash              KP_4 小键盘4
+# Left 左箭头               bracketright ]         KP_5 小键盘5
+# Up 上箭头                 asciicircum ^          KP_6 小键盘6
+# Right 右箭头              underscore _           KP_7 小键盘7
+# Down 下箭头               grave `                KP_8 小键盘8
+# PrioPage_Up 上翻          braceleft {           KP_9 小键盘9
+# NexPage_Down 下翻         bar |
+# End 末位                  braceright }
+# Begin 始位                asciitilde ~
+# Shift_L 左Shift
+# Shift_R 右Shift
+# Control_L 左Ctrl
+# Control_R 右Ctrl
+# Meta_L 左Meta
+# Meta_R 右Meta
+# Alt_L 左Alt
+# Alt_R 右Alt
+# Super_L 左Super
+# Super_R 右Super
+# Hyper_L 左Hyper
+# Hyper_R 右Hyper
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

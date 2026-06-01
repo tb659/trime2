@@ -79,9 +79,8 @@ translator:
 punctuator:
   import_preset: default
 
-# key_binder:
-menu:
-#  page_size: 30 #候选数量
+key_binder:
+  import_preset: default
 
 recognizer:
   import_preset: default
