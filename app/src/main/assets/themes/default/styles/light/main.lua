@@ -10,6 +10,12 @@ function table.merge(t1, t2)
   return result
 end
 
+local FONT = {
+  -- "kafei.ttf",
+  -- "xr.ttf",
+  "TH-Feon.ttf",
+}
+
 name = "可乐"
 author = "tbagr"
 -- 输入主颜色或图片
@@ -22,7 +28,7 @@ keyboard = {
     -- 键盘背景颜色或图片
     background = 0xffdddddd,
     -- 指定样式全局字体或字体集
-    font = "kafei.ttf",
+    font = FONT,
 }
 
 -- 默认按键样式
@@ -47,10 +53,8 @@ key = {
     repeat_click_time = 200,
     -- 按键字体
     -- font="b.ttf"
-    -- font={"a.ttf","b.ttf"}
-    -- font = "JetBrainsMono-Medium.ttf",
+    -- font={ "a.ttf","b.ttf" }
     -- font = "kafei.ttf",
-    -- font = {"xr.ttf", "TumanPUA.ttf", "TH-Feon.ttf", "simsung.ttf", "simsunb.ttf", "simsun.ttc", "LXGWWenKaiGBScreenR.ttf", "kafei.ttf"},
     -- 震动开关
     vibration_enabled = true,
     vibration_effect = {
@@ -485,6 +489,27 @@ candidate = {
     }
 }
 
+-- 工具栏样式
+toolbar = table.merge(candidate, {
+    -- 显示方案定义的开关
+    schema_switches = true,
+    hide = table.clone(candidate.key),
+    -- 支持添加preset_keys按键，也可以直接写事件的表，
+    -- 可以指定按键的style
+    -- keys = { { label = "菜单", send = "Control+grave" }, "Mode_switch", "Keyboard_clipboard", "Keyboard_editor", "Mode_small", "Mode_float" },
+    key = table.merge(candidate.key, {
+        -- 工具栏文字大小
+        text_size = 16,
+        -- 工具栏边距
+        margins = {
+            left = 5,
+            top = 3,
+            right = 5,
+            bottom = 0
+        }
+    })
+})
+
 -- 剪贴板样式
 clipboard = table.merge(candidate.expanded, {
     item = table.merge(key, {
@@ -504,27 +529,6 @@ clipboard = table.merge(candidate.expanded, {
         gravity = "right",
         keys = { "hide", "page_up", "page_down", "undo", "redo" }
     }
-})
-
--- 工具栏样式
-toolbar = table.merge(candidate, {
-    -- 显示方案定义的开关
-    schema_switches = true,
-    hide = table.clone(candidate.key),
-    -- 支持添加preset_keys按键，也可以直接写事件的表，
-    -- 可以指定按键的style
-    -- keys = { { label = "菜单", send = "Control+grave" }, "Mode_switch", "Keyboard_clipboard", "Keyboard_editor", "Mode_small", "Mode_float" },
-    key = table.merge(candidate.key, {
-        -- 工具栏文字大小
-        text_size = 16,
-        -- 工具栏边距
-        margins = {
-            left = 5,
-            top = 2,
-            right = 5,
-            bottom = 0
-        }
-    })
 })
 
 -- 预编辑提示区样式
