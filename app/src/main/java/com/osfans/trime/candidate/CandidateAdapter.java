@@ -104,8 +104,9 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         layout.setPadding(px8, px1, px8, px1);
 
         // 设置容器 LayoutParams
+        int candidateMinWidth = ThemeManager.getCandidateMinWidth();
         RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
+                candidateMinWidth > 0 ? candidateMinWidth : ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.MATCH_PARENT); // 横向列表高度建议 MATCH_PARENT
         layout.setLayoutParams(lp);
 
@@ -215,7 +216,8 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         holder.itemView.post(() -> {
             ViewGroup.LayoutParams lp = holder.itemView.getLayoutParams();
             if (lp != null) {
-                lp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+                int minW = ThemeManager.getCandidateMinWidth();
+                lp.width = minW > 0 ? minW : ViewGroup.LayoutParams.WRAP_CONTENT;
                 lp.height = ViewGroup.LayoutParams.MATCH_PARENT;
                 holder.itemView.setLayoutParams(lp);
                 // 关键：强制要求父容器重新布局

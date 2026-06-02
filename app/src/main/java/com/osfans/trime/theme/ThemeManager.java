@@ -310,6 +310,17 @@ public class ThemeManager {
      *
      * @return 高度值(px)。
      */
+    public static int getCandidateMinWidth() {
+        int w = getStyle().getStyle("candidate").getSize("min_width", 0);
+        if (w <= 0 && mGlobals != null) {
+            LuaValue candidate = mGlobals.get("candidate");
+            if (candidate.istable()) {
+                w = dp2px(candidate.get("min_width").optint(0));
+            }
+        }
+        return Math.max(0, w);
+    }
+
     public static int getCandidateHeight() {
         int h = (int) (getStyle().getStyle("candidate").getSize("height", mCandidateHeight) * Math.min(1, Config.getKeyboardHeightScale()));
         if (Config.is_hide_comment()) h /= 2;

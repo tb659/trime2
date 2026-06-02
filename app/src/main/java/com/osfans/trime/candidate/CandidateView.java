@@ -139,9 +139,10 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
 
         mHide.setContentDescription("更多候选"); // 无障碍描述
         mHide.setOnClickListener(this); // 设置点击监听
-        mHide.setMinimumWidth(height); // 设置最小宽度
+        int btnWidth = mCandidateStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key")).getSize("width", 0);
+        if (btnWidth > 0) mHide.setMinimumWidth(btnWidth); else mHide.setMinimumWidth(height);
         root.addView(mListView, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height, 1)); // 添加列表,权重为1
-        root.addView(mHide, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, height)); // 添加按钮
+        root.addView(mHide, new LayoutParams(btnWidth > 0 ? btnWidth : ViewGroup.LayoutParams.WRAP_CONTENT, height)); // 添加按钮
         mListView.setAdapter(mAdapter = new CandidateAdapter(new ArrayList<>())); // 设置适配器
     }
 
@@ -293,8 +294,10 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
         ViewGroup.LayoutParams lp = mListView.getLayoutParams();
         lp.height = height;
         mListView.setLayoutParams(lp);
-        mHide.setMinimumWidth(height);
+        int btnWidth = mCandidateStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key")).getSize("width", 0);
+        if (btnWidth > 0) mHide.setMinimumWidth(btnWidth); else mHide.setMinimumWidth(height);
         ViewGroup.LayoutParams hideLp = mHide.getLayoutParams();
+        hideLp.width = btnWidth > 0 ? btnWidth : ViewGroup.LayoutParams.WRAP_CONTENT;
         hideLp.height = height;
         mHide.setLayoutParams(hideLp);
     }

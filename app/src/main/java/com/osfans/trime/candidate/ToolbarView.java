@@ -102,7 +102,8 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
         mListView.addView(itemsLayout, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         LuaValue hide = mToolbarStyle.get("hide");
-        mHide = new KeyView(getContext(), hide.istable()?mToolbarStyle.getKeyStyle("hide", mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key"))):mToolbarStyle.getKeyStyle("key", ThemeManager.getStyle().getKeyStyle("key")));
+        KeyStyle hideStyle = hide.istable() ? mToolbarStyle.getKeyStyle("hide", mKeyStyle) : mKeyStyle;
+        mHide = new KeyView(getContext(), hideStyle);
         if (hide.istable()) {
             mHide.setText(hide.get("text").optjstring(""));
         } else {
@@ -110,10 +111,11 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
         }
         mHide.setContentDescription("收起键盘");
         mHide.setOnClickListener(this);
-        mHide.setMinimumWidth(height);
+        int hideWidth = hideStyle.getSize("width", 0);
+        if (hideWidth > 0) mHide.setMinimumWidth(hideWidth); else mHide.setMinimumWidth(height);
 
         root.addView(mListView, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height, 1));
-        root.addView(mHide, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, height));
+        root.addView(mHide, new LayoutParams(hideWidth > 0 ? hideWidth : ViewGroup.LayoutParams.WRAP_CONTENT, height));
 
         mTopKeys.clear();
         mBottomKeys.clear();
@@ -143,7 +145,8 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
                     };
                     topKey.setOnClickListener(v -> aSwitch.toggleOption());
                     topKey.setText(aSwitch.getUnState());
-                    topKey.setMinimumWidth(rowHeight);
+                    int topKeyWidth = topStyle.getSize("width", 0);
+                    if (topKeyWidth > 0) topKey.setMinimumWidth(topKeyWidth); else topKey.setMinimumWidth(rowHeight);
                     topKey.setVisibility(showTwoRows ? VISIBLE : GONE);
 
                     // 下：当前选中选项（key 样式，始终显示）
@@ -156,7 +159,8 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
                     };
                     bottomKey.setOnClickListener(v -> aSwitch.toggleOption());
                     bottomKey.setText(aSwitch.getState());
-                    bottomKey.setMinimumWidth(rowHeight);
+                    int bottomKeyWidth = mKeyStyle.getSize("width", 0);
+                    if (bottomKeyWidth > 0) bottomKey.setMinimumWidth(bottomKeyWidth); else bottomKey.setMinimumWidth(rowHeight);
 
                     column.addView(topKey, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, showTwoRows ? rowHeight : 0));
                     column.addView(bottomKey, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, showTwoRows ? rowHeight : height));
@@ -184,13 +188,15 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
                     style = ThemeManager.getStyle().getKeyStyle(s.tojstring(), mKeyStyle);
                 }
                 KeyView key = new KeyView(getContext(), o.get("click").isnil() ? new Key(new Event(o)) : new Key(o), style);
-                itemsLayout.addView(key, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-                key.setMinimumWidth(height);
+                int keyWidth = style.getSize("width", 0);
+                itemsLayout.addView(key, new ViewGroup.LayoutParams(keyWidth > 0 ? keyWidth : ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                if (keyWidth > 0) key.setMinimumWidth(keyWidth); else key.setMinimumWidth(height);
                 mBottomKeys.add(key);
             } else if (o.isstring()) {
                 KeyView key = new KeyView(getContext(), new Key(o.tojstring()), mKeyStyle);
-                itemsLayout.addView(key, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-                key.setMinimumWidth(height);
+                int keyWidth = mKeyStyle.getSize("width", 0);
+                itemsLayout.addView(key, new ViewGroup.LayoutParams(keyWidth > 0 ? keyWidth : ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                if (keyWidth > 0) key.setMinimumWidth(keyWidth); else key.setMinimumWidth(height);
                 mBottomKeys.add(key);
             }
         }

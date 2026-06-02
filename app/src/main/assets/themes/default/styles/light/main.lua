@@ -10,11 +10,8 @@ function table.merge(t1, t2)
   return result
 end
 
-local FONT = {
-  -- "kafei.ttf",
-  -- "xr.ttf",
-  "TH-Feon.ttf",
-}
+local DEFALUT_FONT = { "kafei.ttf", "xr.ttf" }
+local HINT_FONT = { "TH-Feon.ttf", "xr.ttf" }
 
 name = "可乐"
 author = "tbagr"
@@ -28,15 +25,18 @@ keyboard = {
     -- 键盘背景颜色或图片
     background = 0xffdddddd,
     -- 指定样式全局字体或字体集
-    font = FONT,
+    -- font = DEFALUT_FONT,
 }
 
 -- 默认按键样式
 key = {
     -- 全局默认键高（dp），即 key_height 不存在时的兜底值
-    height = 56,
+    height = 52,
     -- 按键文字颜色
     text_color = 0xff000000,
+    -- 按键字体
+    font = DEFALUT_FONT,
+    -- font={ "a.ttf","b.ttf" }
     -- 按键文字大小
     text_size = 20,
     -- 按键背景颜色或图片
@@ -51,10 +51,6 @@ key = {
     long_click_time = 300,
     -- 按键重复执行间隔
     repeat_click_time = 200,
-    -- 按键字体
-    -- font="b.ttf"
-    -- font={ "a.ttf","b.ttf" }
-    -- font = "kafei.ttf",
     -- 震动开关
     vibration_enabled = true,
     vibration_effect = {
@@ -79,7 +75,7 @@ key = {
         left = 0,
         top = 0,
         right = 0,
-        bottom = 2
+        bottom = 0
     },
     -- 按键助记
     -- 在按键使用hint默认hint,或者使用hint_up,hint_down,hint_left,hint_right定义四个方向hint
@@ -87,6 +83,8 @@ key = {
         show = true,
         -- 助记文字颜色
         text_color = 0xff444444,
+        -- 助记字体
+        font = HINT_FONT,
         -- 助记文字大小
         text_size = 10,
         up = {
@@ -125,6 +123,8 @@ key = {
         show = true,
         -- 长按文字颜色
         text_color = 0xff444444,
+        -- 助记字体
+        font = HINT_FONT,
         -- 长按文字大小
         text_size = 10,
         -- 震动开关
@@ -171,7 +171,7 @@ key = {
         -- 文字颜色
         text_color = 0xff000000,
         -- 文字大小
-        text_size = 22,
+        text_size = 16,
         -- 按键背景颜色或图片
         background = 0xffffffff,
         -- 按键阴影高度
@@ -302,13 +302,15 @@ text_size_14 = table.merge(key, {
 symbol = {
     -- 面板背景颜色或图片
     background = 0xffdddddd,
-    -- 面板文字大小
-    text_size = 22,
-    -- 面板文字颜色
-    text_color = 0xff000000,
-    indicator_color = 0xFF0055FF,
+    -- 面板文字
     text = table.clone(key),
     -- 符号更多面板工具栏
+    tool_bar = {
+        -- 位置 left,top,right,bottom
+        gravity = "bottom",
+        keys = { "hide", "page_up", "page_down", "BackSpace" }
+    },
+    -- 符号更多面板工具栏文字
     key = {
         -- 按键文字颜色
         text_color = 0xff000000,
@@ -339,12 +341,6 @@ symbol = {
             -- 背景颜色或图片
             background = 0xffaaaaaa,
         }
-    },
-    -- 符号更多面板工具栏
-    tool_bar = {
-        -- 位置 left,top,right,bottom
-        gravity = "right",
-        keys = { "hide", "page_up", "page_down", "BackSpace" }
     }
 }
 
@@ -352,12 +348,16 @@ symbol = {
 candidate = {
     -- 候选面板高度
     height = 48,
+    -- 候选最小宽度（0 为自适应）
+    min_width = 0,
     -- 背景颜色或图片
     background = 0xffdddddd,
     -- 候选文字大小
     text_size = 16,
     -- 候选文字颜色
     text_color = 0xff000000,
+    -- 候选文字字体
+    font = "TH-Feon.ttf",
     -- 阴影高度
     elevation = 2,
     -- 阴影颜色
@@ -387,8 +387,9 @@ candidate = {
     },
     -- 候选栏按键
     key = {
+        width = 40,
         -- 文本
-        text = "▽",
+        text = "﹀",
         -- 文字颜色
         text_color = 0xff000000,
         -- 文字大小

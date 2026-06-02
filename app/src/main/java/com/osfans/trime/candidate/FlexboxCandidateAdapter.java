@@ -81,8 +81,9 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
         layout.setPadding(dp, dp2, dp, dp2);
         // 关键:必须使用 FlexboxLayoutManager.LayoutParams
         // 宽度设为 WRAP_CONTENT,高度设为 WRAP_CONTENT
+        int candidateMinWidth = ThemeManager.getCandidateMinWidth();
         FlexboxLayoutManager.LayoutParams lp = new FlexboxLayoutManager.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
+                candidateMinWidth > 0 ? candidateMinWidth : ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         //lp.setFlexBasisPercent(0.2f);
         lp.setFlexGrow(1.0f); // 设置弹性增长系数,使项目均匀填充空间
@@ -151,7 +152,8 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
         holder.itemView.post(() -> {
             ViewGroup.LayoutParams lp = holder.itemView.getLayoutParams();
             if (lp != null) {
-                lp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+                int minW = ThemeManager.getCandidateMinWidth();
+                lp.width = minW > 0 ? minW : ViewGroup.LayoutParams.WRAP_CONTENT;
                 holder.itemView.setLayoutParams(lp);
                 // 关键：强制要求父容器重新布局
                 //holder.itemView.requestLayout();

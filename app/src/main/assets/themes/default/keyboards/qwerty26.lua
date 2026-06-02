@@ -59,7 +59,8 @@ rows = {
               ascii = { click = "Keyboard_symbols", swipe_up = "Keyboard_settings", hint_up = "", swipe_right = "Schema_settings", hint_right = "", hint_long = "菜单" } },
             { click = "Keyboard_number", swipe_up = "Keyboard_default_zhuji", hint_up = "", long_click = "Theme_settings", composing = "Select_five", popup = {"Theme_settings", "Color_switch"}, style = "functional" },
             { click = "，", ascii = ",", long_click = "<", composing = "Select_four", style = "text_size_14" },
-            { click = "space", label = "schema_name", long_click="VOICE_ASSIST", width = 30, swipe_repeatable = true, swipe_left = "Left", swipe_right = "Right", swipe_up = "Up", swipe_down = "Down", repeat_click_time = 100 },
+            { click = "space", label = "schema_name", long_click="VOICE_ASSIST", width = 30, swipe_repeatable = true, repeat_click_time = 100,
+              swipe_left = "Left", swipe_right = "Right", swipe_up = "Up", swipe_down = "Down", hint_left = "", hint_right = "", hint_up = "", hint_down = "" },
             { click = "。", ascii = ".", long_click = ">", composing = "Select_two", style = "text_size_14" },
             { click = "/", long_click = "?" , composing = "Select_three", style = "text_size_14" },
             { click = "Return", style = "enter", label = "Enter", width = 15, long_click = "" }
