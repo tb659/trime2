@@ -504,12 +504,12 @@ toolbar = table.merge(candidate, {
     schema_switches = true,
     hide = table.clone(candidate.key),
     -- 工具栏容器外边距（与外部的间距）
-    -- bottom 默认等于 elevation，避免阴影被裁剪
+    -- bottom 至少等于 elevation 才能避免阴影被裁剪
     margins = {
         left = 5,
         top = 0,
         right = 5,
-        bottom = 0
+        bottom = 5
     },
     -- 支持添加preset_keys按键，也可以直接写事件的表，
     -- 可以指定按键的style
