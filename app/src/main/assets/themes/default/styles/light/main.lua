@@ -16,14 +16,14 @@ local HINT_FONT = { "TH-Feon.ttf", "xr.ttf" }
 name = "可乐"
 author = "tbagr"
 -- 输入主颜色或图片
-background = 0xffdddddd
+background = 0xffEBEBEB
 
 -- 键盘
 keyboard = {
     -- 键盘高度
     height = 240,
     -- 键盘背景颜色或图片
-    background = 0xffdddddd,
+    background = 0xffEBEBEB,
     -- 指定样式全局字体或字体集
     -- font = DEFALUT_FONT,
 }
@@ -64,6 +64,12 @@ key = {
     -- 音效声音
     -- sound_effect = "click1.ogg",
     sound_effect = { "click1.ogg", "click2.ogg", "click3.ogg" },
+    -- 按键音效律动模式
+    --   "random"  从 sound_effect 数组中随机选一个音效,并从默认速率集 {0.8, 1.0, 1.2} 中随机选一个播放速率
+    --   "rate"    固定选 sound_effect 数组的第一个音效,并从默认速率集 {0.8, 1.0, 1.2} 中随机选一个播放速率
+    -- 也可以是 table 配置自定义速率集合：
+    --   sound_rhythm = { mode = "random", params = { 0.7, 0.9, 1.0, 1.1, 1.3 } }
+    sound_rhythm = "random",
     -- 按键四周留白
     margins = {
         left = 2,
@@ -351,23 +357,25 @@ candidate = {
     -- 候选最小宽度（0 为自适应）
     min_width = 0,
     -- 背景颜色或图片
-    background = 0xffdddddd,
+    background = 0xffFFFFFF,
     -- 候选文字大小
     text_size = 16,
     -- 候选文字颜色
-    text_color = 0xff000000,
+    text_color = 0xff525993,
     -- 候选文字字体
     font = "TH-Feon.ttf",
     -- 阴影高度
     elevation = 2,
     -- 阴影颜色
     shadow_color = 0xff000000,
+    -- 圆角半径
+    corner_radius = 4,
     -- 候选栏面板按下状态
     pressed = {
         -- 背景色
-        background = 0x44888888,
+        background = 0xffFFFFFF,
         -- 文字颜色
-        text_color = 0xff000000,
+        text_color = 0xff7ECD65,
         -- 圆角半径
         corner_radius = 0,
     },
@@ -495,17 +503,29 @@ toolbar = table.merge(candidate, {
     -- 显示方案定义的开关
     schema_switches = true,
     hide = table.clone(candidate.key),
+    -- 工具栏容器外边距（与外部的间距）
+    -- bottom 默认等于 elevation，避免阴影被裁剪
+    margins = {
+        left = 5,
+        top = 0,
+        right = 5,
+        bottom = 0
+    },
     -- 支持添加preset_keys按键，也可以直接写事件的表，
     -- 可以指定按键的style
     -- keys = { { label = "菜单", send = "Control+grave" }, "Mode_switch", "Keyboard_clipboard", "Keyboard_editor", "Mode_small", "Mode_float" },
     key = table.merge(candidate.key, {
         -- 工具栏文字大小
         text_size = 16,
-        -- 工具栏边距
+        -- 工具栏文字颜色
+        text_color = 0xff525993,
+        -- 工具栏背景颜色或图片
+        background = 0xffFFFFFF,
+        -- 工具栏内按键边距
         margins = {
-            left = 5,
+            left = 3,
             top = 3,
-            right = 5,
+            right = 3,
             bottom = 0
         }
     })
