@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 候选词管理器 (CandidatesManager)。
@@ -36,10 +37,16 @@ public class CandidatesManager {
     private static final int MAX_SEARCH_LIMIT = 500;
 
     // ==================== 成员变量 ====================
-    
+
+    /**
+     * 当前 Rime 引擎实例引用（仅用于查询 READY 状态，不直接调用 JNI）。
+     * 使用 AtomicReference 包装以保证多线程间的可见性。
+     */
+    private static final AtomicReference<Rime> mRimeRef = new AtomicReference<>(null);
+
     /** 笔画过滤映射表,key 为字符的 codePoint,value 为笔画编码。使用 volatile 保证多线程可见性 */
     // 使用 volatile 保证 Map 引用在多线程间的可见性
-    // 初始化为一个空的不可变 Map,避免 initStroke 完成前的空指针风险
+    // 初始化为一个空的不可变 Map，避免 initStroke 完成前的空指针风险
     private static volatile Map<Integer, String> mFilterStrokeMap = Collections.emptyMap();
 
     /** 是否启用单字过滤模式 */
@@ -48,6 +55,23 @@ public class CandidatesManager {
     private static String mFilterStroke;
     /** 笔画过滤提示文本 */
     private static String mFilterStrokeTip;
+
+    /**
+     * Rime 引擎未就绪时,候选词查询在主线程上轮询等待 READY 状态的最长时间(毫秒)。
+     * 该值需要覆盖冷启动/方案组切换/部署等场景下 librime 启动的最坏耗时(解压资源/编译码表等),
+     * 超过该时间会放弃等待,返回空列表,避免主线程被无限阻塞。
+     */
+    private static final long READY_WAIT_TIMEOUT_MS = 5_000L; // ms
+
+    /**
+     * 设置 Rime 引擎实例引用，供 {@link #next(int)} 等方法判断引擎是否就绪。
+     * 必须在 {@link com.osfans.trime.TrimeService#onCreate()} 期间调用一次。
+     *
+     * @param rime Rime 实例，可为 null（清空引用）。
+     */
+    public static void setRime(Rime rime) {
+        mRimeRef.set(rime);
+    }
 
     /**
      * 异步初始化笔画库
@@ -116,6 +140,22 @@ public class CandidatesManager {
      * @return 过滤后的候选词列表。
      */
     public static ArrayList<CandidateItem> next(int pageSize) {
+        // 兜底：如果 Rime 引擎尚未就绪(冷启动/方案组切换/部署等场景),
+        // 在主线程短暂轮询等待 READY,避免直接返回空列表造成候选栏永远空白。
+        // 等待期间调度器仍然会推进 rime-main 线程执行 startRime,所以不会真正"卡死"。
+        Rime rime = mRimeRef.get();
+        if (rime != null && !rime.isReady()) {
+            long deadline = System.currentTimeMillis() + READY_WAIT_TIMEOUT_MS;
+            while (!rime.isReady() && System.currentTimeMillis() < deadline) {
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+
         ArrayList<CandidateItem> resultList = new ArrayList<>(); // 结果列表
         int searchedCount = 0; // 已检索的原始候选词计数
 
