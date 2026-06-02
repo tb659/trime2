@@ -1460,6 +1460,25 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         return new RippleDrawable(ColorStateList.valueOf(Color.parseColor("#40000000")), content, content);
     }
 
+    /**
+     * 按律动模式播放按键音效。
+     * 由 KeyStyle 的 sound_rhythm 字段决定播放行为:
+     * random（随机选音效）/ rate（固定第一个音效）。
+     * 两种模式都会循环应用播放速率（默认 0.8→1.0→1.2）制造音高起伏的律动。
+     * 当样式未配置自定义音效时,回退到系统默认点击音效。
+     */
+    private void playKeySound(KeyStyle style) {
+        if (style == null) return;
+        float[] params = style.pickNextSoundEffect();
+        int soundId = (int) params[0];
+        if (soundId > 0) {
+            ThemeManager.play(soundId, params[1], 1.0f);
+        } else {
+            // 播放系统默认点击音效
+            playSoundEffect(SoundEffectConstants.CLICK);
+        }
+    }
+
     private boolean mLongClicked;
     private FloatKeyboard popupKeyboard;
     // --- 7. 内部类与 Runnables ---
@@ -1505,15 +1524,8 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             }
             // 检查长按样式配置中是否启用了声音反馈
             if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
-                // 获取自定义音效ID
-                int sound = mKeyStyle.getLongClickKeyStyle().getSoundEffect();
-                if (sound > 0) {
-                    // 播放自定义音效
-                    ThemeManager.play(sound);
-                } else {
-                    // 播放系统默认点击音效
-                    playSoundEffect(SoundEffectConstants.CLICK);
-                }
+                // 按律动模式播放长按音效
+                playKeySound(mKeyStyle.getLongClickKeyStyle());
             }
 
             // 标记长按事件已发生，防止抬起时触发单击事件
@@ -1617,14 +1629,8 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
             // 2. 处理声音反馈
             if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
-                int sound = mKeyStyle.getLongClickKeyStyle().getSoundEffect();
-                if (sound > 0) {
-                    // 播放自定义音效
-                    ThemeManager.play(sound);
-                } else {
-                    // 播放系统默认点击音效
-                    playSoundEffect(SoundEffectConstants.CLICK);
-                }
+                // 按律动模式播放长按音效
+                playKeySound(mKeyStyle.getLongClickKeyStyle());
             }
 
             // 3. 触发点击事件（执行按键逻辑）
@@ -1662,14 +1668,8 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
             // 处理声音反馈
             if (mKeyStyle.getLongClickKeyStyle().isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
-                int sound = mKeyStyle.getLongClickKeyStyle().getSoundEffect();
-                if (sound > 0) {
-                    // 播放自定义音效
-                    ThemeManager.play(sound);
-                } else {
-                    // 播放系统默认点击音效
-                    playSoundEffect(SoundEffectConstants.CLICK);
-                }
+                // 按律动模式播放长按音效
+                playKeySound(mKeyStyle.getLongClickKeyStyle());
             }
 
             // 如果当前存在有效的滑动方向，则触发对应的事件
@@ -1758,14 +1758,8 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             }
             // 检查是否启用声音反馈
             if (mKeyStyle.isSoundEnabled() && !Rime.getRimeOption("_hide_key_sound")) {
-                int sound = mKeyStyle.getSoundEffect();
-                if (sound > 0) {
-                    // 播放自定义音效
-                    ThemeManager.play(sound);
-                } else {
-                    // 播放系统默认点击音效
-                    playSoundEffect(SoundEffectConstants.CLICK);
-                }
+                // 按律动模式播放按键音效
+                playKeySound(mKeyStyle);
             }
         }
 

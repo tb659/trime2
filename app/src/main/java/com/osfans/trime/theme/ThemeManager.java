@@ -770,15 +770,30 @@ public class ThemeManager {
     }
 
     /**
-     * 播放音效。
+     * 播放音效（默认参数:左右声道 1.0,速率 1.0,无循环）。
      *
      * @param soundId 音效 ID。
      */
     public static void play(int soundId) {
-        if (mSoundPool != null && soundId > 0) {
-            // 参数依次为：左声道、右声道、优先级、循环、速率
-            mSoundPool.play(soundId, 1.0f, 1.0f, 1, 0, 1.0f);
-        }
+        play(soundId, 1.0f, 1.0f);
+    }
+
+    /**
+     * 播放音效（指定播放速率/音量），用于实现按键音效的"律动"效果。
+     *
+     * @param soundId 音效 ID,小于等于 0 时直接返回。
+     * @param rate    播放速率(0.5~2.0),1.0 为原速,>1.0 音调更高、节奏更紧凑。
+     * @param volume  音量(0.0~1.0),0.0 为静音,1.0 为满音量。
+     */
+    public static void play(int soundId, float rate, float volume) {
+        if (mSoundPool == null || soundId <= 0) return;
+        // 防御性夹紧
+        if (rate < 0.5f) rate = 0.5f;
+        if (rate > 2.0f) rate = 2.0f;
+        if (volume < 0.0f) volume = 0.0f;
+        if (volume > 1.0f) volume = 1.0f;
+        // 参数依次为:左声道、右声道、优先级、循环(0=不循环)、速率
+        mSoundPool.play(soundId, volume, volume, 1, 0, rate);
     }
 
     /**

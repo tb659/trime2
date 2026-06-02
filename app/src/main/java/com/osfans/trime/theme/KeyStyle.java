@@ -85,6 +85,12 @@ public class KeyStyle extends Style {
     private int[] mSoundEffectIDs;
     private boolean mHasCachedSoundEffect;
     private final Random mSoundRandom = new Random();
+    // 音效律动模式缓存
+    private boolean mHasCachedSoundRhythm;
+    /** 律动模式：{@code "random"}（随机选音效并随机选 rate） / {@code "rate"}（固定选第一个音效并随机选 rate） */
+    private String mSoundRhythmMode;
+    /** 律动参数：随机选取的播放速率数组（默认 0.8/1.0/1.2 三选一） */
+    private float[] mSoundRhythmRates;
     // 音效开关缓存
     private boolean mHasCachedSoundEnabled;
     private boolean mSoundEnabled;
@@ -387,42 +393,108 @@ public class KeyStyle extends Style {
     }
 
     /**
-     * 获取音效 ID。
-     * 从样式目录或音效目录中查找音效文件并加载。
-     * 支持单个字符串或字符串数组（随机播放）。
+     * 按律动模式（sound_rhythm）选择下一个音效 ID,并返回配套的播放速率。
      *
-     * @return 音效 ID,如果未找到则返回 -1。
+     * <p>律动模式说明:
+     * <ul>
+     *   <li>{@code random} — 随机从 sound_effect 数组中选一个音效,并从 rate 数组中随机选一个播放速率（默认 0.8/1.0/1.2）</li>
+     *   <li>{@code rate}   — 固定选 sound_effect 数组的第一个音效,并从 rate 数组中随机选一个播放速率</li>
+     * </ul>
+     *
+     * @return 长度为 2 的数组:[soundId, rate];soundId <= 0 表示无音效可播
      */
-    public int getSoundEffect() {
-        if (!mHasCachedSoundEffect) {
-            mHasCachedSoundEffect = true;
-            LuaValue ve = get("sound_effect");
-            if (ve.isstring()) {
-                int id = loadSingleSound(ve.tojstring());
-                if (id > 0) mSoundEffectIDs = new int[]{id};
-            } else if (ve.istable()) {
-                int len = ve.length();
-                if (len > 0) {
-                    ArrayList<Integer> ids = new ArrayList<>();
-                    for (int i = 1; i <= len; i++) {
-                        LuaValue item = ve.get(i);
-                        if (item.isstring()) {
-                            int id = loadSingleSound(item.tojstring());
-                            if (id > 0) ids.add(id);
-                        }
+    public float[] pickNextSoundEffect() {
+        ensureSoundEffectIDsLoaded();
+        ensureSoundRhythmLoaded();
+        if (mSoundEffectIDs == null || mSoundEffectIDs.length == 0) {
+            return new float[]{-1f, 1.0f};
+        }
+        final int id;
+        final String mode = mSoundRhythmMode == null ? "random" : mSoundRhythmMode;
+        if ("rate".equals(mode)) {
+            id = mSoundEffectIDs[0];
+        } else {
+            // random（默认）:从数组中随机选一个音效
+            id = mSoundEffectIDs[mSoundRandom.nextInt(mSoundEffectIDs.length)];
+        }
+        float rate = 1.0f;
+        if (mSoundRhythmRates != null && mSoundRhythmRates.length > 0) {
+            rate = mSoundRhythmRates[mSoundRandom.nextInt(mSoundRhythmRates.length)];
+        }
+        // 防御性夹紧,避免参数越界
+        if (rate < 0.5f) rate = 0.5f;
+        if (rate > 2.0f) rate = 2.0f;
+        return new float[]{id, rate};
+    }
+
+    /**
+     * 加载并缓存音效 ID 列表（提取自旧 getSoundEffect 中的解析逻辑）。
+     */
+    private void ensureSoundEffectIDsLoaded() {
+        if (mHasCachedSoundEffect) return;
+        mHasCachedSoundEffect = true;
+        LuaValue ve = get("sound_effect");
+        if (ve.isstring()) {
+            int id = loadSingleSound(ve.tojstring());
+            if (id > 0) mSoundEffectIDs = new int[]{id};
+        } else if (ve.istable()) {
+            int len = ve.length();
+            if (len > 0) {
+                ArrayList<Integer> ids = new ArrayList<>();
+                for (int i = 1; i <= len; i++) {
+                    LuaValue item = ve.get(i);
+                    if (item.isstring()) {
+                        int id = loadSingleSound(item.tojstring());
+                        if (id > 0) ids.add(id);
                     }
-                    if (!ids.isEmpty()) {
-                        mSoundEffectIDs = new int[ids.size()];
-                        for (int i = 0; i < ids.size(); i++)
-                            mSoundEffectIDs[i] = ids.get(i);
-                    }
+                }
+                if (!ids.isEmpty()) {
+                    mSoundEffectIDs = new int[ids.size()];
+                    for (int i = 0; i < ids.size(); i++)
+                        mSoundEffectIDs[i] = ids.get(i);
                 }
             }
         }
-        if (mSoundEffectIDs != null && mSoundEffectIDs.length > 0) {
-            return mSoundEffectIDs[mSoundRandom.nextInt(mSoundEffectIDs.length)];
+    }
+
+    /**
+     * 加载并缓存律动模式/参数（sound_rhythm）。
+     * 支持字符串（"random"/"rate"）或 table 形式。
+     */
+    private void ensureSoundRhythmLoaded() {
+        if (mHasCachedSoundRhythm) return;
+        mHasCachedSoundRhythm = true;
+        LuaValue vr = get("sound_rhythm");
+        if (vr.isstring()) {
+            mSoundRhythmMode = vr.tojstring();
+        } else if (vr.istable()) {
+            LuaValue modeVal = vr.get("mode");
+            if (modeVal.isstring()) {
+                mSoundRhythmMode = modeVal.tojstring();
+            }
+            // params 数组:用于配置自定义随机选取的速率集合
+            LuaValue params = vr.get("params");
+            mSoundRhythmRates = parseFloatArray(params);
         }
-        return -1;
+        if (mSoundRhythmMode == null) mSoundRhythmMode = "random";
+        // 默认随机速率集合:{0.8, 1.0, 1.2}
+        if (mSoundRhythmRates == null || mSoundRhythmRates.length == 0) {
+            mSoundRhythmRates = new float[]{0.8f, 1.0f, 1.2f};
+        }
+    }
+
+    /**
+     * 解析 Lua table 形式给出的 float 数组(索引从 1 开始)。
+     */
+    private static float[] parseFloatArray(LuaValue v) {
+        if (!v.istable()) return null;
+        int len = v.length();
+        if (len <= 0) return null;
+        float[] arr = new float[len];
+        for (int i = 0; i < len; i++) {
+            arr[i] = (float) v.get(i + 1).optdouble(1.0);
+        }
+        return arr;
     }
 
     /**
