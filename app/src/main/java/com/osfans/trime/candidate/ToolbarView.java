@@ -88,15 +88,22 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
                 root.setOutlineSpotShadowColor(dShadowColor);
             }
         }
-        int height = toolbarHeight - elevation;
         LayoutParams lp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         // 读取工具栏容器外边距配置；未配置时 bottom 默认等于 elevation，避免阴影被裁剪
         Style margins = mToolbarStyle.getStyle("margins");
+        int marginBottom = margins.getSize("bottom", elevation);
+        // 工具栏 root 内可用高度 = 工具栏总高 - bottom margin；这样当 bottom > elevation 时仍能包住两行 switches
+        int height = toolbarHeight - marginBottom;
+        // 让 rowHeight 至少为「文字高度(含 font padding 估计)+ key 上下 margin」,保证 KeyView 内 keyRoot 装得下文字
+        Style keyMargins = mKeyStyle.getStyle("margins");
+        int keyMarginTop = keyMargins.getSize("top", 0);
+        int keyMarginBottom = keyMargins.getSize("bottom", 0);
+        int minRowHeight = Math.round(mKeyStyle.getTextSize()) + 4 + keyMarginTop + keyMarginBottom;
         lp.setMargins(
                 margins.getSize("left", 0),
                 margins.getSize("top", 0),
                 margins.getSize("right", 0),
-                margins.getSize("bottom", elevation)
+                marginBottom
         );
         addView(root, lp);
 
@@ -140,7 +147,7 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
                     LinearLayout column = new LinearLayout(getContext());
                     column.setOrientation(VERTICAL);
 
-                    int rowHeight = height / 2;
+                    int rowHeight = Math.max(height / 2, minRowHeight);
 
                     // 上：未选中选项（comment 样式，有注释时显示）
                     KeyView topKey = new KeyView(getContext(), topStyle) {
@@ -228,8 +235,14 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
         boolean showTwoRows = !Config.is_hide_comment();
         int toolbarHeight = ThemeManager.getCandidateHeight();
         int elevation = (int) mToolbarStyle.getSize("elevation", 2);
-        int height = toolbarHeight - elevation;
-        int rowHeight = height / 2;
+        Style margins = mToolbarStyle.getStyle("margins");
+        int marginBottom = margins.getSize("bottom", elevation);
+        int height = toolbarHeight - marginBottom;
+        Style keyMargins = mKeyStyle.getStyle("margins");
+        int keyMarginTop = keyMargins.getSize("top", 0);
+        int keyMarginBottom = keyMargins.getSize("bottom", 0);
+        int minRowHeight = Math.round(mKeyStyle.getTextSize()) + 4 + keyMarginTop + keyMarginBottom;
+        int rowHeight = Math.max(height / 2, minRowHeight);
 
         ViewGroup.LayoutParams lvLp = mListView.getLayoutParams();
         lvLp.height = height;
