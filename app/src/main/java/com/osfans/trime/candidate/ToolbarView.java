@@ -90,7 +90,14 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
         }
         int height = toolbarHeight - elevation;
         LayoutParams lp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        lp.setMargins(0, 0, 0, elevation);
+        // 读取工具栏容器外边距配置；未配置时 bottom 默认等于 elevation，避免阴影被裁剪
+        Style margins = mToolbarStyle.getStyle("margins");
+        lp.setMargins(
+                margins.getSize("left", 0),
+                margins.getSize("top", 0),
+                margins.getSize("right", 0),
+                margins.getSize("bottom", elevation)
+        );
         addView(root, lp);
 
         // 创建横向滚动容器
