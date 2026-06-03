@@ -20,11 +20,8 @@ background = 0xffEBEBEB
 
 -- 键盘
 keyboard = {
-    -- 键盘高度
     height = 240,
-    -- 键盘背景颜色或图片
     background = 0xffEBEBEB,
-    -- 指定样式全局字体或字体集
     -- font = DEFALUT_FONT,
 }
 
@@ -42,7 +39,7 @@ key = {
     -- 按键背景颜色或图片
     background = 0xffffffff,
     -- 按键阴影高度
-    elevation = 4,
+    elevation = 2,
     -- 按键圆角半径
     corner_radius = 6,
     -- 按键阴影颜色
@@ -71,18 +68,8 @@ key = {
     --   sound_rhythm = { mode = "random", params = { 0.7, 0.9, 1.0, 1.1, 1.3 } }
     sound_rhythm = "random",
     -- 按键四周留白
-    margins = {
-        left = 2,
-        top = 5,
-        right = 2,
-        bottom = 5
-    },
-    padding = {
-        left = 0,
-        top = 0,
-        right = 0,
-        bottom = 0
-    },
+    margins = { left = 2, top = 5, right = 2, bottom = 5 },
+    padding = { left = 0, top = 0, right = 0, bottom = 0 },
     -- 按键助记
     -- 在按键使用hint默认hint,或者使用hint_up,hint_down,hint_left,hint_right定义四个方向hint
     hint = {
@@ -219,56 +206,63 @@ popup = {
     })
 }
 
+-- shift键
+shift = table.merge(key, {
+    text_color = 0xff,
+    background = "kafei/xrsh.png",
+    pressed = {
+        text_color = 0xff,
+        background = "kafei/xrsha.png",
+    },
+    margins = { left = 0, top = 0, right = 0, bottom = 0 }
+})
+
 -- 删除键
-BackSpace = table.merge(key, {
-    -- 按键重复执行间隔
-    repeat_click_time = 50,
-    -- 音效开关
-    sound_enabled = true,
-    -- 音效声音
-    sound_effect = "del.ogg",
-    -- 功能键文字大小
-    text_size = 14,
-    -- 功能键背景颜色或图片
-    background = 0xffaaaaaa,
-    -- 功能键按下背景颜色或图片
+backspace = table.merge(key, {
+    text_color = 0xff,
+    background = "kafei/xrsc.png",
     pressed = table.merge(key.pressed, {
-        background = 0xff888888,
-        -- 功能键按下文字颜色
-        text_color = 0xffffffff
+        text_color = 0xff,
+        background = "kafei/xrsca.png",
     }),
+    margins = { left = 0, top = -1, right = 0, bottom = -1 },
+    elevation = 4,
+    repeat_click_time = 50,
+    sound_enabled = true,
+    sound_effect = "del.ogg"
+})
+
+-- 符号键
+symbols = table.merge(key, {
+    text_color = 0xff,
+    background = "kafei/xrcd.png",
+    pressed = table.merge(key.pressed, {
+        text_color = 0xff,
+        background = "kafei/xrcda.png",
+    }),
+    margins = { left = 0, top = 0, right = 0, bottom = 0 }
 })
 
 -- 空格键
 space = table.merge(key, {
-    -- 空格键文字大小
     text_size = 12,
-    -- 空格键长按超时
     long_click_time = 300,
-    -- 音效开关
     sound_enabled = true,
-    -- 音效声音
     sound_effect = "space.ogg"
 })
 
--- 回车键样式，需要在回车键定义style="enter"
+-- 回车键
 enter = table.merge(key, {
-    -- 回车键文字大小
     text_size = 14,
-    -- 回车键背景颜色或图片
-    background = 0xff1976D2,
-    -- 回车键按下背景颜色或图片
+    background = 0xff3C5AB0,
+    text_color = 0xffFFFFFF,
     pressed = table.merge(key.pressed, {
+        text_color = 0xffFFFFFF,
         background = 0xff1565C0,
-        -- 回车键按下文字颜色
-        text_color = 0xff000000
     }),
-    -- 回车键禁止预览
     preview = nil,
-    -- 音效开关
     sound_enabled = true,
-    -- 音效声音
-    sound_effect = "enter.ogg"
+    sound_effect = "enter.ogg",
 })
 
 -- 数字键盘回车键
@@ -280,28 +274,7 @@ enter2 = table.merge(enter, {
     -- 音效开关
     sound_enabled = true,
     -- 音效声音
-    sound_effect = "enter.ogg"
-})
-
--- 功能键样式，需要在功能按键定义style="functional"
-functional = table.merge(key, {
-    -- 功能键文字大小
-    text_size = 14,
-    -- 功能键背景颜色或图片
-    background = 0xffaaaaaa,
-    -- 功能键按下背景颜色或图片
-    pressed = table.merge(key.pressed, {
-        background = 0xff888888,
-        -- 功能键按下文字颜色
-        text_color = 0xffffffff
-    }),
-    -- 功能键禁止预览
-    preview = nil
-})
-
--- 文字大小
-text_size_14 = table.merge(key, {
-    text_size = 14,
+    sound_effect = "enter.ogg",
 })
 
 -- 符号更多面板
@@ -395,7 +368,7 @@ candidate = {
     },
     -- 候选栏按键
     key = {
-        width = 40,
+        width = 38,
         -- 文本
         text = "﹀",
         -- 文字颜色
@@ -505,12 +478,7 @@ toolbar = table.merge(candidate, {
     hide = table.clone(candidate.key),
     -- 工具栏容器外边距（与外部的间距）
     -- bottom 至少等于 elevation 才能避免阴影被裁剪
-    margins = {
-        left = 5,
-        top = 0,
-        right = 5,
-        bottom = 5
-    },
+    margins = { left = 5, top = 0, right = 5, bottom = 5 },
     -- 支持添加preset_keys按键，也可以直接写事件的表，
     -- 可以指定按键的style
     -- keys = { { label = "菜单", send = "Control+grave" }, "Mode_switch", "Keyboard_clipboard", "Keyboard_editor", "Mode_small", "Mode_float" },
@@ -522,12 +490,7 @@ toolbar = table.merge(candidate, {
         -- 工具栏背景颜色或图片
         background = 0xffFFFFFF,
         -- 工具栏内按键边距
-        margins = {
-            left = 3,
-            top = 3,
-            right = 3,
-            bottom = 0
-        }
+        margins = { left = 3, top = 3, right = 3, bottom = 0 }
     })
 })
 
@@ -537,12 +500,7 @@ clipboard = table.merge(candidate.expanded, {
         -- 剪切板剪切项文字大小
         text_size = 14,
         -- 剪切板剪切项内边距
-        padding = {
-            left = 4,
-            top = 4,
-            right = 4,
-            bottom = 4
-        }
+        padding = { left = 4, top = 4, right = 4, bottom = 4 }
     }),
     -- 剪切板工具栏
     tool_bar = {
@@ -591,12 +549,7 @@ composition = {
     -- 最小高度
     min_height = 0,
     -- 边距
-    margins = {
-        left = 5,
-        top = 0,
-        right = 5,
-        bottom = 0
-    },
+    margins = { left = 5, top = 0, right = 5, bottom = 0 },
     -- 候选词的行间距(px)
     line_spacing = 0,
     -- 候选词的行间距(倍数)

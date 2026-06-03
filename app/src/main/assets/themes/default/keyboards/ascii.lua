@@ -53,7 +53,7 @@ rows = {
     -- 第四行
     {
         keys = {
-            { click = "Shift_L", style = "functional", width = 15},
+            { click = "Shift_L", width = 15 },
             { click = "z" },
             { click = "x" },
             { click = "c" },
@@ -61,19 +61,19 @@ rows = {
             { click = "b" },
             { click = "n" },
             { click = "m" },
-            { click = "BackSpace", style = "functional", label = "⌫", width = 15 },
+            { click = "BackSpace", label = "⌫", width = 15 },
         }
     },
     -- 第五行
     {
         -- height = 50,
         keys = {
-            { click="Keyboard_symbols", style = "functional", width = 15 },
-            { click="Keyboard_number", style = "functional" },
+            { click="Keyboard_symbols", width = 15 },
+            { click="Keyboard_number" },
             { click = "," },
             { click = "space", width = 30, swipe_repeatable=true, swipe_left="Left",swipe_right="Right",swipe_up="Up",swipe_down="Down"},
             { click = "." },
-            { click="@", style = "functional" },
+            { click="@" },
             { click = "Return", style = "enter", label = "Enter", width = 15 }
         }
     },

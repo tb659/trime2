@@ -392,7 +392,7 @@ public class ThemeManager {
         copyFieldIfPresent(style, key, "vibration_enabled");
         copyFieldIfPresent(style, key, "vibration_effect");
         copyFieldIfPresent(style, key, "sound_effect");
-        copyFieldIfPresent(style, key, "style_long_click");
+        copyFieldIfPresent(style, key, "long_click_style");
         
         // Level 2: Row-level defaults - 处理行级别的默认配置，优先级次之
         if (row != null) {
@@ -411,7 +411,7 @@ public class ThemeManager {
             applyDefault(style, row, "vibration_enabled");
             applyDefault(style, row, "vibration_effect");
             applyDefault(style, row, "sound_effect");
-            applyDefault(style, row, "style_long_click");
+            applyDefault(style, row, "long_click_style");
         }
         
         // Level 3: Keyboard-level defaults - 处理键盘级别的全局默认配置，优先级最低
@@ -430,7 +430,7 @@ public class ThemeManager {
         applyDefaultFrom(style, globals, "key_vibration_enabled", "vibration_enabled");
         applyDefaultFrom(style, globals, "key_vibration_effect", "vibration_effect");
         applyDefaultFrom(style, globals, "key_sound_effect", "sound_effect");
-        applyDefaultFrom(style, globals, "key_style_long_click", "style_long_click");
+        applyDefaultFrom(style, globals, "key_long_click_style", "style_long_click");
         
         return style;
     }
@@ -493,7 +493,7 @@ public class ThemeManager {
         copyFieldIfPresent(resolvedStyle, keySubStyle, "vibration_enabled");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "vibration_effect");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "sound_effect");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "style_long_click");
+        copyFieldIfPresent(resolvedStyle, keySubStyle, "long_click_style");
         
         // Level 2: Row.sub-level defaults - 行级别的子样式默认配置
         if (row != null) {
@@ -514,7 +514,7 @@ public class ThemeManager {
                 applyDefault(resolvedStyle, rowSubStyle, "vibration_enabled");
                 applyDefault(resolvedStyle, rowSubStyle, "vibration_effect");
                 applyDefault(resolvedStyle, rowSubStyle, "sound_effect");
-                applyDefault(resolvedStyle, rowSubStyle, "style_long_click");
+                applyDefault(resolvedStyle, rowSubStyle, "long_click_style");
             }
         }
         
@@ -538,7 +538,7 @@ public class ThemeManager {
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "vibration_enabled");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "vibration_effect");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "sound_effect");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "style_long_click");
+                applyDefault(resolvedStyle, keyboardKeySubStyle, "long_click_style");
             }
         }
         

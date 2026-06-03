@@ -853,7 +853,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
             // 优先使用按键级别的 long_click 样式配置，其次使用主题全局的 key.long_click 配置
             KeyStyle mLongClickStyle;
-            LuaValue keyLongClickStyle = mKey.getMk().get("style_long_click");
+            LuaValue keyLongClickStyle = mKey.getMk().get("long_click_style");
             if (keyLongClickStyle.istable()) {
                 // 按键级别配置存在，基于主题 long_click 样式创建新的样式对象
                 mLongClickStyle = new KeyStyle(keyLongClickStyle, mKeyStyle.getLongClickKeyStyle());

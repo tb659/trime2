@@ -42,38 +42,38 @@ preset_keys = {
     VOLUME_MUTE = { label = "静音", send = "VOLUME_MUTE" },
 
     -- 编辑
-    Shift_L = { label = "Shift", send = "Shift_L", shift_lock = "double" }, -- shift_lock click,double,long
-    Return = { label = "action_labels", send = "Return" },
-    Return1 = { label = "Enter", send = "Return" },
-    Return2 = { label = "回车", send = "Return" },
     Hide = { label = "隐藏", send = "BACK" },
-    BackSpace = { label = "⌫", description = "退格", repeatable = true, send = "BackSpace" },
-    space = { repeatable = false, send = "space" },
-    space1 = { label = "␣", repeatable = false, send = "space" },
     Escape = { label = "Esc", send = "Escape" },
-    Home = { label = "行首", send = "Home" },
     Insert = { label = "插入", send = "Insert" },
-    Delete = { label = "删除", send = "Delete" },
+    Home = { label = "行首", send = "Home" },
     End = { label = "行尾", send = "End" },
-    Page_Up = { label = "上页", send = "Page_Up" },
-    Page_Down = { label = "下页", send = "Page_Down" },
     Left = { label = "←", send = "Left" },
     Down = { label = "↓", send = "Down" },
     Up = { label = "↑", send = "Up" },
     Right = { label = "→", send = "Right" },
+    Page_Up = { label = "上页", send = "Page_Up" },
+    Page_Down = { label = "下页", send = "Page_Down" },
     select_all = { label = "全选", send = "Control+a" },
+    Shift_L = { label = "Shift", send = "Shift_L", shift_lock = "double" }, -- shift_lock click,double,long
+    Return = { label = "action_labels", send = "Return" },
+    Return1 = { label = "Enter", send = "Return" },
+    Return2 = { label = "回车", send = "Return" },
+    space = { repeatable = false, send = "space" },
+    space1 = { label = "␣", repeatable = false, send = "space" },
+    BackSpace = { label = "⌫", description = "退格", repeatable = true, send = "BackSpace" },
     Clear = { label = "清除", text = "{Control+a}{BackSpace}" }, -- 全选并删除
+    ClearH = { label = "Del↔", send = "{End}{Shift+Home}{Delete}" },
+    Delete = { label = "删除", send = "Delete" },
+    delete_all = { label = "全删", text = "{Control+a}{Delete}" }, -- 全选并删除
     cut = { label = "剪切", send = "Control+x" },
     cut_all = { label = "全剪", text = "{Control+a}{Control+x}" }, -- 全选并剪切
     copy = { label = "复制", send = "Control+c" },
     copy_all = { label = "全部复制", text = "{Control+a}{Control+c}" }, -- 全选并复制
-    delete_all = { label = "全删", text = "{Control+a}{Delete}" }, -- 全选并删除
     paste = { label = "粘贴", send = "Control+v" },
     paste_text = { label = "粘贴文本", send = "Control+Shift+Alt+v" }, -- >= Android 6.0
     share_text = { label = "分享文本", send = "Control+Alt+s" }, -- >= Android 6.0
     redo = { label = "重做", send = "Control+Shift+z" }, -- >= Android 6.0
     undo = { label = "撤销", send = "Control+z" }, -- >= Android 6.0
-    ClearH = { label = "☒", send = "{End}{Shift+Home}{Delete}" },
 
     -- rime组合键
     F4 = { label = "菜单", send = "Control+grave" },
@@ -92,9 +92,9 @@ preset_keys = {
     Punct_switch = { toggle = "ascii_punct", send = "Mode_switch", states = { "。，", "．，" } },
 
     -- 切换键盘
-    Keyboard_symbols = { label = " ", send = "Eisu_toggle", select = "symbols" },
+    Keyboard_symbols = { label = "符号", send = "Eisu_toggle", select = "symbols" },
     Keyboard_symbols_ext = { label = "更多", send = "Eisu_toggle", select = "symbols_ext" },
-    Keyboard_number = { label = "数字", send = "Eisu_toggle", select = "number" },
+    Keyboard_number = { label = "123", send = "Eisu_toggle", select = "number" },
     Keyboard_letter = { label = "字母", send = "Eisu_toggle", select = "default" },
     Keyboard_default = { label = "返回", send = "Eisu_toggle", select = ".default" },
     Keyboard_back = { label = "返回", send = "Eisu_toggle", select = ".last" },
