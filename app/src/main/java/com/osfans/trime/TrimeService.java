@@ -48,7 +48,6 @@ import com.osfans.trime.core.CandidateItem;
 import com.osfans.trime.core.DataManager;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.core.RimeConfig;
-import com.osfans.trime.core.RimeLifecycle;
 import com.osfans.trime.core.RimeMessage;
 import com.osfans.trime.core.RimeProto;
 import com.osfans.trime.dialog.DeployDialog;
@@ -177,23 +176,21 @@ public class TrimeService extends InputMethodService {
         mRime = new Rime(new Runnable() {
             @Override
             public void run() {
-                // 在后台线程恢复上次选择的方案，避免主线程被 librime 启动阻塞造成 ANR
-                new Thread(() -> {
-                    String id = Function.getPref(TrimeService.this).getString("select_schema_id", "");
-                    if (!TextUtils.isEmpty(id))
-                        Rime.selectRimeSchema(id);
-                    mHandler.post(() -> {
-                        // 回到主线程初始化内嵌预编辑模式（需要访问 View）
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        // String soft_cursor_key = "soft_cursor";
+                        // Rime.setRimeOption(soft_cursor_key, true); // 软光标
+                        // mRootInputView.setSchema(Rime.getCurrentRimeSchema());
+                        // 恢复上次选择的输入法方案
+                        String id = Function.getPref(TrimeService.this).getString("select_schema_id", "");
+                        if (!TextUtils.isEmpty(id))
+                            Rime.selectRimeSchema(id);
                         initInlinePreedit();
-                    });
-                }, "rime-init-schema").start();
+                    }
+                });
             }
         });
-        // 注册 Rime 引擎实例引用，供候选栏查询 READY 状态
-        CandidatesManager.setRime(mRime);
-        // 注册 Rime 生命周期观察者，在引擎就绪后立即触发一次候选栏刷新，
-        // 避免 IME 弹出后候选栏在用户开始输入前一直显示空白
-        mRime.getLifecycle().addObserver(mRimeReadyObserver);
         // 启动 Rime 引擎
         mRime.startup();
         // 注册 Rime 消息处理器，接收引擎通知
@@ -252,12 +249,6 @@ public class TrimeService extends InputMethodService {
         // 移除所有待处理的 Handler 消息
         mHandler.removeCallbacksAndMessages(null);
         sInstance = null;
-        // 注销 Rime 生命周期观察者
-        if (mRime != null) {
-            mRime.getLifecycle().removeObserver(mRimeReadyObserver);
-        }
-        // 清空候选栏对 Rime 引擎的引用，避免引擎释放后还被访问
-        CandidatesManager.setRime(null);
         // 注销 Rime 消息处理器
         Rime.unregisterRimeMessageHandler(mMessageHandler);
         // 释放 Rime 引擎资源
@@ -266,20 +257,6 @@ public class TrimeService extends InputMethodService {
         ThemeManager.callFunction("onDestroy");
         super.onDestroy();
     }
-
-    /**
-     * Rime 生命周期观察者：在引擎变为 READY 时主动触发一次候选栏刷新，
-     * 让 IME 弹出后候选栏立即出现"无候选"占位符（或当前方案的空列表），
-     * 避免在用户开始输入前候选栏一直显示空白。
-     */
-    private final RimeLifecycle.StateObserver mRimeReadyObserver = new RimeLifecycle.StateObserver() {
-        @Override
-        public void onStateChange(RimeLifecycle.State newState) {
-            if (newState == RimeLifecycle.State.READY) {
-                mHandler.post(() -> updateCandidate());
-            }
-        }
-    };
 
     /**
      * 输入法窗口显示时的初始化操作。
@@ -2315,25 +2292,18 @@ public class TrimeService extends InputMethodService {
 
     /**
      * 重启 Rime 引擎。
-     *
-     * 在后台线程同步等待 restart 真正完成(exitRime + startRime)后,
-     * 再回到主线程读取当前方案并刷新 UI。
-     * 这样可以避免在 librime 尚未就绪时调用 JNI 拿到空值/超时,
-     * 也避免主线程被长时间的 restart 阻塞造成 ANR。
      */
     public void restart() {
-        new Thread(() -> {
-            // 后台线程同步阻塞,直到 restart 真正完成
-            mRime.restart();
-            mHandler.post(() -> {
+        mRime.restart();
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
                 String schema = Rime.getCurrentRimeSchema();
                 if (!TextUtils.isEmpty(schema)) {
                     mRootInputView.setSchema(schema);
                 }
-                // 重新初始化内嵌预编辑模式
-                initInlinePreedit();
-            });
-        }, "rime-restart").start();
+            }
+        });
     }
 
     // 对话框引用

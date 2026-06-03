@@ -7,7 +7,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -25,46 +24,27 @@ public final class RimeDispatcher {
 
     // --- 静态常量(来自伴生对象) ---
 
-    /** 任务等待限制(毫秒) — 超过该时间未运行则记录警告 */
+    /** 任务等待限制(毫秒) */
     private static final long JOB_WAITING_LIMIT = 2000L; // ms
 
-    /**
-     * submit 任务等待结果的超时(毫秒)。
-     * 该值需要覆盖冷启动/方案组切换/部署等场景下 librime 的最坏耗时(解压资源、编译码表等),
-     * 过短会导致任务被截断返回 null,从而让上层 UI 误以为 Rime 已就绪而出现空白/异常。
-     */
-    private static final long SUBMIT_TIMEOUT_MS = 30_000L; // ms
+    // 使用固定大小的线程池
+    /** 执行器(单线程) */
+    private final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     /**
-     * 提交任务并等待结果(最多 SUBMIT_TIMEOUT_MS 毫秒)。
-     *
-     * 任务会投递到 rime-main 单线程的内部队列中串行执行,与 nativeStartup() 共享同一线程,
-     * 从根本上避免 librime JNI 跨线程并发调用导致的竞态。
+     * 提交任务并等待结果(最多2秒)。
      *
      * @param block 要执行的任务。
      * @param <T> 返回类型。
-     * @return 任务结果,如果异常或超时则返回 null。
+     * @return 任务结果,如果异常则返回 null。
      */
     public <T> T submit(Callable<T> block) {
-        if (!isRunning.get()) {
-            // 调度器未运行(尚未 start() 或已 stop()),直接返回 null
-            return null;
-        }
-        FutureTask<T> future = new FutureTask<>(block);
-        WrappedRunnable wrapped = new WrappedRunnable(future, "submit");
-        queue.offer(wrapped);
         try {
-            return future.get(SUBMIT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-            Timber.e(e, "RimeDispatcher submit timed out after %d ms", SUBMIT_TIMEOUT_MS);
-            return null;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            Timber.e(e, "RimeDispatcher submit interrupted");
-            return null;
-        } catch (ExecutionException e) {
-            Timber.e(e, "RimeDispatcher submit execution failed");
-            return null;
+            //return block.call();
+            return executor.submit(block).get(2,TimeUnit.SECONDS);
+        } catch (Exception e) {
+            e.printStackTrace();
+           return null;
         }
     }
 
@@ -137,7 +117,6 @@ public final class RimeDispatcher {
 
         /**
          * 执行任务,如果等待时间超过限制则记录警告。
-         * 任何异常都会被捕获并记录,避免单个任务失败导致主循环退出。
          */
         @Override
         public void run() {
@@ -146,11 +125,7 @@ public final class RimeDispatcher {
                 Timber.w("%s has waited %d ms to get run since created!", toString(), delta);
             }
             started = true;
-            try {
-                runnable.run();
-            } catch (Throwable t) {
-                Timber.e(t, "WrappedRunnable %s threw an exception", toString());
-            }
+            runnable.run();
         }
 
         /**
