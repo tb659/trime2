@@ -92,7 +92,7 @@ preset_keys = {
     Punct_switch = { toggle = "ascii_punct", send = "Mode_switch", states = { "。，", "．，" } },
 
     -- 切换键盘
-    Keyboard_symbols = { label = "符号", send = "Eisu_toggle", select = "symbols" },
+    Keyboard_symbols = { label = " ", send = "Eisu_toggle", select = "symbols" },
     Keyboard_symbols_ext = { label = "更多", send = "Eisu_toggle", select = "symbols_ext" },
     Keyboard_number = { label = "数字", send = "Eisu_toggle", select = "number" },
     Keyboard_letter = { label = "字母", send = "Eisu_toggle", select = "default" },

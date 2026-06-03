@@ -33,7 +33,7 @@ key = {
     -- 全局默认键高（dp），即 key_height 不存在时的兜底值
     height = 52,
     -- 按键文字颜色
-    text_color = 0xff000000,
+    text_color = 0xff525993,
     -- 按键字体
     font = DEFALUT_FONT,
     -- font={ "a.ttf","b.ttf" }
@@ -44,7 +44,7 @@ key = {
     -- 按键阴影高度
     elevation = 4,
     -- 按键圆角半径
-    corner_radius = 4,
+    corner_radius = 6,
     -- 按键阴影颜色
     shadow_color = 0xff000000,
     -- 按键长按超时
@@ -88,7 +88,7 @@ key = {
     hint = {
         show = true,
         -- 助记文字颜色
-        text_color = 0xff444444,
+        text_color = 0xff525993,
         -- 助记字体
         font = HINT_FONT,
         -- 助记文字大小
@@ -96,7 +96,7 @@ key = {
         up = {
             show = true,
             -- 助记文字颜色
-            text_color = 0xff444444,
+            -- text_color = 0xff444444,
             -- 助记文字大小
             -- text_size = 8,
             -- 定义偏移
@@ -105,21 +105,21 @@ key = {
         down = {
             show = true,
             -- 助记文字颜色
-            text_color = 0xff444444,
+            -- text_color = 0xff444444,
             -- 助记文字大小
             -- text_size = 8
         },
         left = {
             show = true,
             -- 助记文字颜色
-            text_color = 0xff444444,
+            -- text_color = 0xff444444,
             -- 助记文字大小
             -- text_size = 8
         },
         right = {
             show = true,
             -- 助记文字颜色
-            text_color = 0xff444444,
+            -- text_color = 0xff444444,
             -- 助记文字大小
             -- text_size = 8
         }
@@ -128,7 +128,7 @@ key = {
     long_click = {
         show = true,
         -- 长按文字颜色
-        text_color = 0xff444444,
+        text_color = 0xff525993,
         -- 助记字体
         font = HINT_FONT,
         -- 长按文字大小
@@ -161,11 +161,11 @@ key = {
         text_color = 0xffffffff,
         -- 助记文字颜色
         hint = {
-            text_color = 0xff444444,
+            text_color = 0xff525993,
         },
         -- 长按文字颜色
         long_click = {
-            text_color = 0xff444444,
+            text_color = 0xff525993,
         }
     },
     -- 按键预览
@@ -183,7 +183,7 @@ key = {
         -- 按键阴影高度
         elevation = 16,
         -- 按键圆角半径
-        corner_radius = 4,
+        corner_radius = 6,
         -- 边框颜色
         stroke_color = 0x88dddddd,
         -- 边框宽度
@@ -198,7 +198,7 @@ popup = {
     -- 键盘阴影高度
     elevation = 16,
     -- 键盘圆角半径
-    corner_radius = 4,
+    corner_radius = 6,
     -- 键盘背景颜色或图片
     background = 0xffdddddd,
     -- 边框颜色
@@ -274,7 +274,7 @@ enter = table.merge(key, {
 -- 数字键盘回车键
 enter2 = table.merge(enter, {
     -- 数字键盘回车键圆角半径
-    -- corner_radius = 4
+    -- corner_radius = 6
     -- 数字键盘回车键禁止预览
     preview = nil,
     -- 音效开关
@@ -327,7 +327,7 @@ symbol = {
         -- 按键阴影高度
         elevation = 2,
         -- 按键圆角半径
-        corner_radius = 4,
+        corner_radius = 6,
         -- 按键阴影颜色
         shadow_color = 0x800000ff,
         -- 符号更多面板工具栏按键按下状态
@@ -369,7 +369,7 @@ candidate = {
     -- 阴影颜色
     shadow_color = 0xff000000,
     -- 圆角半径
-    corner_radius = 4,
+    corner_radius = 6,
     -- 候选栏面板按下状态
     pressed = {
         -- 背景色
@@ -403,11 +403,11 @@ candidate = {
         -- 文字大小
         text_size = 12,
         -- 背景颜色或图片
-        background = 0xffdddddd,
+        background = 0xffFFFFFF,
         -- 阴影高度
         elevation = 0,
         -- 圆角半径
-        corner_radius = 4,
+        corner_radius = 6,
         -- 按键阴影颜色
         shadow_color = 0x800000ff,
         -- 候选按键按下状态
@@ -474,7 +474,7 @@ candidate = {
             -- 按键阴影高度
             elevation = 2,
             -- 按键圆角半径
-            corner_radius = 4,
+            corner_radius = 6,
             -- 按键阴影颜色
             shadow_color = 0x800000ff,
             -- 候选栏展开面板按键按下状态
