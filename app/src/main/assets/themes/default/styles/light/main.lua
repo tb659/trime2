@@ -187,7 +187,7 @@ popup = {
     -- 键盘圆角半径
     corner_radius = 6,
     -- 键盘背景颜色或图片
-    background = 0xffdddddd,
+    background = 0xffdddd00,
     -- 边框颜色
     stroke_color = 0x88dddddd,
     -- 边框宽度
@@ -208,12 +208,12 @@ popup = {
 
 -- shift键
 shift = table.merge(key, {
-    text_color = 0xff,
+    label = "Enter",
     background = "kafei/xrsh.png",
     pressed = {
-        text_color = 0xff,
         background = "kafei/xrsha.png",
     },
+    hint = { show = false },
     margins = { left = 0, top = 0, right = 0, bottom = 0 }
 })
 
@@ -248,11 +248,15 @@ space = table.merge(key, {
     text_size = 12,
     long_click_time = 300,
     sound_enabled = true,
-    sound_effect = "space.ogg"
+    sound_effect = "space.ogg",
+    swipe_repeatable = true,
+    repeat_click_time = 100,
+    hint = { show = false },
 })
 
 -- 回车键
 enter = table.merge(key, {
+    label = "123",
     text_size = 14,
     background = 0xff3C5AB0,
     text_color = 0xffFFFFFF,
@@ -260,7 +264,10 @@ enter = table.merge(key, {
         text_color = 0xffFFFFFF,
         background = 0xff1565C0,
     }),
-    preview = nil,
+    preview = {
+        text_size = 24,
+        background = 0xff3C5000,
+    },
     sound_enabled = true,
     sound_effect = "enter.ogg",
 })

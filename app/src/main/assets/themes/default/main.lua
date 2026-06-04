@@ -54,7 +54,7 @@ preset_keys = {
     Page_Up = { label = "上页", send = "Page_Up" },
     Page_Down = { label = "下页", send = "Page_Down" },
     select_all = { label = "全选", send = "Control+a" },
-    Shift_L = { label = "Shift", send = "Shift_L", shift_lock = "double" }, -- shift_lock click,double,long
+    Shift_L = { label = "", send = "Shift_L", shift_lock = "double" }, -- shift_lock click,double,long
     Return = { label = "action_labels", send = "Return" },
     Return1 = { label = "Enter", send = "Return" },
     Return2 = { label = "回车", send = "Return" },

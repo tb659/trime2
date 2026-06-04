@@ -47,7 +47,7 @@ rows = {
         width = 10.0857,
         keys = {
             { width = 1 },
-            { click = "Shift_L", width = 13.7, swipe_up = "Candidate_switch", swipe_down = "", composing = "delimiter", hint_up = "", style = "shift" },
+            { click = "Shift_L", width = 13.7, swipe_up = "Candidate_switch", composing = "delimiter", style = "shift" },
             { click = "z", swipe_up = "`", hint_up = { offset_x = -10 } },
             { click = "x", long_click = "cut" },
             { click = "c", long_click = "copy" },
@@ -55,7 +55,7 @@ rows = {
             { click = "b", swipe_up = "Keyboard_editor", hint_up = "", long_click = "Keyboard_clipboard", swipe_down = "Keyboard_phrase" },
             { click = "n", swipe_up = ";", long_click = ":", hint_up = { offset_x = -10 }, long_click_style = { offset_x = 10 } },
             { click = "m", swipe_up = "'", long_click = "\"", hint_up = { offset_x = -10 }, long_click_style = { offset_x = 10 } },
-            { click = "BackSpace", width = 13.7, style = "backspace", swipe_up = "Clear", hint_up = "", swipe_left = "ClearH", hint_left = "" },
+            { click = "BackSpace", width = 13.7, swipe_up = "Clear", hint_up = "", swipe_left = "ClearH", hint_left = "", style = "backspace" },
             { width = 1 },
         }
     },
@@ -67,10 +67,10 @@ rows = {
             { click = "Keyboard_symbols", width = 13.7, long_click = "Mode_switch", hint_long = "", swipe_up = "Keyboard_settings", hint_up = "", swipe_right = "Schema_settings", hint_right = "", style = "symbols" },
             { click = "Keyboard_number", swipe_up = "Keyboard_default_zhuji", hint_up = "", swipe_left = "Theme_settings", hint_left = "", swipe_right = "Color_switch", hint_right = "", composing = "Select_five" },
             { click = "，", ascii = ",", long_click = "<", composing = "Select_four", text_size = 14 },
-            { click = "space", width = 30.2751, label = "schema_name", long_click="VOICE_ASSIST", swipe_repeatable = true, repeat_click_time = 100, swipe_left = "Left", swipe_right = "Right", swipe_up = "Up", swipe_down = "Down", hint_left = "", hint_right = "", hint_up = "", hint_down = "" },
+            { click = "space", width = 30.2751, long_click="VOICE_ASSIST", swipe_left = "Left", swipe_right = "Right", swipe_up = "Up", swipe_down = "Down", style = "space" },
             { click = "。", ascii = ".", long_click = ">", composing = "Select_two", text_size = 14 },
             { click = "/", long_click = "?" , composing = "Select_three", text_size = 14 },
-            { click = "Return", width = 13.7, style = "enter" },
+            { click = "Return", width = 13.7, label = "Enter", style = "enter" },
             { width = 1 },
         }
     },
