@@ -117,6 +117,8 @@ public final class RimeSchema {
 
         /**
          * 切换选项状态。
+         * 注意：不能依赖本地 reset 字段，因为外部（如 keybinder）可能已改变了 Rime 引擎中的选项值。
+         * 必须先从 Rime 引擎读取当前值再取反，确保状态切换始终正确。
          */
         public void toggleOption() {
             if (!options.isEmpty()) {
@@ -124,10 +126,11 @@ public final class RimeSchema {
                 reset = (reset + 1) % options.size();
                 Rime.setRimeOption(options.get(reset), true);
             } else {
-                Log.w("TAG", "toggleOption:1 "+reset );
-                reset = 1 - reset;
-                Log.w("TAG", "toggleOption:2 "+reset );
-                Rime.setRimeOption(getName(), reset == 1);
+                // 从 Rime 引擎读取当前真实状态，而不是依赖可能过期的本地 reset 字段
+                boolean currentValue = Rime.getRimeOption(getName());
+                Rime.setRimeOption(getName(), !currentValue);
+                // 同步本地 reset 字段，使其与 Rime 引擎状态保持一致
+                reset = Rime.getRimeOption(getName()) ? 1 : 0;
             }
         }
     }

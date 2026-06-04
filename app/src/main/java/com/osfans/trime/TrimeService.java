@@ -1278,7 +1278,8 @@ public class TrimeService extends InputMethodService {
                 // 切换按键音效，需在主线程刷新 UI
                 mHandler.post(mRimeOptionRunnable);
             } else {
-                // 其他未明确处理的选项变更，统一触发刷新逻辑
+                // 对于其他选项，包括 ascii_punct 等开关选项，也需要更新UI
+                // 这些选项会影响工具栏开关的状态显示
                 updateRimeOption();
             }
         }
