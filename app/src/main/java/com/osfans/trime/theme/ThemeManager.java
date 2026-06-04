@@ -404,14 +404,15 @@ public class ThemeManager {
             applyDefault(style, row, "elevation");
             applyDefault(style, row, "corner_radius");
             applyDefault(style, row, "shadow_color");
-            applyDefault(style, row, "long_click_time");
-            applyDefault(style, row, "repeat_click_time");
             applyDefault(style, row, "font");
+            applyDefault(style, row, "long_click_time");
+            applyDefault(style, row, "long_click_style");
+            applyDefault(style, row, "swipe_repeatable");
+            applyDefault(style, row, "repeat_click_time");
             applyDefault(style, row, "sound_enabled");
+            applyDefault(style, row, "sound_effect");
             applyDefault(style, row, "vibration_enabled");
             applyDefault(style, row, "vibration_effect");
-            applyDefault(style, row, "sound_effect");
-            applyDefault(style, row, "long_click_style");
         }
         
         // Level 3: Keyboard-level defaults - 处理键盘级别的全局默认配置，优先级最低
@@ -423,15 +424,16 @@ public class ThemeManager {
         applyDefaultFrom(style, globals, "key_elevation", "elevation");
         applyDefaultFrom(style, globals, "key_corner_radius", "corner_radius");
         applyDefaultFrom(style, globals, "key_shadow_color", "shadow_color");
-        applyDefaultFrom(style, globals, "key_long_click_time", "long_click_time");
-        applyDefaultFrom(style, globals, "key_repeat_click_time", "repeat_click_time");
         applyDefaultFrom(style, globals, "key_font", "font");
+        applyDefaultFrom(style, globals, "key_long_click_time", "long_click_time");
+        applyDefaultFrom(style, globals, "key_long_click_style", "long_click_style");
+        applyDefaultFrom(style, globals, "key_swipe_repeatable", "swipe_repeatable");
+        applyDefaultFrom(style, globals, "key_repeat_click_time", "repeat_click_time");
         applyDefaultFrom(style, globals, "key_sound_enabled", "sound_enabled");
+        applyDefaultFrom(style, globals, "key_sound_effect", "sound_effect");
         applyDefaultFrom(style, globals, "key_vibration_enabled", "vibration_enabled");
         applyDefaultFrom(style, globals, "key_vibration_effect", "vibration_effect");
-        applyDefaultFrom(style, globals, "key_sound_effect", "sound_effect");
-        applyDefaultFrom(style, globals, "key_long_click_style", "style_long_click");
-        
+
         return style;
     }
 
@@ -486,15 +488,16 @@ public class ThemeManager {
         copyFieldIfPresent(resolvedStyle, keySubStyle, "elevation");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "corner_radius");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "shadow_color");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "long_click_time");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "repeat_click_time");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "font");
+        copyFieldIfPresent(resolvedStyle, keySubStyle, "long_click_time");
+        copyFieldIfPresent(resolvedStyle, keySubStyle, "long_click_style");
+        copyFieldIfPresent(resolvedStyle, keySubStyle, "swipe_repeatable");
+        copyFieldIfPresent(resolvedStyle, keySubStyle, "repeat_click_time");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "sound_enabled");
+        copyFieldIfPresent(resolvedStyle, keySubStyle, "sound_effect");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "vibration_enabled");
         copyFieldIfPresent(resolvedStyle, keySubStyle, "vibration_effect");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "sound_effect");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "long_click_style");
-        
+
         // Level 2: Row.sub-level defaults - 行级别的子样式默认配置
         if (row != null) {
             LuaTable rowSubStyle = row.get(subStyleName).opttable(null);
@@ -507,14 +510,15 @@ public class ThemeManager {
                 applyDefault(resolvedStyle, rowSubStyle, "elevation");
                 applyDefault(resolvedStyle, rowSubStyle, "corner_radius");
                 applyDefault(resolvedStyle, rowSubStyle, "shadow_color");
-                applyDefault(resolvedStyle, rowSubStyle, "long_click_time");
-                applyDefault(resolvedStyle, rowSubStyle, "repeat_click_time");
                 applyDefault(resolvedStyle, rowSubStyle, "font");
+                applyDefault(resolvedStyle, rowSubStyle, "long_click_time");
+                applyDefault(resolvedStyle, rowSubStyle, "long_click_style");
+                applyDefault(resolvedStyle, rowSubStyle, "swipe_repeatable");
+                applyDefault(resolvedStyle, rowSubStyle, "repeat_click_time");
                 applyDefault(resolvedStyle, rowSubStyle, "sound_enabled");
+                applyDefault(resolvedStyle, rowSubStyle, "sound_effect");
                 applyDefault(resolvedStyle, rowSubStyle, "vibration_enabled");
                 applyDefault(resolvedStyle, rowSubStyle, "vibration_effect");
-                applyDefault(resolvedStyle, rowSubStyle, "sound_effect");
-                applyDefault(resolvedStyle, rowSubStyle, "long_click_style");
             }
         }
         
@@ -531,14 +535,15 @@ public class ThemeManager {
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "elevation");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "corner_radius");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "shadow_color");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "long_click_time");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "repeat_click_time");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "font");
+                applyDefault(resolvedStyle, keyboardKeySubStyle, "long_click_time");
+                applyDefault(resolvedStyle, keyboardKeySubStyle, "long_click_style");
+                applyDefault(resolvedStyle, keyboardKeySubStyle, "swipe_repeatable");
+                applyDefault(resolvedStyle, keyboardKeySubStyle, "repeat_click_time");
+                applyDefault(resolvedStyle, keyboardKeySubStyle, "sound_effect");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "sound_enabled");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "vibration_enabled");
                 applyDefault(resolvedStyle, keyboardKeySubStyle, "vibration_effect");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "sound_effect");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "long_click_style");
             }
         }
         

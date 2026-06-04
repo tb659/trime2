@@ -1806,7 +1806,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
             // 如果发生了滑动（方向不为 NONE）
             if (direction != SWIPE_NONE) {
-                if (mKey.isSwipeRepeatable()) {
+                if (mKeyStyle.getBoolean("swipe_repeatable", false)) {
                     // 如果是可重复滑动的按键，停止重复任务
                     removeCallbacks(mSwipRepeatableRunnable);
                 } else {
@@ -1923,7 +1923,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
                     showPreview(true, previewText);
 
                     // 如果该方向支持滑动重复触发，则启动重复任务
-                    if (mKey.isSwipeRepeatable()) {
+                    if (mKeyStyle.getBoolean("swipe_repeatable", false)) {
                         postDelayed(mSwipRepeatableRunnable, mKeyStyle.getRepeatClickTime());
                     }
                 } else {
