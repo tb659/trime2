@@ -288,8 +288,11 @@ public class Key {
         }
         // 确定按键样式名称，优先使用 style 字段，否则使用 click 事件
         mStyle = mk.get("style").optjstring(mk.get("click").optjstring("key"));
-        // 解析按键的基本显示属性
-        label = mk.get("label").optjstring("");
+        // // 解析按键的基本显示属性
+        // label = mk.get("label").optjstring("");
+        // 解析按键的基本显示属性（用 nil 区分“未设置”和“显式空串”，以使 label="" 生效）
+        LuaValue labelVal = mk.get("label");
+        label = labelVal.isnil() ? null : labelVal.optjstring("");
         hint = mk.get("hint").optjstring("");
         description = mk.get("description").optjstring("");
         // 解析滑动事件是否可重复触发
@@ -987,7 +990,7 @@ public class Key {
                     }
                 }
             }
-            if (!TextUtils.isEmpty(label))
+            if (label != null)
                 return label;
         }
         return event.getLabel();

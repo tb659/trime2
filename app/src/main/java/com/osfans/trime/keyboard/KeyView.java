@@ -1240,7 +1240,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
         // 1. 设置主标签文本 (Click Label)
         String click = mKey.getLabel();
-        if (!TextUtils.isEmpty(click)) {
+        if (click != null) {
             setClickText(click);
         }
 

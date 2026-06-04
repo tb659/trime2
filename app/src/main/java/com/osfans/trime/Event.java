@@ -296,7 +296,10 @@ public class Event {
             option = m.get("option").optjstring("");
             select = m.get("select").optjstring("");
             toggle = m.get("toggle").optjstring("");
-            label = m.get("label").optjstring("");
+            {
+                LuaValue lv = m.get("label");
+                label = lv.isnil() ? null : lv.optjstring("");
+            }
             preview = m.get("preview").optjstring("");
             description = m.get("description").optjstring("");
             shiftLock = m.get("shift_lock").optjstring("");
@@ -356,7 +359,10 @@ public class Event {
         option = m.get("option").optjstring("");
         select = m.get("select").optjstring("");
         toggle = m.get("toggle").optjstring("");
-        label = m.get("label").optjstring("");
+        {
+            LuaValue lv = m.get("label");
+            label = lv.isnil() ? null : lv.optjstring("");
+        }
         preview = m.get("preview").optjstring("");
         description = m.get("description").optjstring("");
         shiftLock = m.get("shift_lock").optjstring("");
@@ -596,7 +602,7 @@ public class Event {
      * 如果label已经设置则直接返回，否则根据按键码生成显示标签。
      */
     private void parseLabel() {
-        if (!TextUtils.isEmpty(label)) return;
+        if (label != null) return;
         int c = code;
         if (c > 0)
             label = getDisplayLabel(c);
