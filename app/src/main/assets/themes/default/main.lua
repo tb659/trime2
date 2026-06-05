@@ -82,7 +82,7 @@ preset_keys = {
     CommitScriptText = { label = "编码", send = "Shift+Return" },
     CommitComment = { label = "编码", send = "Control+Shift+Return" },
     DeleteCandidate = { label = "删词", send = "Control+Delete" },
-    delimiter = { label = "分词", text = "'", description = "分词" },
+    delimiter = { label = "", text = "'", description = "" }, -- 分词
 
     -- rime状态
     Mode_switch = { toggle = "ascii_mode", send = "Mode_switch", states = { "中文", "英文" } },
@@ -164,4 +164,3 @@ preset_keys = {
 }
 
 -- 支持回调，onConfigurationChanged，onStartInput，onWindowShown，onWindowHidden，onFinishInput，onDestroy,onSpeechResults
-

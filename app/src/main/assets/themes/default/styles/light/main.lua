@@ -10,8 +10,9 @@ function table.merge(t1, t2)
   return result
 end
 
-local DEFALUT_FONT = { "kafei.ttf", "xr.ttf" }
-local HINT_FONT = { "TH-Feon.ttf", "xr.ttf" }
+local defalut_font = { "kafei.ttf", "xr.ttf" }
+local hint_font = { "TH-Feon.ttf", "xr.ttf" }
+local key_color = 0xff525993
 
 name = "可乐"
 author = "tbagr"
@@ -22,7 +23,7 @@ background = 0xffEBEBEB
 keyboard = {
     height = 240,
     background = 0xffEBEBEB,
-    -- font = DEFALUT_FONT,
+    -- font = defalut_font,
 }
 
 -- 默认按键样式
@@ -30,9 +31,9 @@ key = {
     -- 全局默认键高（dp），即 key_height 不存在时的兜底值
     height = 52,
     -- 按键文字颜色
-    text_color = 0xff525993,
+    text_color = key_color,
     -- 按键字体
-    font = DEFALUT_FONT,
+    font = defalut_font,
     -- font={ "a.ttf","b.ttf" }
     -- 按键文字大小
     text_size = 20,
@@ -59,8 +60,8 @@ key = {
     -- 音效开关
     sound_enabled = true,
     -- 音效声音
-    -- sound_effect = "click1.ogg",
-    sound_effect = { "click1.ogg", "click2.ogg", "click3.ogg" },
+    -- sound_effect = { "click.ogg", "click.ogg", "click.ogg" },
+    sound_effect = "click.ogg",
     -- 按键音效律动模式
     --   "random"  从 sound_effect 数组中随机选一个音效,并从默认速率集 {0.8, 1.0, 1.2} 中随机选一个播放速率
     --   "rate"    固定选 sound_effect 数组的第一个音效,并从默认速率集 {0.8, 1.0, 1.2} 中随机选一个播放速率
@@ -75,9 +76,9 @@ key = {
     hint = {
         show = true,
         -- 助记文字颜色
-        text_color = 0xff525993,
+        text_color = key_color,
         -- 助记字体
-        font = HINT_FONT,
+        font = hint_font,
         -- 助记文字大小
         text_size = 10,
         up = {
@@ -115,9 +116,9 @@ key = {
     long_click = {
         show = true,
         -- 长按文字颜色
-        text_color = 0xff525993,
+        text_color = key_color,
         -- 助记字体
-        font = HINT_FONT,
+        font = hint_font,
         -- 长按文字大小
         text_size = 10,
         -- 震动开关
@@ -131,9 +132,9 @@ key = {
     -- 按键按下状态
     pressed = {
         -- 宽度缩放
-        scale_x = 0.9,
+        scale_x = 1,
         -- 高度缩放
-        scale_y = 0.9,
+        scale_y = 1,
         -- 高度改变
         translation_z = 8,
         -- 水平移动
@@ -148,25 +149,27 @@ key = {
         text_color = 0xffffffff,
         -- 助记文字颜色
         hint = {
-            text_color = 0xff525993,
+            text_color = key_color,
         },
         -- 长按文字颜色
         long_click = {
-            text_color = 0xff525993,
+            text_color = key_color,
         }
     },
     -- 按键预览
     preview = {
         -- 宽度缩放
-        scale_x = 0.9,
+        scale_x = 1,
         -- 高度缩放
-        scale_y = 0.9,
+        scale_y = 1,
         -- 文字颜色
-        text_color = 0xff000000,
+        text_color = key_color,
         -- 文字大小
         text_size = 16,
+        -- 按键字体
+        font = defalut_font,
         -- 按键背景颜色或图片
-        background = 0xffffffff,
+        background = 0xffffff00,
         -- 按键阴影高度
         elevation = 16,
         -- 按键圆角半径
@@ -201,88 +204,8 @@ popup = {
         width = 10,
         -- 弹出键盘按键高度
         height = 15,
-        -- 弹出键盘按键禁止预览
-        preview = nil
     })
 }
-
--- shift键
-shift = table.merge(key, {
-    label = "Enter",
-    background = "kafei/xrsh.png",
-    pressed = {
-        background = "kafei/xrsha.png",
-    },
-    hint = { show = false },
-    margins = { left = 0, top = 0, right = 0, bottom = 0 }
-})
-
--- 删除键
-backspace = table.merge(key, {
-    text_color = 0xff,
-    background = "kafei/xrsc.png",
-    pressed = table.merge(key.pressed, {
-        text_color = 0xff,
-        background = "kafei/xrsca.png",
-    }),
-    margins = { left = 0, top = -1, right = 0, bottom = -1 },
-    elevation = 4,
-    repeat_click_time = 50,
-    sound_enabled = true,
-    sound_effect = "del.ogg"
-})
-
--- 符号键
-symbols = table.merge(key, {
-    text_color = 0xff,
-    background = "kafei/xrcd.png",
-    pressed = table.merge(key.pressed, {
-        text_color = 0xff,
-        background = "kafei/xrcda.png",
-    }),
-    margins = { left = 0, top = 0, right = 0, bottom = 0 }
-})
-
--- 空格键
-space = table.merge(key, {
-    text_size = 12,
-    long_click_time = 300,
-    sound_enabled = true,
-    sound_effect = "space.ogg",
-    swipe_repeatable = true,
-    repeat_click_time = 100,
-    hint = { show = false },
-})
-
--- 回车键
-enter = table.merge(key, {
-    label = "123",
-    text_size = 14,
-    background = 0xff3C5AB0,
-    text_color = 0xffFFFFFF,
-    pressed = table.merge(key.pressed, {
-        text_color = 0xffFFFFFF,
-        background = 0xff1565C0,
-    }),
-    preview = {
-        text_size = 24,
-        background = 0xff3C5000,
-    },
-    sound_enabled = true,
-    sound_effect = "enter.ogg",
-})
-
--- 数字键盘回车键
-enter2 = table.merge(enter, {
-    -- 数字键盘回车键圆角半径
-    -- corner_radius = 6
-    -- 数字键盘回车键禁止预览
-    preview = nil,
-    -- 音效开关
-    sound_enabled = true,
-    -- 音效声音
-    sound_effect = "enter.ogg",
-})
 
 -- 符号更多面板
 symbol = {
@@ -341,9 +264,9 @@ candidate = {
     -- 候选文字大小
     text_size = 16,
     -- 候选文字颜色
-    text_color = 0xff525993,
+    text_color = key_color,
     -- 候选文字字体
-    font = "TH-Feon.ttf",
+    font = hint_font,
     -- 阴影高度
     elevation = 2,
     -- 阴影颜色
@@ -493,7 +416,7 @@ toolbar = table.merge(candidate, {
         -- 工具栏文字大小
         text_size = 16,
         -- 工具栏文字颜色
-        text_color = 0xff525993,
+        text_color = key_color,
         -- 工具栏背景颜色或图片
         background = 0xffFFFFFF,
         -- 工具栏内按键边距
@@ -597,3 +520,74 @@ composition = {
 
 -- 总高度
 height = keyboard.height + candidate.height
+
+-- shift键
+shift = {
+    background = "kafei/xrsh.png",
+    hint = { show = false },
+    preview = nil,
+    pressed = {
+        background = "kafei/xrsha.png",
+    },
+    margins = { left = 0, top = 0, right = 0, bottom = 0 },
+}
+
+-- 删除键
+backspace = {
+    text_color = 0xff,
+    background = "kafei/xrsc.png",
+    margins = { left = 0, top = -1, right = 0, bottom = -1 },
+    elevation = 4,
+    repeat_click_time = 50,
+    sound_enabled = true,
+    sound_effect = "del.ogg",
+    pressed = table.merge(key.pressed, {
+        text_color = 0xff,
+        background = "kafei/xrsca.png",
+    }),
+}
+
+-- 符号键
+symbols = {
+    text_color = 0xff,
+    background = "kafei/xrcd.png",
+    margins = { left = 0, top = 0, right = 0, bottom = 0 },
+    pressed = table.merge(key.pressed, {
+        text_color = 0xff,
+        background = "kafei/xrcda.png",
+    }),
+}
+
+-- 空格键
+space = {
+    text_size = 12,
+    long_click_time = 300,
+    sound_enabled = true,
+    sound_effect = "space.ogg",
+    swipe_repeatable = true,
+    repeat_click_time = 100,
+    hint = { show = false },
+}
+
+-- 回车键
+enter = {
+    text_size = 14,
+    background = 0xff3C5AB0,
+    text_color = 0xffFFFFFF,
+    sound_enabled = true,
+    sound_effect = "enter.ogg",
+    pressed = table.merge(key.pressed, {
+        text_color = 0xffFFFFFF,
+        background = 0xff1565C0,
+    }),
+}
+
+-- 数字键盘回车键
+enter2 = {
+    -- 数字键盘回车键圆角半径
+    -- corner_radius = 6
+    -- 音效开关
+    sound_enabled = true,
+    -- 音效声音
+    sound_effect = "enter.ogg",
+}
