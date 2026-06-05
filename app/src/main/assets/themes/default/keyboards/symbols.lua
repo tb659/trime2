@@ -1,7 +1,7 @@
 name = "符号键盘"
 author = "tbagr"
-key_width = 10
-key_height = 50
+width = 10
+height = 50
 rows = {
     -- 第一行
     {

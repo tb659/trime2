@@ -70,7 +70,7 @@ public class SymbolsKeyboardView extends LinearLayout implements ResourceFinder 
         Globals globals = JsePlatform.standardGlobals();
         globals.finder = this;
         globals.loadfile("symbols.lua").call();
-        mKeyMap=globals.get("key_maps").checktable();
+        mKeyMap=globals.get("maps").checktable();
         mSymbolStyle = ThemeManager.getStyle().getStyle("symbol");
         mKeyStyle=mSymbolStyle.getKeyStyle("key",ThemeManager.getStyle().getKeyStyle("key"));
         mTrime=TrimeService.getInstance();
@@ -88,7 +88,7 @@ public class SymbolsKeyboardView extends LinearLayout implements ResourceFinder 
     public SymbolsKeyboardView(@NonNull Context context,Globals globals) {
         super(context);
         long time=System.currentTimeMillis();
-        mKeyMap=globals.get("key_maps").checktable();
+        mKeyMap=globals.get("maps").checktable();
         mSymbolStyle = ThemeManager.getStyle().getStyle("symbol");
         mKeyStyle=mSymbolStyle.getKeyStyle("key",ThemeManager.getStyle().getKeyStyle("key"));
         mTrime=TrimeService.getInstance();

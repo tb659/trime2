@@ -521,23 +521,35 @@ composition = {
 -- 总高度
 height = keyboard.height + candidate.height
 
+-- 按键点按和长按时的助记位置
+hint_offset = table.merge(key, {
+    hint = table.merge(key.hint, {
+        text_size = 12,
+        up = { offset_x = -10 },
+    }),
+    long_click = table.merge(key.long_click, {
+        offset_x = 10,
+    }),
+})
+
 -- shift键
-shift = {
+shift = table.merge(key, {
     background = "kafei/xrsh.png",
     hint = { show = false },
     preview = nil,
-    pressed = {
+    pressed = table.merge(key.pressed, {
         background = "kafei/xrsha.png",
-    },
+    }),
     margins = { left = 0, top = 0, right = 0, bottom = 0 },
-}
+})
 
 -- 删除键
-backspace = {
+backspace = table.merge(key, {
     text_color = 0xff,
     background = "kafei/xrsc.png",
-    margins = { left = 0, top = -1, right = 0, bottom = -1 },
     elevation = 4,
+    margins = { left = 0, top = -1, right = 0, bottom = -1 },
+    hint = { show = false },
     repeat_click_time = 50,
     sound_enabled = true,
     sound_effect = "del.ogg",
@@ -545,32 +557,41 @@ backspace = {
         text_color = 0xff,
         background = "kafei/xrsca.png",
     }),
-}
+})
 
 -- 符号键
-symbols = {
+symbols = table.merge(key, {
     text_color = 0xff,
     background = "kafei/xrcd.png",
     margins = { left = 0, top = 0, right = 0, bottom = 0 },
+    hint = { show = false },
+    long_click = table.merge(key.long_click, {
+        text_color = 0xff,
+    }),
     pressed = table.merge(key.pressed, {
         text_color = 0xff,
         background = "kafei/xrcda.png",
     }),
-}
+})
+
+-- 符号键
+numbers = table.merge(key, {
+    hint = { show = false },
+})
 
 -- 空格键
-space = {
+space = table.merge(key, {
     text_size = 12,
+    hint = { show = false },
     long_click_time = 300,
     sound_enabled = true,
     sound_effect = "space.ogg",
     swipe_repeatable = true,
     repeat_click_time = 100,
-    hint = { show = false },
-}
+})
 
 -- 回车键
-enter = {
+enter = table.merge(key, {
     text_size = 14,
     background = 0xff3C5AB0,
     text_color = 0xffFFFFFF,
@@ -580,14 +601,14 @@ enter = {
         text_color = 0xffFFFFFF,
         background = 0xff1565C0,
     }),
-}
+})
 
 -- 数字键盘回车键
-enter2 = {
+enter2 = table.merge(enter, {
     -- 数字键盘回车键圆角半径
     -- corner_radius = 6
     -- 音效开关
     sound_enabled = true,
     -- 音效声音
     sound_effect = "enter.ogg",
-}
+})

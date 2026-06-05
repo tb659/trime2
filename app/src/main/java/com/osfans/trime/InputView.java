@@ -209,7 +209,7 @@ public class InputView extends FrameLayout implements ResourceFinder {
                 ThemeManager.sendMsg("setKeyboard " + e); // 捕获Lua执行异常并通知主题管理器
             }
             Log.w(TAG, "setKeyboard:Log 4");
-            // 如果键盘指定了 base，先加载 base 键盘的布局，再应用 key_overrides 覆盖
+            // 如果键盘指定了 base，先加载 base 键盘的布局，再应用 overrides 覆盖
             String base = globals.get("base").optjstring("");
             if (!TextUtils.isEmpty(base)) {
                 LuaValue baseFunc = globals.loadfilex(base + ".lua");
@@ -218,7 +218,7 @@ public class InputView extends FrameLayout implements ResourceFinder {
                     baseFunc.call(); // base 键盘的 rows 等配置被设置到同一 globals
                 }
                 // 应用按键覆盖配置
-                LuaValue overrides = globals.get("key_overrides");
+                LuaValue overrides = globals.get("overrides");
                 if (overrides.istable()) {
                     applyKeyOverrides(globals, overrides);
                 }
@@ -230,7 +230,7 @@ public class InputView extends FrameLayout implements ResourceFinder {
                 targetView = new FlexboxKeyboardView(getContext(), globals); // Flexbox布局键盘
             } else if (globals.get("keys").istable()) {
                 targetView = new AbsKeyboardView(getContext(), globals); // 绝对布局键盘
-            } else if (globals.get("key_maps").istable()) {
+            } else if (globals.get("maps").istable()) {
                 // 符号键盘特殊处理，显示在自定义视图区域
                 SymbolsKeyboardView symbolsView = mSymbolsViewCache.get(id);
                 if(symbolsView==null){
@@ -309,12 +309,12 @@ public class InputView extends FrameLayout implements ResourceFinder {
     }
 
     /**
-     * 将 key_overrides 表中的字段覆盖应用到 rows 表的对应按键上。
-     * key_overrides 格式：{ [行号] = { [列号] = { 字段名 = 值, ... }, ... }, 行级字段 = 值, ... }
+     * 将 overrides 表中的字段覆盖应用到 rows 表的对应按键上。
+     * overrides 格式：{ [行号] = { [列号] = { 字段名 = 值, ... }, ... }, 行级字段 = 值, ... }
      * 行内的数字索引为按键覆盖，字符串索引为行级覆盖（直接写入 row 表）。
      *
      * @param globals  Lua 全局环境，包含 rows 表
-     * @param overrides key_overrides 配置表
+     * @param overrides overrides 配置表
      */
     private void applyKeyOverrides(Globals globals, LuaValue overrides) {
         LuaValue rowsValue = globals.get("rows");

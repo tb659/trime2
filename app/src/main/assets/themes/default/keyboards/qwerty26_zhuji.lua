@@ -2,9 +2,9 @@ name = "26键-助记"
 author = "tbagr"
 base = "qwerty26"
 -- 按键覆盖配置：继承 base 键盘（qwerty26）的布局，只在此处覆盖需要修改的按键字段
--- 格式: key_overrides[行号] = { [列号] = { 字段名 = 新值, ... }, ... }
+-- 格式: overrides[行号] = { [列号] = { 字段名 = 新值, ... }, ... }
 -- 行号和列号都从 1 开始
-key_overrides = {
+overrides = {
     [1] = {
         margins = { left = 0, top = 0, right = 0, bottom = 0 },
         padding = { left = 0, top = 0, right = 0, bottom = 0 },

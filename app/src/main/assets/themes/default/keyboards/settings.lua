@@ -1,8 +1,8 @@
 name = "设置键盘"
 author = "tbagr"
-key_width = 20
-key_text_size = 16
--- key_height = 60
+width = 20
+text_size = 16
+-- height = 60
 flex_box = {
     direction="row",
     -- 第一列

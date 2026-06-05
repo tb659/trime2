@@ -416,23 +416,23 @@ public class ThemeManager {
         }
         
         // Level 3: Keyboard-level defaults - 处理键盘级别的全局默认配置，优先级最低
-        applyDefaultFrom(style, globals, "key_text_color", "text_color");
-        applyDefaultFrom(style, globals, "key_text_size", "text_size");
-        applyDefaultFrom(style, globals, "key_background", "background");
-        applyDefaultFrom(style, globals, "key_padding", "padding");
-        applyDefaultFrom(style, globals, "key_margins", "margins");
-        applyDefaultFrom(style, globals, "key_elevation", "elevation");
-        applyDefaultFrom(style, globals, "key_corner_radius", "corner_radius");
-        applyDefaultFrom(style, globals, "key_shadow_color", "shadow_color");
-        applyDefaultFrom(style, globals, "key_font", "font");
-        applyDefaultFrom(style, globals, "key_long_click_time", "long_click_time");
-        applyDefaultFrom(style, globals, "key_long_click_style", "long_click_style");
-        applyDefaultFrom(style, globals, "key_swipe_repeatable", "swipe_repeatable");
-        applyDefaultFrom(style, globals, "key_repeat_click_time", "repeat_click_time");
-        applyDefaultFrom(style, globals, "key_sound_enabled", "sound_enabled");
-        applyDefaultFrom(style, globals, "key_sound_effect", "sound_effect");
-        applyDefaultFrom(style, globals, "key_vibration_enabled", "vibration_enabled");
-        applyDefaultFrom(style, globals, "key_vibration_effect", "vibration_effect");
+        applyDefaultFrom(style, globals, "text_color");
+        applyDefaultFrom(style, globals, "text_size");
+        applyDefaultFrom(style, globals, "background");
+        applyDefaultFrom(style, globals, "padding");
+        applyDefaultFrom(style, globals, "margins");
+        applyDefaultFrom(style, globals, "elevation");
+        applyDefaultFrom(style, globals, "corner_radius");
+        applyDefaultFrom(style, globals, "shadow_color");
+        applyDefaultFrom(style, globals, "font");
+        applyDefaultFrom(style, globals, "long_click_time");
+        applyDefaultFrom(style, globals, "long_click_style");
+        applyDefaultFrom(style, globals, "swipe_repeatable");
+        applyDefaultFrom(style, globals, "repeat_click_time");
+        applyDefaultFrom(style, globals, "sound_enabled");
+        applyDefaultFrom(style, globals, "sound_effect");
+        applyDefaultFrom(style, globals, "vibration_enabled");
+        applyDefaultFrom(style, globals, "vibration_effect");
 
         return style;
     }
@@ -579,12 +579,11 @@ public class ThemeManager {
      *
      * @param target 目标 LuaTable。
      * @param globals Lua 全局环境。
-     * @param sourceKey 全局环境中的源键名。
-     * @param targetKey 目标表中的目标键名。
+     * @param key 键名。
      */
-    private static void applyDefaultFrom(LuaTable target, Globals globals, String sourceKey, String targetKey) {
-        LuaValue v = globals.get(sourceKey); // 从全局环境获取值
-        if (!v.isnil() && target.get(targetKey).isnil()) target.set(targetKey, v); // 如果全局值不为 nil 且目标值为 nil，则设置
+    private static void applyDefaultFrom(LuaTable target, Globals globals, String key) {
+        LuaValue v = globals.get(key); // 从全局环境获取值
+        if (!v.isnil() && target.get(key).isnil()) target.set(key, v); // 如果全局值不为 nil 且目标值为 nil，则设置
     }
 
     /**

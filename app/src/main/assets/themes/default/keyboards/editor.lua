@@ -1,6 +1,6 @@
 name = "编辑键盘"
 author = "tbagr"
-key_text_size = 16
+text_size = 16
 flex_box = {
     direction = "row",
     -- 第一列

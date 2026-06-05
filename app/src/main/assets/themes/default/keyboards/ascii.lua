@@ -2,7 +2,7 @@ name = "36键密码"
 author = "tbagr"
 ascii_mode = true
 lock = true
-key_width = 10
+width = 10
 rows = {
     -- 第一行
     {
