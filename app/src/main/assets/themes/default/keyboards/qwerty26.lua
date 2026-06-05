@@ -29,7 +29,7 @@ rows = {
     {
         width = 10.0857,
         keys = {
-            { width = 4.61435 },
+            { width = 4.61435, background = 0xff },
             { click = "a", long_click = "select_all" },
             { click = "s" },
             { click = "d" },
@@ -39,7 +39,7 @@ rows = {
             { click = "j", swipe_up = "=", long_click = "+", hint_up = { offset_x = -10 }, long_click_style = { offset_x = 10 } },
             { click = "k", swipe_up = "[]{Left}", long_click = "{}{Left}", hint_up = { offset_x = -10 }, long_click_style = { offset_x = 10 } },
             { click = "l", swipe_up = "\\", long_click = "|", hint_up = { offset_x = -10 }, long_click_style = { offset_x = 10 } },
-            { width = 4.61435 },
+            { width = 4.61435, background = 0xff },
         }
     },
     -- 第三行
