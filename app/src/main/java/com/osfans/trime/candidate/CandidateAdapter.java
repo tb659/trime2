@@ -268,9 +268,14 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         mIdx = 0; // 重置选中索引
         oldIdx = 0;
         mData.clear(); // 清空旧数据
-        mData.addAll(next); // 添加新数据
-        if(!next.isEmpty())
-            Rime.highlightRimeCandidate(next.get(0).getIndex()); // 高亮第一个候选词
+        if (next.isEmpty() && Rime.isComposing() && !TextUtils.isEmpty(Rime.getRimeRawInput())) {
+            // 无候选词且正在编码时，显示原始输入码作为候选（点击直接上屏）
+            mData.add(new CandidateItem(Rime.getRimeRawInput()));
+        } else {
+            mData.addAll(next); // 添加新数据
+            if (!next.isEmpty())
+                Rime.highlightRimeCandidate(next.get(0).getIndex()); // 高亮第一个候选词
+        }
         notifyDataSetChanged(); // 通知数据更新
     }
 
