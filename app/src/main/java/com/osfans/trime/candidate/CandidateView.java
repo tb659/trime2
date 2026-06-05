@@ -109,7 +109,9 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
         // 设置 CandidateView 自身的高度,防止输入法界面闪烁
         int height = mCandidateStyle.getHeight(48) - elevation; // 计算实际高度
         LayoutParams lp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        lp.setMargins(0, 0, 0, elevation); // 设置底部边距为阴影高度
+        Style margins = mCandidateStyle.getStyle("margins");
+        lp.setMargins(margins.getSize("left", 0), margins.getSize("top", 0),
+                margins.getSize("right", 0), margins.getSize("bottom", elevation));
         addView(root, lp);
         
         // 创建 RecyclerView
@@ -300,6 +302,15 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
         hideLp.width = btnWidth > 0 ? btnWidth : ViewGroup.LayoutParams.WRAP_CONTENT;
         hideLp.height = height;
         mHide.setLayoutParams(hideLp);
+        // 重新应用候选栏面板外边距
+        LayoutParams rootLp = (LayoutParams) root.getLayoutParams();
+        if (rootLp != null) {
+            Style margins = mCandidateStyle.getStyle("margins");
+            int marginBottom = margins.getSize("bottom", elevation);
+            rootLp.setMargins(margins.getSize("left", 0), margins.getSize("top", 0),
+                    margins.getSize("right", 0), margins.getSize("bottom", marginBottom));
+            root.setLayoutParams(rootLp);
+        }
     }
 
     /**

@@ -273,6 +273,9 @@ candidate = {
     shadow_color = 0xff000000,
     -- 圆角半径
     corner_radius = 6,
+    -- 工具栏容器外边距（与外部的间距）
+    -- bottom 至少等于 elevation 才能避免阴影被裁剪
+    margins = { left = 5, top = 0, right = 5, bottom = 2 },
     -- 候选栏面板按下状态
     pressed = {
         -- 背景色
@@ -280,7 +283,8 @@ candidate = {
         -- 文字颜色
         text_color = 0xff7ECD65,
         -- 圆角半径
-        corner_radius = 0,
+        -- corner_radius = 0,
+        margins = { left = 0, top = 0, right = 0, bottom = 0 },
     },
     -- 候选栏面板助记
     comment = {
@@ -313,6 +317,8 @@ candidate = {
         corner_radius = 6,
         -- 按键阴影颜色
         shadow_color = 0x800000ff,
+        -- 工具栏内按键边距
+        margins = { left = 3, top = 3, right = 3, bottom = 0 },
         -- 候选按键按下状态
         pressed = {
             -- 宽度缩放
@@ -339,6 +345,7 @@ candidate = {
         text_size = 14,
         -- 文字颜色
         text_color = 0xff000000,
+        margins = { left = 3, top = 3, right = 3, bottom = 3 },
         -- 候选栏展开面板笔画筛选栏
         filter_bar = {
             -- 位置 left,top,right,bottom
@@ -364,12 +371,12 @@ candidate = {
             -- 文字大小
             text_size = 12,
             -- 文字颜色
-            text_color = 0xff444444
+            text_color = key_color
         },
         -- 候选栏展开面板按键
         key = {
             -- 按键文字颜色
-            text_color = 0xff000000,
+            text_color = key_color,
             -- 按键文字大小
             text_size = 14,
             -- 按键背景颜色或图片
@@ -383,11 +390,11 @@ candidate = {
             -- 候选栏展开面板按键按下状态
             pressed = {
                 -- 宽度缩放
-                scale_x = 0.9,
+                scale_x = 1,
                 -- 高度缩放
-                scale_y = 0.9,
+                scale_y = 1,
                 -- 高度改变
-                translation_z = -1,
+                translation_z = 0,
                 -- 水平移动
                 translation_x = 0,
                 -- 垂直移动
@@ -406,9 +413,6 @@ toolbar = table.merge(candidate, {
     -- 显示方案定义的开关
     schema_switches = true,
     hide = table.clone(candidate.key),
-    -- 工具栏容器外边距（与外部的间距）
-    -- bottom 至少等于 elevation 才能避免阴影被裁剪
-    margins = { left = 5, top = 0, right = 5, bottom = 5 },
     -- 支持添加preset_keys按键，也可以直接写事件的表，
     -- 可以指定按键的style
     -- keys = { { label = "菜单", send = "Control+grave" }, "Mode_switch", "Keyboard_clipboard", "Keyboard_editor", "Mode_small", "Mode_float" },
@@ -419,8 +423,6 @@ toolbar = table.merge(candidate, {
         text_color = key_color,
         -- 工具栏背景颜色或图片
         background = 0xffFFFFFF,
-        -- 工具栏内按键边距
-        margins = { left = 3, top = 3, right = 3, bottom = 0 }
     })
 })
 

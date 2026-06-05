@@ -25,6 +25,7 @@ import com.osfans.trime.TrimeService;
 import com.osfans.trime.core.CandidateItem;
 import com.osfans.trime.core.Rime;
 import com.osfans.trime.theme.KeyStyle;
+import com.osfans.trime.theme.Style;
 import com.osfans.trime.theme.ThemeManager;
 
 import java.util.ArrayList;
@@ -209,9 +210,46 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         holder.itemView.setContentDescription(data.getText());
         holder.itemView.setSelected(mIdx == position);
         holder.itemView.setBackground(mIdx == position ? mCandidatePressedBackground : null);
-        holder.tvText.setTextColor(mIdx == position ? mCandidatePressedStyle.getTextColor() : mCandidateStyle.getTextColor());
-        holder.tvComment.setTextColor(mIdx == position ? mCommentPressedStyle.getTextColor() : mCommentStyle.getTextColor());
-        //holder.itemView.setElevation(mIdx == position? mCandidatePressedStyle.getElevation():0);
+        boolean pressed = mIdx == position;
+        {
+            KeyStyle tc = pressed ? mCandidatePressedStyle : mCandidateStyle;
+            holder.tvText.setTextColor(tc.getTextColor());
+            holder.tvText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, tc.getTextSize());
+            holder.tvText.setTypeface(tc.getFont());
+            holder.tvText.setGravity(tc.getGravity(Gravity.CENTER));
+        }
+        {
+            KeyStyle cc = pressed ? mCommentPressedStyle : mCommentStyle;
+            holder.tvComment.setTextColor(cc.getTextColor());
+            holder.tvComment.setTextSize(TypedValue.COMPLEX_UNIT_DIP, cc.getTextSize());
+            holder.tvComment.setTypeface(cc.getFont());
+            holder.tvComment.setGravity(cc.getGravity(Gravity.CENTER));
+        }
+        {
+            KeyStyle cs = pressed ? mCandidatePressedStyle : mCandidateStyle;
+            ((LinearLayout) holder.itemView).setGravity(cs.getGravity(Gravity.CENTER));
+            Style padding = cs.getStyle("padding");
+            int paddingLeft = padding.getSize("left", -1);
+            if (paddingLeft >= 0) {
+                int paddingTop = padding.getSize("top", -1);
+                int paddingRight = padding.getSize("right", -1);
+                int paddingBottom = padding.getSize("bottom", -1);
+                holder.itemView.setPadding(
+                    paddingTop >= 0 ? paddingLeft : holder.itemView.getPaddingLeft(),
+                    paddingTop >= 0 ? paddingTop : holder.itemView.getPaddingTop(),
+                    paddingRight >= 0 ? paddingRight : holder.itemView.getPaddingRight(),
+                    paddingBottom >= 0 ? paddingBottom : holder.itemView.getPaddingBottom());
+            }
+            Style margins = cs.getStyle("margins");
+            int ml = margins.getSize("left", -1);
+            if (ml >= 0) {
+                ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) holder.itemView.getLayoutParams();
+                if (mlp != null) {
+                    mlp.setMargins(ml, margins.getSize("top", -1),
+                            margins.getSize("right", -1), margins.getSize("bottom", -1));
+                }
+            }
+        }
         // 2. 强制处理宽度更新
         holder.itemView.post(() -> {
             ViewGroup.LayoutParams lp = holder.itemView.getLayoutParams();
