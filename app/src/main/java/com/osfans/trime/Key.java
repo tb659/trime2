@@ -141,6 +141,8 @@ public class Key {
     private Event ascii;
     // 编码状态下的事件配置
     private Event composing;
+    // 编码状态下的事件原始配置表（用于提取样式字段）
+    private LuaValue mComposingMk;
     // 有候选词菜单时的事件配置
     private Event has_menu;
     // 翻页时的事件配置
@@ -245,8 +247,20 @@ public class Key {
             }
         }
         // 解析编码状态下的事件配置
-        s = mk.get("composing").optjstring("");
-        if (!TextUtils.isEmpty(s)) composing = new Event(s);
+        LuaValue c = mk.get("composing");
+        if (c.istable()) {
+            composing = new Event(c);
+            mComposingMk = c;
+        } else {
+            s = c.optjstring("");
+            if (!TextUtils.isEmpty(s)) {
+                composing = new Event(s);
+                LuaValue preset = presetKeys.get(s);
+                if (preset.istable()) {
+                    mComposingMk = preset;
+                }
+            }
+        }
 
         // 解析有候选词菜单时的事件配置
         s = mk.get("has_menu").optjstring("");
@@ -305,9 +319,6 @@ public class Key {
             send_bindings = false;
         }
 
-        int c = getCode();
-        String l = getLabel();
-
         // 读取是否启用按键朗读功能（无障碍支持）
         speak_key_label = Config.isSpeakKeyLabel();
         // 解析长按弹出窗口配置
@@ -315,7 +326,7 @@ public class Key {
         if (!obj.isnil()) {
             // 弹出配置可以是表（按键列表）或字符串（字符集）
             if (obj.istable()) {
-                popupKeys = (List) obj.checktable().stringValues();
+                popupKeys = obj.checktable().stringValues();
                 // 如果启用了长按弹出功能，且按键是单字母，则自动添加大小写变体
                 if (TrimeService.getInstance().isLongPressPopup()) {
                     String ll = getLabel();
@@ -399,6 +410,15 @@ public class Key {
      */
     public boolean isComposingKey() {
         return mComposingKey;
+    }
+
+    /**
+     * 获取编码状态下的原始配置表，用于提取样式字段（如 text_size）。
+     *
+     * @return 编码状态的 Lua 配置表，若无则返回 null。
+     */
+    public LuaValue getComposingMk() {
+        return mComposingMk;
     }
 
     /**

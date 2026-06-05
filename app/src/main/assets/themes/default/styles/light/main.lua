@@ -581,7 +581,7 @@ numbers = table.merge(key, {
 
 -- 空格键
 space = table.merge(key, {
-    text_size = 12,
+    text_size = 14,
     hint = { show = false },
     long_click_time = 300,
     sound_enabled = true,

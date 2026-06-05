@@ -1243,6 +1243,8 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         if (click != null) {
             setClickText(click);
         }
+        // 根据编码状态重新应用按键样式
+        reapplyKeyStyle();
 
         // 2. 设置长按标签文本 (Long Click Label)
         String longClick = mKey.getLongClickLabel();
@@ -1371,6 +1373,60 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
                 // 如果视图不存在，创建新的右滑提示视图并添加到布局中
                 mHints[SWIPE_RIGHT] = addHint(ev, Gravity.RIGHT, ht);
             }
+        }
+    }
+
+    /**
+     * 获取当前生效的 KeyStyle。
+     * 如果按键有编码配置表且 Rime 处于编码状态，
+     * 则返回以编码表中字段覆盖按键样式的合并样式；否则返回按键默认样式。
+     */
+    private KeyStyle getActiveStyle() {
+        LuaValue mk = mKey != null ? mKey.getComposingMk() : null;
+        if (mk != null && !mk.isnil() && Rime.isComposing()) {
+            return new KeyStyle(mk, mKeyStyle);
+        }
+        return mKeyStyle;
+    }
+
+    /**
+     * 根据编码状态重新应用按键样式（文字大小/颜色/字体、偏移、海拔、内边距、外边距）。
+     * 使用 getActiveStyle() 获取的样式，支持编码表任意字段覆盖。
+     */
+    private void reapplyKeyStyle() {
+        KeyStyle style = getActiveStyle();
+        // 1. 文字样式
+        mClick.setTextSize(TypedValue.COMPLEX_UNIT_DIP, style.getTextSize());
+        mClick.setTextColor(style.getTextColor());
+        mClick.setTypeface(style.getFont());
+        // 2. 偏移量
+        mClick.setTranslationX(style.getSize("offset_x", 0));
+        mClick.setTranslationY(style.getSize("offset_y", 0));
+        // 3. 海拔
+        keyRoot.setElevation(style.getElevation());
+        // 4. 阴影颜色 (Android P+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            int dShadowColor = style.getShadowColor();
+            if (dShadowColor != 0) {
+                keyRoot.setOutlineAmbientShadowColor(dShadowColor);
+                keyRoot.setOutlineSpotShadowColor(dShadowColor);
+            }
+        }
+        // 5. 内边距
+        Style padding = style.getStyle("padding");
+        mClick.setPadding(padding.getSize("left", 0), padding.getSize("top", 0),
+                padding.getSize("right", 0), padding.getSize("bottom", 0));
+        keyRoot.setPadding(padding.getSize("left", 0), padding.getSize("top", 0),
+                padding.getSize("right", 0), padding.getSize("bottom", 0));
+        // 6. 外边距
+        Style margins = style.getStyle("margins");
+        LayoutParams params = (LayoutParams) keyRoot.getLayoutParams();
+        if (params != null) {
+            params.setMargins(margins.getSize("left", style.getElevation() / 3),
+                    margins.getSize("top", style.getElevation() / 3),
+                    margins.getSize("right", style.getElevation() / 3),
+                    margins.getSize("bottom", style.getElevation() / 3));
+            keyRoot.setLayoutParams(params);
         }
     }
 

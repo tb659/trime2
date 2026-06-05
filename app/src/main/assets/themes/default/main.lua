@@ -157,10 +157,10 @@ preset_keys = {
     AddPhrase = { label = "添加", command = "add_phrase", option = "%1$s" }, -- 将输入的内容添加到短语
 
     -- 候选
-    Select_two = { label = "次选", send = 2 },
-    Select_three = { label = "三选", send = 3 },
-    Select_four = { label = "四选", send = 4 },
-    Select_five = { label = "五选", send = 5 },
+    Select_two = { label = "次选", send = 2, text_size = 14 },
+    Select_three = { label = "三选", send = 3, text_size = 14 },
+    Select_four = { label = "四选", send = 4, text_size = 14 },
+    Select_five = { label = "五选", send = 5, text_size = 14 },
 }
 
 -- 支持回调，onConfigurationChanged，onStartInput，onWindowShown，onWindowHidden，onFinishInput，onDestroy,onSpeechResults
