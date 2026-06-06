@@ -7,7 +7,7 @@ rows = {
     -- 第一行
     {
         width = 9.8,
-        height = 50,
+        height = 45,
         keys = {
             { width = 1 },
             { click = "1" },
@@ -63,7 +63,7 @@ rows = {
         width = 10.0857,
         keys = {
             { width = 1 },
-            { click = "Shift_L", width = 13.7, style = "shift" },
+            { click = "Shift_L", width = 13.7, style = "key_shift" },
             { click = "z" },
             { click = "x" },
             { click = "c" },
@@ -71,7 +71,7 @@ rows = {
             { click = "b" },
             { click = "n" },
             { click = "m" },
-            { click = "BackSpace", width = 13.7, style = "backspace" },
+            { click = "BackSpace", width = 13.7, style = "key_backspace" },
             { width = 1 },
         }
     },
@@ -81,13 +81,13 @@ rows = {
         width = 10.0857,
         keys = {
             { width = 1 },
-            { click="Keyboard_symbols", width = 13.7, style = "symbols" },
-            { click="Keyboard_number" },
+            { click="Keyboard_symbols", width = 13.7, long_click = "Mode_switch", swipe_up = "Keyboard_menu", swipe_right = "Schema_settings", style = "key_symbols" },
+            { click="Keyboard_number", swipe_up = "Keyboard_default_zhuji", swipe_left = "Theme_settings", swipe_right = "Color_switch", composing = "Select_five", style = "key_numbers" },
             { click = "," },
-            { click = "space", width = 30.2751, swipe_repeatable=true, swipe_left="Left",swipe_right="Right",swipe_up="Up",swipe_down="Down", style = "space"},
+            { click = "space", width = 30.2751, swipe_repeatable=true, swipe_left="Left",swipe_right="Right",swipe_up="Up",swipe_down="Down", style = "key_space"},
             { click = "." },
             { click="@" },
-            { click = "Return", width = 13.7, label = "Enter", style = "enter" },
+            { click = "Return", width = 13.7, label = "Enter", style = "key_enter" },
             { width = 1 },
         }
     },

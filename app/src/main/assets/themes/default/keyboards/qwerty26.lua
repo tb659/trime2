@@ -1,7 +1,8 @@
 name = "26键"
 author = "tbagr"
 lock = true
--- key_background = "0xfffff000"
+
+-- background = 0xfffff000
 -- rows行键盘，宽度和高度为键盘总宽度的百分比
 rows = {
     -- 第一行
@@ -21,7 +22,7 @@ rows = {
             { click = "u", swipe_up = "7", long_click = "&", style = "hint_offset" },
             { click = "i", swipe_up = "8", long_click = "*", style = "hint_offset" },
             { click = "o", swipe_up = "9", long_click = "(){Left}", style = "hint_offset" },
-            { click = "p", swipe_up = "0", long_click = "~", style = "hint_offset" },
+            { click = "p", swipe_up = "0", long_click = "Hide", style = "hint_offset" },
             { width = 1 },
         }
     },
@@ -47,15 +48,15 @@ rows = {
         width = 10.0857,
         keys = {
             { width = 1 },
-            { click = "Shift_L", width = 13.7, swipe_up = "Candidate_switch", composing = "delimiter", style = "shift" },
-            { click = "z", swipe_up = "`", style = "hint_offset" },
+            { click = "Shift_L", width = 13.7, swipe_up = "Candidate_switch", composing = "delimiter", style = "key_shift" },
+            { click = "z", swipe_up = "`", long_click = "~", style = "hint_offset" },
             { click = "x", long_click = "cut" },
             { click = "c", long_click = "copy" },
             { click = "v", long_click = "paste" },
             { click = "b", swipe_up = "Keyboard_editor", hint_up = "", long_click = "Keyboard_clipboard", swipe_down = "Keyboard_phrase" },
             { click = "n", swipe_up = ";", long_click = ":", style = "hint_offset" },
             { click = "m", swipe_up = "'", long_click = "\"", style = "hint_offset" },
-            { click = "BackSpace", width = 13.7, swipe_up = "Clear", swipe_left = "ClearH", style = "backspace" },
+            { click = "BackSpace", width = 13.7, swipe_up = "Clear", swipe_left = "ClearH", style = "key_backspace" },
             { width = 1 },
         }
     },
@@ -64,13 +65,13 @@ rows = {
         width = 10.0857,
         keys = {
             { width = 1 },
-            { click = "Keyboard_symbols", width = 13.7, long_click = "Mode_switch", swipe_up = "Keyboard_settings", swipe_right = "Schema_settings", style = "symbols" },
-            { click = "Keyboard_number", swipe_up = "Keyboard_default_zhuji", swipe_left = "Theme_settings", swipe_right = "Color_switch", composing = "Select_five", style = "numbers" },
+            { click = "Keyboard_symbols", width = 13.7, long_click = "Mode_switch", swipe_up = "Keyboard_menu", swipe_right = "Schema_settings", style = "key_symbols" },
+            { click = "Keyboard_number", swipe_up = "Keyboard_default_zhuji", swipe_left = "Theme_settings", swipe_right = "Color_switch", composing = "Select_five", style = "key_numbers" },
             { click = "，", ascii = ",", long_click = "<", composing = "Select_four" },
-            { click = "space", width = 30.2751, long_click="VOICE_ASSIST", swipe_left = "Left", swipe_right = "Right", swipe_up = "Up", swipe_down = "Down", style = "space" },
+            { click = "space", width = 30.2751, long_click="VOICE_ASSIST", swipe_left = "Left", swipe_right = "Right", swipe_up = "Up", swipe_down = "Down", style = "key_space" },
             { click = "。", ascii = ".", long_click = ">", composing = "Select_two" },
             { click = "/", long_click = "?" , composing = "Select_three" },
-            { click = "Return", width = 13.7, label = "Enter", style = "enter" },
+            { click = "Return", width = 13.7, label = "Enter", style = "key_enter" },
             { width = 1 },
         }
     },

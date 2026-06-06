@@ -42,7 +42,7 @@ preset_keys = {
     VOLUME_MUTE = { label = "静音", send = "VOLUME_MUTE" },
 
     -- 编辑
-    Hide = { label = "隐藏", send = "BACK" },
+    Hide = { label = "↓", send = "BACK" }, -- 隐藏
     Escape = { label = "Esc", send = "Escape" },
     Insert = { label = "插入", send = "Insert" },
     Home = { label = "行首", send = "Home" },
@@ -54,12 +54,12 @@ preset_keys = {
     Page_Up = { label = "上页", send = "Page_Up" },
     Page_Down = { label = "下页", send = "Page_Down" },
     select_all = { label = "全选", send = "Control+a" },
-    Shift_L = { label = "", send = "Shift_L", shift_lock = "double" }, -- shift_lock click,double,long
+    Shift_L = { label = "Shift", send = "Shift_L", shift_lock = "double" }, -- shift_lock click,double,long
     Return = { label = "action_labels", send = "Return" },
     Return1 = { label = "Enter", send = "Return" },
     Return2 = { label = "回车", send = "Return" },
     space = { repeatable = false, send = "space" },
-    space1 = { label = "␣", repeatable = false, send = "space" },
+    space1 = { label = "空格", repeatable = true, send = "space" },
     BackSpace = { label = "⌫", description = "退格", repeatable = true, send = "BackSpace" },
     Clear = { label = "清除", text = "{Control+a}{BackSpace}" }, -- 全选并删除
     ClearH = { label = "Del↔", send = "{End}{Shift+Home}{Delete}" },
@@ -82,17 +82,17 @@ preset_keys = {
     CommitScriptText = { label = "编码", send = "Shift+Return" },
     CommitComment = { label = "编码", send = "Control+Shift+Return" },
     DeleteCandidate = { label = "删词", send = "Control+Delete" },
-    delimiter = { label = "", text = "'", description = "" }, -- 分词
+    delimiter = { label = "分词", text = "'", description = "" }, -- 分词
 
     -- rime状态
-    Mode_switch = { toggle = "ascii_mode", send = "Mode_switch", states = { "中文", "英文" } },
+    Mode_switch = { toggle = "ascii_mode", send = "Mode_switch", states = { "中文", "英文" }, preview = false },
     Zenkaku_Hankaku = { toggle = "full_shape", send = "Mode_switch", states = { "半角", "全角" } },
     Henkan = { toggle = "simplification", send = "Mode_switch", states = { "繁体", "简体" } },
     Charset_switch = { toggle = "extended_charset", send = "Mode_switch", states = { "常用", "全部" } },
     Punct_switch = { toggle = "ascii_punct", send = "Mode_switch", states = { "。，", "．，" } },
 
     -- 切换键盘
-    Keyboard_symbols = { label = "符号", send = "Eisu_toggle", select = "symbols" },
+    Keyboard_symbols = { label = "❖", send = "Eisu_toggle", select = "symbols" },
     Keyboard_symbols_ext = { label = "更多", send = "Eisu_toggle", select = "symbols_ext" },
     Keyboard_number = { label = "123", send = "Eisu_toggle", select = "number" },
     Keyboard_letter = { label = "字母", send = "Eisu_toggle", select = "default" },
@@ -102,7 +102,7 @@ preset_keys = {
     Keyboard_clipboard = { label = "剪贴板", send = "Eisu_toggle", select = "clipboard" },
     Keyboard_phrase = { label = "短语", send = "Eisu_toggle", select = "phrase" },
     Keyboard_editor = { label = "编辑", send = "Eisu_toggle", select = "editor" },
-    Keyboard_settings = { label = "菜单", send = "Eisu_toggle", select = "settings" },
+    Keyboard_menu = { label = "菜单", send = "Eisu_toggle", select = "menu" },
     Keyboard_default_zhuji = { label = "助记", send = "Eisu_toggle", select = "qwerty26_zhuji" },
 
     -- trime设定
