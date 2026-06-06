@@ -54,7 +54,7 @@ public class AbsKeyboardView extends KeyboardView{
         String style = globals.get("style").optjstring("keyboard");
         long time=System.currentTimeMillis();
         setBackground(ThemeManager.getStyle().getStyle(style).getBackground(0xffdddddd));
-        mRowHeightDp = globals.get("key_height").optdouble(50);
+        mRowHeightDp = globals.get("height").optdouble(50);
         mKeyWidth = globals.get("key_width").optdouble(20);
         loadRows();
         Log.w("RowKeyboardView", "init time: "+(System.currentTimeMillis()-time) );

@@ -339,14 +339,14 @@ public class ThemeManager {
     }
 
     /**
-     * 获取键盘 Lua 中 key_height 的 dp 值。
-     * 优先级: Lua key_height → 主题 key.height。
+     * 获取键盘 Lua 中 height 的 dp 值。
+     * 优先级: Lua height → 主题 key.height。
      * 返回 0 表示无 dp 配置,应使用百分比模式(旧行为)。
      */
     public static double keyRowHeight(Globals globals) {
-        // 优先级1: Lua 中的 key_height (dp)
-        double h = globals.get("key_height").optdouble(0);
-        Log.d(TAG, "key_height:" + h);
+        // 优先级1: Lua 中的 height (dp)
+        double h = globals.get("height").optdouble(0);
+        Log.d(TAG, "height:" + h);
         if (h > 0) return h;
         
         // 优先级2: 主题 key.height (dp)

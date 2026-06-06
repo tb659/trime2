@@ -72,8 +72,8 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
     /**
      * 加载键盘行配置。
      * 支持 dp 和百分比双模式:
-     * - dp 模式(key_height 存在时): 行高取 row.height → key_height → 50dp,按键 height 为 dp 单独覆盖
-     * - 百分比模式(key_height 不存在时): 回落旧行为,使用主题 keyboard.height 等分
+     * - dp 模式(height 存在时): 行高取 row.height → height → 50dp,按键 height 为 dp 单独覆盖
+     * - 百分比模式(height 不存在时): 回落旧行为,使用主题 keyboard.height 等分
      */
     private void loadRows() {
         TrimeService mTrime= TrimeService.getInstance();
@@ -86,7 +86,7 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
         mIsDpMode = ThemeManager.keyRowHeight(globals) > 0;
 
         if (mIsDpMode) {
-            // === dp 模式: 行高 = row.height → key_height → 主题 key.height ===
+            // === dp 模式: 行高 = row.height → height → 主题 key.height ===
             double keyHeightDp = ThemeManager.keyRowHeight(globals);
             Log.d(TAG, "keyHeightDp:" + keyHeightDp);
             double[] rowDp = new double[len];
@@ -95,6 +95,7 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
                 LuaTable row = mRows.get(i + 1).checktable();
                 Log.d(TAG, "row.get(height)" + row.get("height").optdouble(0));
                 double h = row.get("height").optdouble(0);
+                if (h <= 0) h = globals.get("height").optdouble(0);
                 if (h <= 0) h = keyHeightDp;
                 rowDp[i] = h;
                 totalDp += h;
