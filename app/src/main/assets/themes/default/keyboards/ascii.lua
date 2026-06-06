@@ -6,8 +6,10 @@ width = 10
 rows = {
     -- 第一行
     {
+        width = 9.8,
         height = 50,
         keys = {
+            { width = 1 },
             { click = "1" },
             { click = "2" },
             { click = "3" },
@@ -18,11 +20,14 @@ rows = {
             { click = "8" },
             { click = "9" },
             { click = "0" },
+            { width = 1 },
         }
     },
     -- 第二行
     {
+        width = 9.8,
         keys = {
+            { width = 1 },
             { click = "q" },
             { click = "w" },
             { click = "e" },
@@ -33,12 +38,14 @@ rows = {
             { click = "i" },
             { click = "o" },
             { click = "p" },
+            { width = 1 },
         }
     },
     -- 第三行
     {
+        width = 10.0857,
         keys = {
-            { width = 5 },
+            { width = 4.61435, background = 0xff },
             { click = "a" },
             { click = "s" },
             { click = "d" },
@@ -48,12 +55,15 @@ rows = {
             { click = "j" },
             { click = "k" },
             { click = "l" },
+            { width = 4.61435, background = 0xff },
         }
     },
     -- 第四行
     {
+        width = 10.0857,
         keys = {
-            { click = "Shift_L", width = 15 },
+            { width = 1 },
+            { click = "Shift_L", width = 13.7, style = "shift" },
             { click = "z" },
             { click = "x" },
             { click = "c" },
@@ -61,20 +71,24 @@ rows = {
             { click = "b" },
             { click = "n" },
             { click = "m" },
-            { click = "BackSpace", label = "⌫", width = 15 },
+            { click = "BackSpace", width = 13.7, style = "backspace" },
+            { width = 1 },
         }
     },
     -- 第五行
     {
         -- height = 50,
+        width = 10.0857,
         keys = {
-            { click="Keyboard_symbols", width = 15 },
+            { width = 1 },
+            { click="Keyboard_symbols", width = 13.7, style = "symbols" },
             { click="Keyboard_number" },
             { click = "," },
-            { click = "space", width = 30, swipe_repeatable=true, swipe_left="Left",swipe_right="Right",swipe_up="Up",swipe_down="Down"},
+            { click = "space", width = 30.2751, swipe_repeatable=true, swipe_left="Left",swipe_right="Right",swipe_up="Up",swipe_down="Down", style = "space"},
             { click = "." },
             { click="@" },
-            { click = "Return", style = "enter", label = "Enter", width = 15 }
+            { click = "Return", width = 13.7, label = "Enter", style = "enter" },
+            { width = 1 },
         }
     },
 }
