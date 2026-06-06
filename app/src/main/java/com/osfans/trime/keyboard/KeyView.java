@@ -293,7 +293,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             mLongClicked = false;
             return;
         }
-        
+
         // 如果当前按键配置对象不为空
         if (mKey != null) {
             // 判断当前按键是否为 Shift 键
@@ -552,6 +552,37 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         if (keyPreview == null)
             return;
 
+        // 防御性检查（同 initView 逻辑）：使用 rawget 绕过 __index 链
+        // 检查 mKey 表上的 "preview" 字段
+        if (mKey != null) {
+            LuaValue mk = mKey.getMk();
+            if (mk != null && mk.istable()) {
+                LuaValue pv = mk.checktable().get("preview");
+                if (pv.isboolean() && !pv.toboolean()) {
+                    if (isPressed) keyPreview.setVisibility(GONE);
+                    return;
+                }
+                // 检查命名样式：mColor[styleName] 的 rawget("preview")
+                LuaValue styleName = mk.checktable().get("style");
+                if (styleName.isstring()) {
+                    LuaValue namedStyle = ThemeManager.getStyle().get(styleName.tojstring());
+                    if (namedStyle.istable()) {
+                        LuaValue nsPv = namedStyle.checktable().rawget(LuaValue.valueOf("preview"));
+                        if (nsPv.isboolean() && !nsPv.toboolean()) {
+                            if (isPressed) keyPreview.setVisibility(GONE);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        // 检查 mKeyStyle 样式链
+        LuaValue stylePv = mKeyStyle.get("preview");
+        if (stylePv.isboolean() && !stylePv.toboolean()) {
+            if (isPressed) keyPreview.setVisibility(GONE);
+            return;
+        }
+
         // 处理非按下状态：取消动画并隐藏预览
         if (!isPressed) {
             keyPreview.animate().cancel();
@@ -562,6 +593,10 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         // 设置预览文本，如果文本为空则隐藏预览
         if (text != null) {
             keyPreview.setText(text);
+            keyPreview.setMinimumWidth(getWidth());
+            int widthSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+            int heightSpec = MeasureSpec.makeMeasureSpec(getMeasuredHeight(), MeasureSpec.EXACTLY);
+            keyPreview.measure(widthSpec, heightSpec);
         } else {
             keyPreview.setVisibility(GONE);
             return;
@@ -593,25 +628,64 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             };
         }*/
 
+        // 获取预览样式配置
+        KeyStyle previewStyle = mKeyStyle.getKeyStyle("preview", mKeyStyle);
+        // 预览偏移
+        float offsetX = previewStyle.getSize("offset_x", 0);
+        float offsetY = previewStyle.getSize("offset_y", 0);
+
+        // 边界检查，确保预览不超出屏幕
+        // 获取按键在屏幕上的绝对坐标
+        int[] location = new int[2];
+        getLocationOnScreen(location);
+        int keyLeft = location[0];
+        int keyTop = location[1];
+        int keyWidth = getWidth();
+        int keyHeight = getHeight();
+        // 预览实际内容宽度（经过 UNSPECIFIED 测量，不受按键宽度限制）
+        int previewWidth = keyPreview.getMeasuredWidth();
+        // 预览上浮的基础高度（按键高度 × 缩放 × 1.01）
+        float baseTransY = -keyHeight * previewStyle.getScaleY() * 1.01f;
+        // 获取 preview 在 KeyView 中的布局参数（含 margins）
+        LayoutParams lp = (LayoutParams) keyPreview.getLayoutParams();
+        // 计算 preview 在 KeyView 中的水平位置（CENTER_HORIZONTAL 对齐）
+        int previewLayoutLeft = lp.leftMargin + (keyWidth - previewWidth - lp.leftMargin - lp.rightMargin) / 2;
+        // 计算 preview 在 KeyView 中的垂直位置（默认 TOP 对齐）
+        int previewLayoutTop = lp.topMargin;
+        TrimeService trime = TrimeService.getInstance();
+        int screenWidth = trime.getWidth();
+        // 从预览样式中读取到屏幕边缘的最小距离
+        int marginLeft = previewStyle.getSize("boundary_margin_left", 0);
+        int marginRight = previewStyle.getSize("boundary_margin_right", 0);
+        int marginTop = previewStyle.getSize("boundary_margin_top", 0);
+        // 预测预览最终的屏幕坐标
+        int predictedLeft = keyLeft + previewLayoutLeft + (int) offsetX;
+        int predictedRight = predictedLeft + previewWidth;
+        int predictedTop = keyTop + previewLayoutTop + (int) (baseTransY + offsetY);
+        // 超出左边界 → 右移
+        if (predictedLeft < marginLeft) offsetX += marginLeft - predictedLeft;
+        // 超出右边界 → 左移
+        else if (predictedRight > screenWidth - marginRight) offsetX += screenWidth - marginRight - predictedRight;
+        // 超出上边界 → 下移
+        if (predictedTop < marginTop) offsetY += marginTop - predictedTop;
+
         // 初始化预览视图的起始状态（缩小、透明、低位）
         if (isPressed) {
             keyPreview.setAlpha(0);
             keyPreview.setScaleX(0.5f);
             keyPreview.setScaleY(0.5f);
-            keyPreview.setTranslationY(0);
+            keyPreview.setTranslationY(offsetY);
             keyPreview.setTranslationZ(1);
             keyPreview.setVisibility(VISIBLE);
         }
 
-        // 获取预览样式配置
-        KeyStyle previewStyle = mKeyStyle.getKeyStyle("preview", mKeyStyle);
         // 执行显示动画：放大、上浮、不透明
         keyPreview.animate()
                 .scaleX(previewStyle.getScaleX())
                 .scaleY(previewStyle.getScaleY())
                 .translationZ(1)
-                .translationY(-getHeight() * previewStyle.getScaleY() * 1.01f)
-                .translationX(0)
+                .translationY(-getHeight() * previewStyle.getScaleY() * 1.01f + offsetY)
+                .translationX(offsetX)
                 .setDuration(100)
                 .alpha(1.f)
                 .setInterpolator(FAST_OUT_SLOW_IN)
@@ -718,6 +792,24 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     private final Rect mHitRect = new Rect();
 
     /**
+     * 当测量大小时调用。
+     * 测量预览视图的宽度。
+     *
+     * @param widthMeasureSpec  宽度测量规格。
+     * @param heightMeasureSpec 高度测量规格。
+     */
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        if (keyPreview != null) {
+            keyPreview.setMinimumWidth(getMeasuredWidth());
+            int widthSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+            int heightSpec = MeasureSpec.makeMeasureSpec(getMeasuredHeight(), MeasureSpec.EXACTLY);
+            keyPreview.measure(widthSpec, heightSpec);
+        }
+    }
+
+    /**
      * 当布局发生变化时调用。
      * 标记命中矩形失效,延迟到需要时再重新计算。
      *
@@ -730,7 +822,7 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
-        // 布局变动时，仅标记失效，不立即计算（因为父容器可能还在变）
+        // 布局变动时，仅标记失效，不立即计算（因为父容器可能还在定）
         if (changed)
             mRectInvalidated = true;
     }
@@ -1188,7 +1280,66 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
         addView(keyRoot, params);
 
         // 如果配置了预览窗口 (preview)，则初始化 keyPreview
-        if (mKeyStyle.hasKey("preview")) {
+        boolean previewDisabled = false;
+        // 检查顺序（优先级从高到低）：
+        // 1. 按键表上 mKey.getMk() 的 "preview" 字段
+        // 2. 按键表上内联 style 表的 "preview" 字段
+        // 3. 命名样式（mColor 中 styleName 对应表的 "preview" 字段，使用 rawget 绕过 __index）
+        // 4. 样式链（mKeyStyle）中 "preview" 字段
+        Log.d(TAG, "initView: style=" + (mKey != null ? mKey.getStyle() : "null") + " label=" + (mKey != null ? mKey.getLabel() : "null"));
+        if (mKey != null) {
+            LuaValue mk = mKey.getMk();
+            if (mk != null && mk.istable()) {
+                LuaTable keyTable = mk.checktable();
+                LuaValue pv = keyTable.get("preview");
+                Log.d(TAG, "initView: pv=" + pv + " isboolean=" + pv.isboolean());
+                if (pv.isboolean()) {
+                    previewDisabled = !pv.toboolean();
+                }
+                if (!previewDisabled) {
+                    LuaValue styleVal = keyTable.get("style");
+                    Log.d(TAG, "initView: styleVal=" + styleVal + " istable=" + styleVal.istable());
+                    if (styleVal.istable()) {
+                        LuaValue spv = styleVal.checktable().get("preview");
+                        if (spv.isboolean()) {
+                            previewDisabled = !spv.toboolean();
+                        }
+                    }
+                }
+            }
+        }
+        // 3. 命名样式 rawget 检查：直接读取 mColor[styleName]，不使用 __index 链
+        if (!previewDisabled && mKey != null) {
+            LuaValue mk = mKey.getMk();
+            if (mk != null && mk.istable()) {
+                LuaValue styleName = mk.checktable().get("style");
+                Log.d(TAG, "initView: styleName=" + styleName);
+                if (styleName.isstring()) {
+                    LuaValue namedStyle = ThemeManager.getStyle().get(styleName.tojstring());
+                    Log.d(TAG, "initView: namedStyle=" + namedStyle + " istable=" + namedStyle.istable());
+                    if (namedStyle.istable()) {
+                        LuaValue nsPv = namedStyle.checktable().rawget(LuaValue.valueOf("preview"));
+                        Log.d(TAG, "initView: rawget preview from namedStyle=" + nsPv + " isboolean=" + nsPv.isboolean());
+                        if (nsPv.isboolean()) {
+                            previewDisabled = !nsPv.toboolean();
+                        }
+                    }
+                }
+            }
+        }
+        // 4. mKeyStyle 样式链检查
+        if (!previewDisabled) {
+            LuaValue stylePv = mKeyStyle.get("preview");
+            Log.d(TAG, "initView: mKeyStyle.get(preview)=" + stylePv + " isboolean=" + stylePv.isboolean());
+            if (stylePv.isboolean()) {
+                previewDisabled = !stylePv.toboolean();
+            }
+        }
+        Log.d(TAG, "initView: previewDisabled=" + previewDisabled);
+        // 只有当 preview 未禁用且样式链中存在有效的 preview 表时才创建预览
+        if (!previewDisabled) {
+            LuaValue previewTable = mKeyStyle.get("preview");
+            if (previewTable.istable()) {
             // 获取预览窗口的样式配置，若未定义则回退到当前按键样式
             KeyStyle previewStyle = mKeyStyle.getKeyStyle("preview", mKeyStyle);
             // 创建预览窗口的 TextView 实例
@@ -1207,10 +1358,14 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             keyPreview.setVisibility(GONE);
             // 设置文本在预览窗口中的对齐方式为居中
             keyPreview.setGravity(Gravity.CENTER);
+            // label 不换行
+            keyPreview.setSingleLine(true);
             // 设置预览窗口的海拔高度，影响阴影大小
             keyPreview.setElevation(previewStyle.getElevation());
             // 设置文本大小，单位为 DIP (密度独立像素)
             keyPreview.setTextSize(TypedValue.COMPLEX_UNIT_DIP, previewStyle.getTextSize());
+            // 设置文本字体
+            keyPreview.setTypeface(previewStyle.getFont());
             // 设置文本颜色
             keyPreview.setTextColor(previewStyle.getTextColor());
 
@@ -1222,8 +1377,31 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
                     keyPreview.setOutlineSpotShadowColor(dShadowColor);
                 }
             }
-            // 将预览窗口添加到 KeyView 中
-            addView(keyPreview, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+            // 设置预览窗口的内边距
+            Style previewPadding = previewStyle.getStyle("padding");
+            keyPreview.setPadding(
+                previewPadding.getSize("left", 0),
+                previewPadding.getSize("top", 0),
+                previewPadding.getSize("right", 0),
+                previewPadding.getSize("bottom", 0)
+            );
+
+            // 设置预览窗口的外边距
+            Style previewMargins = previewStyle.getStyle("margins");
+            LayoutParams previewLp = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER_HORIZONTAL);
+            previewLp.setMargins(
+                previewMargins.getSize("left", 0),
+                previewMargins.getSize("top", 0),
+                previewMargins.getSize("right", 0),
+                previewMargins.getSize("bottom", 0)
+            );
+            // 将预览窗口添加到 KeyView 中，宽度自适应内容
+            addView(keyPreview, previewLp);
+            // 预览偏移
+            keyPreview.setTranslationX(previewStyle.getSize("offset_x", 0));
+            keyPreview.setTranslationY(previewStyle.getSize("offset_y", 0));
+            }
         }
 
         // 设置 keyRoot 的轮廓提供者以支持阴影绘制，并允许阴影溢出
