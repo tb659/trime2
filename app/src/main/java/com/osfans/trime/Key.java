@@ -997,6 +997,8 @@ public class Key {
                         return action;
                 }
             }
+            if (label != null)
+                return label;
             if (Rime.isAsciiMode() && !mAsciiMode)
                 return event.getLabel();
             if (event.getCode() == KeyEvent.KEYCODE_SPACE) {
@@ -1010,8 +1012,6 @@ public class Key {
                     }
                 }
             }
-            if (label != null)
-                return label;
         }
         return event.getLabel();
     }
