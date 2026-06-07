@@ -45,16 +45,17 @@ preset_keys = {
     Hide = { label = "↓", send = "BACK" }, -- 隐藏
     Escape = { label = "Esc", send = "Escape" },
     Insert = { label = "插入", send = "Insert" },
-    Home = { label = "行首", send = "Home" },
-    End = { label = "行尾", send = "End" },
+    Home = { label = "⇤", send = "Home" },
+    End = { label = "⇥", send = "End" },
     Left = { label = "←", send = "Left" },
     Down = { label = "↓", send = "Down" },
     Up = { label = "↑", send = "Up" },
     Right = { label = "→", send = "Right" },
-    Page_Up = { label = "上页", send = "Page_Up" },
-    Page_Down = { label = "下页", send = "Page_Down" },
-    select_all = { label = "全选", send = "Control+a" },
+    Page_Up = { label = "△", send = "Page_Up" },
+    Page_Down = { label = "▽", send = "Page_Down" },
+    select_all = { label = "☑", send = "Control+a" },
     Shift_L = { label = "Shift", send = "Shift_L", shift_lock = "double" }, -- shift_lock click,double,long
+    -- Shift_R = { label = "☩", send = "Shift_R", shift_lock = "double" }, -- shift_lock click,double,long
     Return = { label = "action_labels", send = "Return" },
     Return1 = { label = "Enter", send = "Return" },
     Return2 = { label = "回车", send = "Return" },
@@ -62,18 +63,18 @@ preset_keys = {
     space1 = { label = "空格", repeatable = true, send = "space" },
     BackSpace = { label = "⌫", description = "退格", repeatable = true, send = "BackSpace" },
     Clear = { label = "清除", text = "{Control+a}{BackSpace}" }, -- 全选并删除
-    ClearH = { label = "Del↔", send = "{End}{Shift+Home}{Delete}" },
+    ClearH = { label = "☒", send = "{End}{Shift+Home}{Delete}" },
     Delete = { label = "删除", send = "Delete" },
     delete_all = { label = "全删", text = "{Control+a}{Delete}" }, -- 全选并删除
-    cut = { label = "剪切", send = "Control+x" },
+    cut = { label = "✁", send = "Control+x" },
     cut_all = { label = "全剪", text = "{Control+a}{Control+x}" }, -- 全选并剪切
-    copy = { label = "复制", send = "Control+c" },
-    copy_all = { label = "全部复制", text = "{Control+a}{Control+c}" }, -- 全选并复制
-    paste = { label = "粘贴", send = "Control+v" },
+    copy = { label = "❐", send = "Control+c" },
+    copy_all = { label = "全复", text = "{Control+a}{Control+c}" }, -- 全选并复制
+    paste = { label = "▣", send = "Control+v" },
     paste_text = { label = "粘贴文本", send = "Control+Shift+Alt+v" }, -- >= Android 6.0
     share_text = { label = "分享文本", send = "Control+Alt+s" }, -- >= Android 6.0
-    redo = { label = "重做", send = "Control+Shift+z" }, -- >= Android 6.0
-    undo = { label = "撤销", send = "Control+z" }, -- >= Android 6.0
+    redo = { label = "↶", send = "Control+Shift+z" }, -- >= Android 6.0
+    undo = { label = "↷", send = "Control+z" }, -- >= Android 6.0
 
     -- rime组合键
     F4 = { label = "菜单", send = "Control+grave" },
@@ -99,9 +100,9 @@ preset_keys = {
     Keyboard_default = { label = "返回", send = "Eisu_toggle", select = ".default" },
     Keyboard_back = { label = "返回", send = "Eisu_toggle", select = ".last" },
     Keyboard_switch = { label = "键盘", send = "Eisu_toggle", select = ".next" },
-    Keyboard_clipboard = { label = "剪贴板", send = "Eisu_toggle", select = "clipboard" },
-    Keyboard_phrase = { label = "短语", send = "Eisu_toggle", select = "phrase" },
-    Keyboard_editor = { label = "编辑", send = "Eisu_toggle", select = "editor" },
+    Keyboard_clipboard = { label = "⏍", send = "Eisu_toggle", select = "clipboard" },
+    Keyboard_phrase = { label = "♨", send = "Eisu_toggle", select = "phrase" },
+    Keyboard_editor = { label = "✎", send = "Eisu_toggle", select = "editor" },
     Keyboard_menu = { label = "菜单", send = "Eisu_toggle", select = "menu" },
     Keyboard_default_zhuji = { label = "助记", send = "Eisu_toggle", select = "qwerty26_zhuji" },
 

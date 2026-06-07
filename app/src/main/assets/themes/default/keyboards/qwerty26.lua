@@ -1,8 +1,10 @@
 name = "26键"
 author = "tbagr"
-lock = true
 
+lock = true
 -- background = 0xfffff000
+
+offset_y = 3
 -- rows行键盘，宽度和高度为键盘总宽度的百分比
 rows = {
     -- 第一行
@@ -31,7 +33,7 @@ rows = {
         width = 10.0857,
         keys = {
             { width = 4.61435, background = 0xff },
-            { click = "a", long_click = "select_all" },
+            { click = "a", long_click = "select_all", style = "hint_offset" },
             { click = "s" },
             { click = "d" },
             { click = "f" },
@@ -50,10 +52,10 @@ rows = {
             { width = 1 },
             { click = "Shift_L", width = 13.7, swipe_up = "Candidate_switch", composing = "delimiter", style = "key_shift" },
             { click = "z", swipe_up = "`", long_click = "~", style = "hint_offset" },
-            { click = "x", long_click = "cut" },
-            { click = "c", long_click = "copy" },
-            { click = "v", long_click = "paste" },
-            { click = "b", swipe_up = "Keyboard_editor", hint_up = "", long_click = "Keyboard_clipboard", swipe_down = "Keyboard_phrase" },
+            { click = "x", long_click = "cut", style = "hint_offset" },
+            { click = "c", long_click = "copy", style = "hint_offset" },
+            { click = "v", long_click = "paste", style = "hint_offset" },
+            { click = "b", swipe_up = "Keyboard_editor", long_click = "Keyboard_clipboard", swipe_down = "Keyboard_phrase", style = "hint_offset" },
             { click = "n", swipe_up = ";", long_click = ":", style = "hint_offset" },
             { click = "m", swipe_up = "'", long_click = "\"", style = "hint_offset" },
             { click = "BackSpace", width = 13.7, swipe_up = "Clear", swipe_left = "ClearH", style = "key_backspace" },

@@ -1,5 +1,6 @@
 name = "26键-助记"
 author = "tbagr"
+
 base = "qwerty26"
 -- 按键覆盖配置：继承 base 键盘（qwerty26）的布局，只在此处覆盖需要修改的按键字段
 -- 格式: overrides[行号] = { [列号] = { 字段名 = 新值, ... }, ... }
@@ -38,7 +39,6 @@ overrides = {
         margins = { left = 0, top = 0, right = 0, bottom = 0 },
         padding = { left = 0, top = 0, right = 0, bottom = 0 },
         [1]  = { background = 0xff },
-        [2] = { margins = { left = 0, top = 0, right = 0, bottom = 0 } },
         [3] = { background = "zhuji/z.png", text_color = 0xff, hint_up = "", hint_long = "" },
         [4] = { background = "zhuji/x.png", text_color = 0xff, hint_up = "", hint_long = "" },
         [5] = { background = "zhuji/c.png", text_color = 0xff, hint_up = "", hint_long = "" },
@@ -46,7 +46,6 @@ overrides = {
         [7] = { background = "zhuji/b.png", text_color = 0xff, hint_up = "", hint_long = "", hint_down = "" },
         [8] = { background = "zhuji/n.png", text_color = 0xff, hint_up = "", hint_long = "" },
         [9] = { background = "zhuji/m.png", text_color = 0xff, hint_up = "", hint_long = "" },
-        [10] = { margins = { left = 0, top = 0, right = 0, bottom = 0 } },
         [11]  = { background = 0xff },
     },
     [4] = {

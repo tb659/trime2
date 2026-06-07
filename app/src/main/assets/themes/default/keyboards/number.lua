@@ -1,8 +1,9 @@
 name = "数字键盘"
 author = "tbagr"
-ascii_mode = true
 
+ascii_mode = true
 text_size = 24
+
 -- rows行键盘，宽度和高度为键盘总宽度的百分比
 rows = {
     -- 第一行

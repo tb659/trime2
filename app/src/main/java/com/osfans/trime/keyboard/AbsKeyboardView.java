@@ -110,7 +110,8 @@ public class AbsKeyboardView extends KeyboardView{
      * @param key Lua 表,包含按键的配置信息(width、height、x、y)。
      */
     private void loadKey(LuaTable key) {
-        int width = (int) (mWidth * key.get("width").optdouble(mKeyWidth) / 100);
+        double globalWidth = globals.get("width").optdouble(mKeyWidth);
+        int width = (int) (mWidth * key.get("width").optdouble(globalWidth) / 100);
         int x = (int) (mWidth * key.get("x").optdouble(0) / 100);
         int height, y;
         if (mIsDpMode) {

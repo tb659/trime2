@@ -20,6 +20,7 @@ import com.osfans.trime.theme.ThemeManager;
 
 import org.luaj.Globals;
 import org.luaj.LuaTable;
+import org.luaj.LuaValue;
 
 /**
  * 行式键盘视图类。
@@ -131,7 +132,8 @@ public class RowKeyboardView extends KeyboardView implements View.OnClickListene
      * @param row Lua 表,包含行的配置信息(width、keys)。
      */
     private void loadRow(LuaTable row) {
-        double width = row.get("width").optdouble(mKeyWidth);
+        double globalWidth = globals.get("width").optdouble(mKeyWidth);
+        double width = row.get("width").optdouble(globalWidth);
         LuaTable keys = row.get("keys").checktable();
         int len = keys.length();
         mLeft=0;

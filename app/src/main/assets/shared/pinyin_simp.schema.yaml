@@ -15,7 +15,7 @@ schema:
 switches:
   - name: ascii_mode
     reset: 0
-    states: [ 中文, 西文 ]
+    states: [中文, 西文]
 
 engine:
   processors:
@@ -82,3 +82,6 @@ recognizer:
     # this change.
     punct: "^/([0-9]+[a-z]*|[a-z]+)$"
     reverse_lookup: "`[a-z]*'?$"
+
+style:
+  preedit_type: input # 嵌入首选项内容(字词)。有4个选项可设：input 嵌入输入码 | composition 嵌入编码 | preview 嵌入首选项 | preview_all 嵌入全部内容
