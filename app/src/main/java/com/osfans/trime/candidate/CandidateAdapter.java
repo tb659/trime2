@@ -92,17 +92,20 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
                 return "com.nirenr.trime.candidate.CandidateItem";
             }
         };
+        // 2. 设置容器的布局
         layout.setGravity(Gravity.CENTER);
         // 在 onCreateViewHolder 里的 layout 设置之后添加
         //TypedValue outValue = new TypedValue();
         //context.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
         //layout.setBackgroundResource(outValue.resourceId);
+        // 3. 设置容器可点击
         layout.setClickable(true);
+        // 4. 添加容器
         layout.setOrientation(LinearLayout.VERTICAL);
         // 内边距：左右 8dp, 上下 2dp
-        int px8 = ThemeManager.dp2px(12);
+        int px6 = ThemeManager.dp2px(6);
         int px1 = ThemeManager.dp2px(1);
-        layout.setPadding(px8, px1, px8, px1);
+        layout.setPadding(px6, px1, px6, px1);
 
         // 设置容器 LayoutParams
         int candidateMinWidth = ThemeManager.getCandidateMinWidth();

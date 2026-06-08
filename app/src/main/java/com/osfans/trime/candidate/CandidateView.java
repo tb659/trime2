@@ -95,11 +95,16 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
                 return "com.nirenr.trime.candidate.CandidateItem";
             }
         };
+        // 设置根布局方向为横向
         root.setOrientation(HORIZONTAL);
+        // 设置背景
         root.setBackground(mCandidateStyle.getBackground(0xffdddddd));
+        // 设置阴影
         int elevation = mCandidateStyle.getSize("elevation", 2);
         root.setElevation(elevation);
+        // 兼容 Android 9+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // 设置阴影颜色
             int dShadowColor = mCandidateStyle.getColor("shadow_color", 0);
             if (dShadowColor != 0) {
                 root.setOutlineAmbientShadowColor(dShadowColor);
@@ -108,7 +113,9 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
         }
         // 设置 CandidateView 自身的高度,防止输入法界面闪烁
         int height = mCandidateStyle.getHeight(48) - elevation; // 计算实际高度
+        // 添加根布局
         LayoutParams lp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        // 设置边距
         Style margins = mCandidateStyle.getStyle("margins");
         lp.setMargins(margins.getSize("left", 0), margins.getSize("top", 0),
                 margins.getSize("right", 0), margins.getSize("bottom", elevation));
