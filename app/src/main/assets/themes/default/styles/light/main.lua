@@ -536,3 +536,11 @@ num_enter = table.merge(key_enter, {
         background = "kafei/xrszhca.png",
     }),
 })
+
+-- 盲打键盘
+touch_typing = table.merge(key, {
+    text_color = 0xff,
+    background = 0xffFFFFFF,
+    hint = { show = false },
+    long_click = { show = false },
+})

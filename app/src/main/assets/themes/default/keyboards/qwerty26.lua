@@ -50,7 +50,7 @@ rows = {
         width = 10.0857,
         keys = {
             { width = 1 },
-            { click = "Shift_L", width = 13.7, swipe_up = "Candidate_switch", composing = "delimiter", style = "key_shift" },
+            { click = "Shift_L", width = 13.7, swipe_up = "Candidate_switch", swipe_down = "Keyboard_touch_typing", composing = "delimiter", style = "key_shift" },
             { click = "z", swipe_up = "`", long_click = "~", style = "hint_offset" },
             { click = "x", long_click = "cut", style = "hint_offset" },
             { click = "c", long_click = "copy", style = "hint_offset" },

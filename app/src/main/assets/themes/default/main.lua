@@ -105,6 +105,7 @@ preset_keys = {
     Keyboard_editor = { label = "✎", send = "Eisu_toggle", select = "editor" },
     Keyboard_menu = { label = "菜单", send = "Eisu_toggle", select = "menu" },
     Keyboard_default_zhuji = { label = "助记", send = "Eisu_toggle", select = "qwerty26_zhuji" },
+    Keyboard_touch_typing = { label = "盲打", send = "Eisu_toggle", select = "qwerty26_touch_typing" },
 
     -- trime设定
     IME_switch = { label = "输入法", send = "LANGUAGE_SWITCH" }, -- 弹出对话框选择输入法
