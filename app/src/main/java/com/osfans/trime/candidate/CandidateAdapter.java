@@ -102,10 +102,6 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         layout.setClickable(true);
         // 4. 添加容器
         layout.setOrientation(LinearLayout.VERTICAL);
-        // 内边距：左右 8dp, 上下 2dp
-        int px6 = ThemeManager.dp2px(6);
-        int px1 = ThemeManager.dp2px(1);
-        layout.setPadding(px6, px1, px6, px1);
 
         // 设置容器 LayoutParams
         int candidateMinWidth = ThemeManager.getCandidateMinWidth();

@@ -215,7 +215,7 @@ candidate = {
     -- 工具栏容器外边距（与外部的间距）
     -- bottom 至少等于 elevation 才能避免阴影被裁剪
     margins = { left = 5, top = 0, right = 5, bottom = 2 },
-    padding = { left = 0, top = 0, right = 0, bottom = 0 },
+    padding = { left = 10, top = 0, right = 0, bottom = 0 },
     -- 候选栏面板按下状态
     pressed = {
         background = 0xff,
@@ -234,6 +234,8 @@ candidate = {
     },
     -- 按键
     key = {
+        width = 38,
+        text = "⚓",
         text_color = key_color,
         text_size = 16,
         background = 0xff,
@@ -301,16 +303,11 @@ candidate = {
 toolbar = table.merge(candidate, {
     -- 显示方案定义的开关
     schema_switches = true,
-    hide = table.merge(candidate.key, {
-        width = 38,
-        text = "⚓",
-    }),
+    hide = table.clone(candidate.key),
     -- 支持添加preset_keys按键，也可以直接写事件的表，
     -- 可以指定按键的style
     -- keys = { { label = "菜单", send = "Control+grave" }, "Mode_switch", "Keyboard_clipboard", "Keyboard_editor", "Mode_small", "Mode_float" },
-    key = table.merge(candidate.key, {
-        width = 38,
-    })
+    key = table.clone(candidate.key)
 })
 
 -- 剪贴板样式
