@@ -77,6 +77,51 @@ public class ThemeManager {
     // 音效文件路径到 ID 的缓存，避免同一文件重复加载
     private static final HashMap<String, Integer> mSoundCache = new HashMap<>();
 
+    // 完整样式字段名列表
+    private static final String[] STYLE_FIELD_NAMES = {
+        "text_color",
+        "text_size",
+        "background",
+        "padding",
+        "margins",
+        "elevation",
+        "corner_radius",
+        "shadow_color",
+        "offset_x",
+        "offset_y",
+        "font",
+        "long_click_time",
+        "long_click_style",
+        "repeat_click_time",
+        "sound_enabled",
+        "sound_effect",
+        "vibration_enabled",
+        "vibration_effect",
+        "swipe_repeatable"
+    };
+
+    // 样式字段名（不含 swipe_repeatable，key 级别用不到该字段）
+    private static final String[] STYLE_FIELD_NAMES_NO_SWIPE = {
+        "text_color",
+        "text_size",
+        "background",
+        "padding",
+        "margins",
+        "elevation",
+        "corner_radius",
+        "shadow_color",
+        "offset_x",
+        "offset_y",
+        "font",
+        "long_click_time",
+        "long_click_style",
+        "repeat_click_time",
+        "sound_enabled",
+        "sound_effect",
+        "vibration_enabled",
+        "vibration_effect",
+    };
+
     /**
      * 获取资源查找器。
      *
@@ -377,68 +422,33 @@ public class ThemeManager {
         LuaTable style = new LuaTable();
 
         // Level 1: Key-level - 处理按键级别的配置，优先级最高
-        copyFieldIfPresent(style, key, "text_color");
-        copyFieldIfPresent(style, key, "text_size");
-        copyFieldIfPresent(style, key, "background");
-        copyFieldIfPresent(style, key, "padding");
-        copyFieldIfPresent(style, key, "margins");
-        copyFieldIfPresent(style, key, "elevation");
-        copyFieldIfPresent(style, key, "corner_radius");
-        copyFieldIfPresent(style, key, "shadow_color");
-        copyFieldIfPresent(style, key, "offset_x");
-        copyFieldIfPresent(style, key, "offset_y");
-        copyFieldIfPresent(style, key, "font");
-        copyFieldIfPresent(style, key, "long_click_time");
-        copyFieldIfPresent(style, key, "repeat_click_time");
-        copyFieldIfPresent(style, key, "sound_enabled");
-        copyFieldIfPresent(style, key, "vibration_enabled");
-        copyFieldIfPresent(style, key, "vibration_effect");
-        copyFieldIfPresent(style, key, "sound_effect");
-        copyFieldIfPresent(style, key, "long_click_style");
+        copyFieldsIfPresent(style, key, STYLE_FIELD_NAMES_NO_SWIPE);
 
         // Level 2: Row-level defaults - 处理行级别的默认配置，优先级次之
         if (row != null) {
-            applyDefault(style, row, "text_color");
-            applyDefault(style, row, "text_size");
-            applyDefault(style, row, "background");
-            applyDefault(style, row, "padding");
-            applyDefault(style, row, "margins");
-            applyDefault(style, row, "elevation");
-            applyDefault(style, row, "corner_radius");
-            applyDefault(style, row, "shadow_color");
-            applyDefault(style, row, "offset_x");
-            applyDefault(style, row, "offset_y");
-            applyDefault(style, row, "font");
-            applyDefault(style, row, "long_click_time");
-            applyDefault(style, row, "long_click_style");
-            applyDefault(style, row, "swipe_repeatable");
-            applyDefault(style, row, "repeat_click_time");
-            applyDefault(style, row, "sound_enabled");
-            applyDefault(style, row, "sound_effect");
-            applyDefault(style, row, "vibration_enabled");
-            applyDefault(style, row, "vibration_effect");
+            applyDefaults(style, row, STYLE_FIELD_NAMES);
+
+            // Level 2.5: Row-level named style - 若 row 指定了 style 名称，从主题风格系统解析该命名样式并应用其字段
+            LuaValue rowStyle = row.get("style");
+            if (rowStyle.isstring() && mColor != null) {
+                LuaValue namedStyleTable = mColor.get(rowStyle.tojstring());
+                if (namedStyleTable.istable()) {
+                    applyDefaults(style, namedStyleTable.checktable(), STYLE_FIELD_NAMES);
+                }
+            }
         }
 
         // Level 3: Keyboard-level defaults - 处理键盘级别的全局默认配置，优先级最低
-        applyDefaultFrom(style, globals, "text_color");
-        applyDefaultFrom(style, globals, "text_size");
-        applyDefaultFrom(style, globals, "background");
-        applyDefaultFrom(style, globals, "padding");
-        applyDefaultFrom(style, globals, "margins");
-        applyDefaultFrom(style, globals, "elevation");
-        applyDefaultFrom(style, globals, "corner_radius");
-        applyDefaultFrom(style, globals, "shadow_color");
-        applyDefaultFrom(style, globals, "offset_x");
-        applyDefaultFrom(style, globals, "offset_y");
-        applyDefaultFrom(style, globals, "font");
-        applyDefaultFrom(style, globals, "long_click_time");
-        applyDefaultFrom(style, globals, "long_click_style");
-        applyDefaultFrom(style, globals, "swipe_repeatable");
-        applyDefaultFrom(style, globals, "repeat_click_time");
-        applyDefaultFrom(style, globals, "sound_enabled");
-        applyDefaultFrom(style, globals, "sound_effect");
-        applyDefaultFrom(style, globals, "vibration_enabled");
-        applyDefaultFrom(style, globals, "vibration_effect");
+        applyDefaultsFrom(style, globals, STYLE_FIELD_NAMES);
+
+        // Level 3.5: Global-level named style - 若全局环境指定了 style 名称，从主题风格系统解析该命名样式并应用其字段
+        LuaValue globalStyle = globals.get("style");
+        if (globalStyle.isstring()) {
+            LuaValue namedStyleTable = mColor.get(globalStyle.tojstring());
+            if (namedStyleTable.istable()) {
+                applyDefaults(style, namedStyleTable.checktable(), STYLE_FIELD_NAMES);
+            }
+        }
 
         return style;
     }
@@ -468,28 +478,7 @@ public class ThemeManager {
         // 检查是否是样式表（包含样式字段）还是数据表（如 popup 的键列表）
         // 如果是数据表（只有数字索引），不应该被当作样式处理
         boolean hasStyleFields = false;
-        String[] styleFieldNames = {
-                "text_color",
-                "text_size",
-                "background",
-                "padding",
-                "margins",
-                "elevation",
-                "corner_radius",
-                "shadow_color",
-                "offset_x",
-                "offset_y",
-                "font",
-                "long_click_time",
-                "long_click_style",
-                "swipe_repeatable",
-                "repeat_click_time",
-                "sound_enabled",
-                "sound_effect",
-                "vibration_enabled",
-                "vibration_effect"
-        };
-        for (String fieldName : styleFieldNames) {
+        for (String fieldName : STYLE_FIELD_NAMES) {
             if (!keySubStyle.get(fieldName).isnil()) {
                 hasStyleFields = true;
                 break;
@@ -505,49 +494,13 @@ public class ThemeManager {
         LuaTable resolvedStyle = new LuaTable();
 
         // Level 1: Key.sub-level - 按键级别的子样式配置，优先级最高
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "text_color");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "text_size");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "background");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "padding");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "margins");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "elevation");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "corner_radius");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "shadow_color");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "offset_x");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "offset_y");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "font");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "long_click_time");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "long_click_style");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "swipe_repeatable");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "repeat_click_time");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "sound_enabled");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "sound_effect");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "vibration_enabled");
-        copyFieldIfPresent(resolvedStyle, keySubStyle, "vibration_effect");
+        copyFieldsIfPresent(resolvedStyle, keySubStyle, STYLE_FIELD_NAMES);
 
         // Level 2: Row.sub-level defaults - 行级别的子样式默认配置
         if (row != null) {
             LuaTable rowSubStyle = row.get(subStyleName).opttable(null);
             if (rowSubStyle != null) {
-                applyDefault(resolvedStyle, rowSubStyle, "text_color");
-                applyDefault(resolvedStyle, rowSubStyle, "text_size");
-                applyDefault(resolvedStyle, rowSubStyle, "background");
-                applyDefault(resolvedStyle, rowSubStyle, "padding");
-                applyDefault(resolvedStyle, rowSubStyle, "margins");
-                applyDefault(resolvedStyle, rowSubStyle, "elevation");
-                applyDefault(resolvedStyle, rowSubStyle, "corner_radius");
-                applyDefault(resolvedStyle, rowSubStyle, "shadow_color");
-                applyDefault(resolvedStyle, rowSubStyle, "offset_x");
-                applyDefault(resolvedStyle, rowSubStyle, "offset_y");
-                applyDefault(resolvedStyle, rowSubStyle, "font");
-                applyDefault(resolvedStyle, rowSubStyle, "long_click_time");
-                applyDefault(resolvedStyle, rowSubStyle, "long_click_style");
-                applyDefault(resolvedStyle, rowSubStyle, "swipe_repeatable");
-                applyDefault(resolvedStyle, rowSubStyle, "repeat_click_time");
-                applyDefault(resolvedStyle, rowSubStyle, "sound_enabled");
-                applyDefault(resolvedStyle, rowSubStyle, "sound_effect");
-                applyDefault(resolvedStyle, rowSubStyle, "vibration_enabled");
-                applyDefault(resolvedStyle, rowSubStyle, "vibration_effect");
+                applyDefaults(resolvedStyle, rowSubStyle, STYLE_FIELD_NAMES);
             }
         }
 
@@ -555,25 +508,7 @@ public class ThemeManager {
         LuaValue globalSubStyle = globals.get(subStyleName);
         if (globalSubStyle.istable()) {
             LuaTable globalSubStyleTable = globalSubStyle.checktable();
-            applyDefault(resolvedStyle, globalSubStyleTable, "text_color");
-            applyDefault(resolvedStyle, globalSubStyleTable, "text_size");
-            applyDefault(resolvedStyle, globalSubStyleTable, "background");
-            applyDefault(resolvedStyle, globalSubStyleTable, "padding");
-            applyDefault(resolvedStyle, globalSubStyleTable, "margins");
-            applyDefault(resolvedStyle, globalSubStyleTable, "elevation");
-            applyDefault(resolvedStyle, globalSubStyleTable, "corner_radius");
-            applyDefault(resolvedStyle, globalSubStyleTable, "shadow_color");
-            applyDefault(resolvedStyle, globalSubStyleTable, "offset_x");
-            applyDefault(resolvedStyle, globalSubStyleTable, "offset_y");
-            applyDefault(resolvedStyle, globalSubStyleTable, "font");
-            applyDefault(resolvedStyle, globalSubStyleTable, "long_click_time");
-            applyDefault(resolvedStyle, globalSubStyleTable, "long_click_style");
-            applyDefault(resolvedStyle, globalSubStyleTable, "swipe_repeatable");
-            applyDefault(resolvedStyle, globalSubStyleTable, "repeat_click_time");
-            applyDefault(resolvedStyle, globalSubStyleTable, "sound_effect");
-            applyDefault(resolvedStyle, globalSubStyleTable, "sound_enabled");
-            applyDefault(resolvedStyle, globalSubStyleTable, "vibration_enabled");
-            applyDefault(resolvedStyle, globalSubStyleTable, "vibration_effect");
+            applyDefaults(resolvedStyle, globalSubStyleTable, STYLE_FIELD_NAMES);
         }
 
         // Level 4: Keyboard.key.sub-level defaults - 键盘级别的主按键子样式默认配置
@@ -581,25 +516,7 @@ public class ThemeManager {
         if (keyboardKeyStyle.istable()) {
             LuaTable keyboardKeySubStyle = keyboardKeyStyle.checktable().get(subStyleName).opttable(null);
             if (keyboardKeySubStyle != null) {
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "text_color");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "text_size");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "background");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "padding");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "margins");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "elevation");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "corner_radius");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "shadow_color");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "offset_x");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "offset_y");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "font");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "long_click_time");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "long_click_style");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "swipe_repeatable");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "repeat_click_time");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "sound_effect");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "sound_enabled");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "vibration_enabled");
-                applyDefault(resolvedStyle, keyboardKeySubStyle, "vibration_effect");
+                applyDefaults(resolvedStyle, keyboardKeySubStyle, STYLE_FIELD_NAMES);
             }
         }
 
@@ -640,6 +557,45 @@ public class ThemeManager {
     private static void applyDefaultFrom(LuaTable target, Globals globals, String key) {
         LuaValue v = globals.get(key); // 从全局环境获取值
         if (!v.isnil() && target.get(key).isnil()) target.set(key, v); // 如果全局值不为 nil 且目标值为 nil，则设置
+    }
+
+    /**
+     * 批量复制源表中存在的字段到目标表（覆盖模式）。
+     *
+     * @param target 目标 LuaTable。
+     * @param source 源 LuaTable。
+     * @param fields 要复制的字段名数组。
+     */
+    private static void copyFieldsIfPresent(LuaTable target, LuaTable source, String[] fields) {
+        for (String field : fields) {
+            copyFieldIfPresent(target, source, field);
+        }
+    }
+
+    /**
+     * 批量将源表中的字段作为默认值应用到目标表（仅当目标表字段值为 nil）。
+     *
+     * @param target 目标 LuaTable。
+     * @param source 源 LuaTable。
+     * @param fields 要应用的字段名数组。
+     */
+    private static void applyDefaults(LuaTable target, LuaTable source, String[] fields) {
+        for (String field : fields) {
+            applyDefault(target, source, field);
+        }
+    }
+
+    /**
+     * 批量从全局环境将字段作为默认值应用到目标表（仅当目标表字段值为 nil）。
+     *
+     * @param target  目标 LuaTable。
+     * @param globals Lua 全局环境。
+     * @param fields  要应用的字段名数组。
+     */
+    private static void applyDefaultsFrom(LuaTable target, Globals globals, String[] fields) {
+        for (String field : fields) {
+            applyDefaultFrom(target, globals, field);
+        }
     }
 
     /**

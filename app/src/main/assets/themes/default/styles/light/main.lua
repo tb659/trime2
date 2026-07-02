@@ -539,3 +539,10 @@ touch_typing = table.merge(key, {
     hint = { show = false },
     long_click = { show = false },
 })
+
+-- 菜单键盘备注
+menu_note = table.merge(key, {
+    text_size = 20,
+    background = 0xff,
+    margins = { bottom = 20 },
+})

@@ -99,7 +99,7 @@ public class FlexboxKeyboardView extends KeyboardView {
                 // 处理该层级下直接定义的 keys
                 LuaValue keys = item.get("keys");
                 if (keys.istable()) {
-                    parseKeys(childLayout, keys.checktable());
+                    parseKeys(childLayout, keys.checktable(), item.checktable());
                 }
             }
         }
@@ -112,7 +112,7 @@ public class FlexboxKeyboardView extends KeyboardView {
      * @param parent 父容器。
      * @param keys Lua 按键配置表。
      */
-    private void parseKeys(FlexboxLayout parent, LuaTable keys) {
+    private void parseKeys(FlexboxLayout parent, LuaTable keys, LuaTable row) {
         int len = keys.length();
         int direction = parent.getFlexDirection();
         for (int i = 1; i <= len; i++) {
@@ -120,13 +120,13 @@ public class FlexboxKeyboardView extends KeyboardView {
             if (keyConfig.istable()) {
                 LuaTable keyTable = keyConfig.checktable();
                 // 解析主样式的默认值
-                LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(keyTable, null, globals);
+                LuaTable styleDefaults = ThemeManager.resolveKeyStyleDefaults(keyTable, row, globals);
                 keyTable.set("__style", styleDefaults);
                 
                 // 为子样式（hint、long_click、pressed、preview、popup）解析默认值
                 String[] subStyleNames = {"hint", "long_click", "pressed", "preview", "popup"};
                 for (String subStyleName : subStyleNames) {
-                    LuaTable resolvedSubStyle = ThemeManager.resolveSubKeyStyleDefaults(keyTable, null, globals, subStyleName);
+                    LuaTable resolvedSubStyle = ThemeManager.resolveSubKeyStyleDefaults(keyTable, row, globals, subStyleName);
                     if (resolvedSubStyle != null) {
                         // 将解析后的子样式设置回原 key 表的对应字段
                         keyTable.set(subStyleName, resolvedSubStyle);
