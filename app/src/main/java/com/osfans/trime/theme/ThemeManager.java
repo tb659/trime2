@@ -467,40 +467,48 @@ public class ThemeManager {
         // 获取按键级别的子样式表
         LuaValue keySubStyleValue = key.get(subStyleName);
 
-        // 如果子样式不存在或不是 table 类型，直接返回 null
-        // 注意：popup 等配置可能是数组（用于定义弹出键列表），不应被处理为样式
-        if (!keySubStyleValue.istable()) {
-            return null;
-        }
-
-        LuaTable keySubStyle = keySubStyleValue.checktable();
-
-        // 检查是否是样式表（包含样式字段）还是数据表（如 popup 的键列表）
-        // 如果是数据表（只有数字索引），不应该被当作样式处理
-        boolean hasStyleFields = false;
-        for (String fieldName : STYLE_FIELD_NAMES) {
-            if (!keySubStyle.get(fieldName).isnil()) {
-                hasStyleFields = true;
-                break;
+        LuaTable keySubStyle = null;
+        boolean hasKeyLevelStyleFields = false;
+        if (keySubStyleValue.istable()) {
+            keySubStyle = keySubStyleValue.checktable();
+            for (String fieldName : STYLE_FIELD_NAMES) {
+                if (!keySubStyle.get(fieldName).isnil()) {
+                    hasKeyLevelStyleFields = true;
+                    break;
+                }
             }
-        }
 
-        // 如果没有样式字段，说明这是数据表（如 popup 的键列表），不处理
-        if (!hasStyleFields) {
-            return null;
+            // popup 等配置可能是纯数据表（数字索引键列表），这类配置不应被样式解析覆盖
+            if (!hasKeyLevelStyleFields && "popup".equals(subStyleName)) {
+                return null;
+            }
         }
 
         // 创建用于存储最终样式的 LuaTable
         LuaTable resolvedStyle = new LuaTable();
 
         // Level 1: Key.sub-level - 按键级别的子样式配置，优先级最高
-        copyFieldsIfPresent(resolvedStyle, keySubStyle, STYLE_FIELD_NAMES);
+        if (hasKeyLevelStyleFields && keySubStyle != null) {
+            copyFieldsIfPresent(resolvedStyle, keySubStyle, STYLE_FIELD_NAMES);
+        }
 
         // Level 2: Row.sub-level defaults - 行级别的子样式默认配置
         if (row != null) {
             LuaTable rowSubStyle = row.get(subStyleName).opttable(null);
             if (rowSubStyle != null) {
                 applyDefaults(resolvedStyle, rowSubStyle, STYLE_FIELD_NAMES);
+            }
+
+            // Level 2.5: Row-level named style sub defaults - 支持从 row.style 对应的命名样式里继承子样式
+            LuaValue rowStyle = row.get("style");
+            if (rowStyle.isstring() && mColor != null) {
+                LuaValue namedStyleTable = mColor.get(rowStyle.tojstring());
+                if (namedStyleTable.istable()) {
+                    LuaTable namedSubStyle = namedStyleTable.checktable().get(subStyleName).opttable(null);
+                    if (namedSubStyle != null) {
+                        applyDefaults(resolvedStyle, namedSubStyle, STYLE_FIELD_NAMES);
+                    }
+                }
             }
         }
 
@@ -520,7 +528,24 @@ public class ThemeManager {
             }
         }
 
-        return resolvedStyle;
+        // Level 4.5: Global-level named style sub defaults - 支持从 keyboard.style 对应的命名样式里继承子样式
+        LuaValue globalStyle = globals.get("style");
+        if (globalStyle.isstring() && mColor != null) {
+            LuaValue namedStyleTable = mColor.get(globalStyle.tojstring());
+            if (namedStyleTable.istable()) {
+                LuaTable namedSubStyle = namedStyleTable.checktable().get(subStyleName).opttable(null);
+                if (namedSubStyle != null) {
+                    applyDefaults(resolvedStyle, namedSubStyle, STYLE_FIELD_NAMES);
+                }
+            }
+        }
+
+        for (String fieldName : STYLE_FIELD_NAMES) {
+            if (!resolvedStyle.get(fieldName).isnil()) {
+                return resolvedStyle;
+            }
+        }
+        return null;
     }
 
     /**

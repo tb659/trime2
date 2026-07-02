@@ -70,11 +70,12 @@ flex_box = {
     {
         direction = "column",
         width = 30,
+        style = "menu_note",
         keys = {
-            { click = "", hint = "可" },
-            { click = "", hint = "乐" },
-            { click = "", hint = "瑞" },
-            { click = "", hint = "宝" }
+            { hint = "可" },
+            { hint = "乐" },
+            { hint = "瑞" },
+            { hint = "宝" }
         }
     },
 }

@@ -128,8 +128,15 @@ public class FlexboxKeyboardView extends KeyboardView {
                 for (String subStyleName : subStyleNames) {
                     LuaTable resolvedSubStyle = ThemeManager.resolveSubKeyStyleDefaults(keyTable, row, globals, subStyleName);
                     if (resolvedSubStyle != null) {
-                        // 将解析后的子样式设置回原 key 表的对应字段
-                        keyTable.set(subStyleName, resolvedSubStyle);
+                        // hint/long_click 可能本身是字符串事件，样式需写入专用字段，避免覆盖原文本/事件
+                        LuaValue originalSubStyle = keyTable.get(subStyleName);
+                        if ("hint".equals(subStyleName) && !originalSubStyle.istable()) {
+                            keyTable.set("style_hint", resolvedSubStyle);
+                        } else if ("long_click".equals(subStyleName) && !originalSubStyle.istable()) {
+                            keyTable.set("long_click_style", resolvedSubStyle);
+                        } else {
+                            keyTable.set(subStyleName, resolvedSubStyle);
+                        }
                     }
                 }
             }
