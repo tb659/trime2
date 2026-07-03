@@ -10,7 +10,7 @@ flex_box = {
     -- 第一列
     {
         direction = "column",
-        width = 30,
+        width = 38,
         style = "menu_note",
         keys = {
             { hint = "爱" },
@@ -56,12 +56,10 @@ flex_box = {
                 { click = "Sound_switch" },
             }
         },
-        -- 第四列第四行
+        -- 第二列第四行
         {
             direction = "row",
             keys = {
-                { click = "="},
-                { click = "KP_0"},
                 { click = "Keyboard_back"},
             }
         },
@@ -69,7 +67,7 @@ flex_box = {
     -- 第三列
     {
         direction = "column",
-        width = 30,
+        width = 40,
         style = "menu_note",
         keys = {
             { hint = "可" },

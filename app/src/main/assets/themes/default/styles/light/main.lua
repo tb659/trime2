@@ -543,7 +543,7 @@ touch_typing = table.merge(key, {
 -- 菜单键盘备注
 menu_note = table.merge(key, {
     background = 0xff,
-    margins = { bottom = 20 },
+    margins = { bottom = 18 },
     hint = table.merge(key.hint, {
         text_size = 16,
     })
