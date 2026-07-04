@@ -41,6 +41,12 @@
 --     max_memory_branches: 15             # 查询分支上限
 --     decay_rate: 0.85                     # 时间衰减系数 (每日)
 --     context_timeout: 5000                # 上下文超时毫秒数
+--     internal_first_min_len: 2            # 首字续写学习最短词长
+--     internal_first_max_len: 10           # 首字续写学习最长词长
+--     internal_first_weight: 0.35          # 首字续写学习权重
+--     internal_pair_min_len: 4             # 前 2 字续写学习最短词长
+--     internal_pair_max_len: 10            # 前 2 字续写学习最长词长
+--     internal_pair_weight: 1.0            # 前 2 字续写学习权重
 --     particle_whitelist: '吧,呢,吗,啦,嘛,呀,欸,哒,哈,哇,啊,哦,噢,咯,呗,哟,呦,哎,嗯,么,啥,谁,哪,里,儿,了,的,过,好,行,对,成'  # 语助词白名单（逗号分隔）
 
 -- ======================== Lua 标准库简写 ========================
@@ -70,10 +76,16 @@ local CONFIG = {
     DECAY_RATE          = 0.85,           -- 每日时间衰减系数
     SCAN_LIMIT          = 80,             -- LevelDB 每次扫描上限
     CONTEXT_TIMEOUT_MS  = 5000,           -- 上下文超时毫秒数（两次上屏间隔超过此值重置记忆链）
+    INTERNAL_FIRST_MIN_LEN = 2,           -- 首字续写学习最短词长
+    INTERNAL_FIRST_MAX_LEN = 10,          -- 首字续写学习最长词长
+    INTERNAL_FIRST_WEIGHT  = 0.35,        -- 首字续写学习权重
+    INTERNAL_PAIR_MIN_LEN  = 4,           -- 前 2 字续写学习最短词长
+    INTERNAL_PAIR_MAX_LEN  = 10,          -- 前 2 字续写学习最长词长
+    INTERNAL_PAIR_WEIGHT   = 1.0,         -- 前 2 字续写学习权重
 }
 -- ======================== 全局状态变量 ========================
 -- 这些变量在三个 Lua 组件（P/T/F）之间共享，用于传递记忆链和预测结果
-local PH_CHAR = "›"         -- 单字符占位符，仅用于触发一次预测展示
+local PH_CHAR = "~"         -- 单字符 ASCII 占位符，避免非 ASCII 输入触发 librime UTF-8 崩溃
 local HISTORY_MAX = 2        -- 历史记忆链深度（只记住最近 N 次上屏）
 
 local history = {}           -- 上屏历史文本数组，最多 HISTORY_MAX 个元素
@@ -122,6 +134,12 @@ local function load_config(env)
     CONFIG.EXPIRY_SECONDS      = (config:get_int("user_predict/expiry_days") or 90) * 86400
     CONFIG.MAX_MEMORY_BRANCHES = config:get_int("user_predict/max_memory_branches") or 15
     CONFIG.DECAY_RATE          = config:get_double("user_predict/decay_rate") or 0.85
+    CONFIG.INTERNAL_FIRST_MIN_LEN = config:get_int("user_predict/internal_first_min_len") or 2
+    CONFIG.INTERNAL_FIRST_MAX_LEN = config:get_int("user_predict/internal_first_max_len") or 10
+    CONFIG.INTERNAL_FIRST_WEIGHT = config:get_double("user_predict/internal_first_weight") or 0.35
+    CONFIG.INTERNAL_PAIR_MIN_LEN = config:get_int("user_predict/internal_pair_min_len") or 4
+    CONFIG.INTERNAL_PAIR_MAX_LEN = config:get_int("user_predict/internal_pair_max_len") or 10
+    CONFIG.INTERNAL_PAIR_WEIGHT = config:get_double("user_predict/internal_pair_weight") or 1.0
     local timeout_val = config:get_int("user_predict/context_timeout")
     if timeout_val ~= nil then CONFIG.CONTEXT_TIMEOUT_MS = timeout_val end
     local whitelist_str = config:get_string("user_predict/particle_whitelist")
@@ -437,25 +455,26 @@ function P.init(env)
         end
 
         -- ============ 自训练写入 LevelDB ============
-        -- update_memory(key, is_tone): 写入或更新一条 n-gram 记录
+        -- update_memory(key, is_tone, delta): 写入或更新一条 n-gram 记录
         -- key 格式：<gram_type>\t<前缀>\t<后续词>
         -- value 格式：count|timestamp
         env.last_written_keys = {}
-        local function update_memory(key, is_tone)
+        local function update_memory(key, is_tone, delta)
             local now = os_time()
+            delta = delta or 1
             local val = db:fetch(key)
             env.last_written_keys[key] = val or ""
             if not val or val == "" then
-                db:update(key, "1|" .. tostring(now))
+                db:update(key, tostring(delta) .. "|" .. tostring(now))
             else
                 local c_str, ts_str = s_match(val, "^([^|]+)|?(.*)$")
                 local count = tonumber(c_str) or 0
                 local ts = tonumber(ts_str) or 0
                 local age = now - ts
                 if age > CONFIG.EXPIRY_SECONDS then
-                    db:update(key, "1|" .. tostring(now))
+                    db:update(key, tostring(delta) .. "|" .. tostring(now))
                 else
-                    db:update(key, tostring(count + 1) .. "|" .. tostring(now))
+                    db:update(key, tostring(count + delta) .. "|" .. tostring(now))
                 end
             end
         end
@@ -525,11 +544,21 @@ function P.init(env)
                 end
             end
 
-            -- 四字成语的 2+2 自动拆分学习
-            -- 如果前 2 字已经在 1-Gram 或 P-Gram 中存在，自动学习后 2 字
-            if len_text == 4 then
+            -- 词内续写学习：只学习“首字 -> 剩余部分”，并降低权重，避免压过正常上下文预测。
+            -- 例如：好笑 -> 好 => 笑， 好半天 -> 好 => 半天。
+            if len_text >= CONFIG.INTERNAL_FIRST_MIN_LEN and len_text <= CONFIG.INTERNAL_FIRST_MAX_LEN then
+                local prefix = text_chars[1] or ""
+                local suffix = table.concat(text_chars, "", 2, len_text)
+                if prefix ~= "" and suffix ~= "" then
+                    update_memory("1\t" .. prefix .. "\t" .. suffix, false, CONFIG.INTERNAL_FIRST_WEIGHT)
+                end
+            end
+
+            -- 前 2 字续写学习：对较长词，若前 2 字已存在于 1-Gram 或 P-Gram，
+            -- 额外学习“前 2 字 -> 剩余部分”，帮助补足如“好半天”这类更长续写。
+            if len_text >= CONFIG.INTERNAL_PAIR_MIN_LEN and len_text <= CONFIG.INTERNAL_PAIR_MAX_LEN then
                 local part1 = text_chars[1] .. text_chars[2]
-                local part2 = text_chars[3] .. text_chars[4]
+                local part2 = table.concat(text_chars, "", 3, len_text)
                 local is_known_prefix = false
                 for _, prefix in ipairs({ "1", "P" }) do
                     local query_key = prefix .. "\t" .. part1 .. "\t"
@@ -542,7 +571,7 @@ function P.init(env)
                     if is_known_prefix then break end
                 end
                 if is_known_prefix then
-                    update_memory("1\t" .. part1 .. "\t" .. part2, false)
+                    update_memory("1\t" .. part1 .. "\t" .. part2, false, CONFIG.INTERNAL_PAIR_WEIGHT)
                 end
             end
         end
@@ -572,7 +601,7 @@ function P.init(env)
         env.just_committed = true
 
         -- ============ 查询预测候选 ============
-        if predict_count == 1 and ctx:get_option("prediction") then
+        if predict_count <= CONFIG.MAX_PREDICTIONS and ctx:get_option("prediction") then
             pending_cands = get_predictions(env, last_commit)
             if pending_cands then
                 env.need_push = true  -- 等 update_notifier 触发后注入占位符

@@ -18,11 +18,20 @@ patch:
   engine/filters/@before 0: lua_filter@*user_predict*F          # 输入过程中根据预测调频
 
   user_predict:
-    db_name: predict                # LevelDB 数据库名称
+    db_name: predict                      # LevelDB 数据库名称
     max_candidates: 30                    # 每次最多显示几个预测候选
-    max_predictions: 100                   # 连续预测最大次数
-    expiry_days: 90                      # 条目过期天数
-    max_memory_branches: 15             # 查询分支上限
-    decay_rate: 0.85                     # 时间衰减系数 (每日)
-    context_timeout: 5000                # 上下文超时毫秒数
+    max_predictions: 100                  # 连续预测最大次数
+    expiry_days: 90                       # 条目过期天数
+    max_memory_branches: 15               # 查询分支上限
+    decay_rate: 0.85                      # 时间衰减系数 (每日)
+    context_timeout: 5000                 # 上下文超时毫秒数
+
+    internal_first_min_len: 2             # 首字续写学习最短词长
+    internal_first_max_len: 6             # 首字续写学习最长词长
+    internal_first_weight: 0.45           # 首字续写学习权重
+
+    internal_pair_min_len: 4              # 前 2 字续写学习最短词长
+    internal_pair_max_len: 6              # 前 2 字续写学习最长词长
+    internal_pair_weight: 0.8             # 前 2 字续写学习权重
+
     particle_whitelist: '吧,呢,吗,啦,嘛,呀,哈,哇,啊'
