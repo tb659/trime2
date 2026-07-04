@@ -993,6 +993,7 @@ public class Composition extends TextView {
         RimeProto.Context.Composition r = mRimeContext.getComposition();
         // 获取预编辑文本字符串
         String s = r.getPreedit();
+        if (isPredictionPlaceholderComposition()) return;
         
         // 定义起始和结束位置变量
         int start, end;
@@ -1060,6 +1061,12 @@ public class Composition extends TextView {
         sep = m.getString("end");
         // 如果后缀分隔符不为空，则追加到缓冲区
         if (!TextUtils.isEmpty(sep)) ss.append(sep);
+    }
+
+    private boolean isPredictionPlaceholderComposition() {
+        if (mRimeContext == null || mRimeContext.getComposition() == null) return false;
+        return "~".equals(mRimeContext.getComposition().getPreedit())
+                && "~".equals(mRimeContext.getInput());
     }
 
     /**
@@ -1552,8 +1559,8 @@ public class Composition extends TextView {
         if (r == null) return 0;
         // 获取预编辑文本字符串
         String s = r.getPreedit();
-        // 如果预编辑文本为空，则返回 0
-        if (TextUtils.isEmpty(s)) return 0;
+        // 如果既没有预编辑文本，也不是预测占位符态，则无需显示编码区
+        if (TextUtils.isEmpty(s) && !isPredictionPlaceholderComposition()) return 0;
         // 暂时设置为单行显示，后续根据内容长度可能调整
         setSingleLine(true); // 设置单行
         // 初始化 SpannableStringBuilder 用于构建富文本

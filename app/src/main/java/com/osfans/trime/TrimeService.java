@@ -1368,6 +1368,7 @@ public class TrimeService extends InputMethodService {
                     break;
             }
             if (s == null) s = "";
+            if ("~".equals(s)) s = "";
             if (ic != null) {
                 CharSequence cs = ic.getSelectedText(0);
                 if (cs == null || !TextUtils.isEmpty(s)) ic.setComposingText(s, 1);
