@@ -43,6 +43,9 @@ switches: # 0 默认关，1 默认开
   - name: udpf_switch
     reset: 0
     states: [U编关, U编开]
+  - name: prediction
+    reset: 1
+    states: ["🕳 关", "🔮 开"]
 
 engine:
   processors: # 组件处理按键消息
