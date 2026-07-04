@@ -5,6 +5,11 @@ patch:
   translator/enable_completion: true # 编码提示，默认关闭，删掉行首的#号，即可开启
   speller/max_code_length: 99 # 最大99码上屏
 
+  translator/enable_encoder: true # 开启自动造词
+  translator/encode_commit_history: true # 对已上屏内容自动成词
+  translator/enable_user_dict: true # 开启用户词典，记录用户词和词频
+  translator/max_phrase_length: 10 # 自动造词最大词长
+
   menu/page_size: 30 # 自定义候选个数，可修改。若要改成5个，行首加上#号注释即可（Rime默认就是5个）
   # menu/alternative_select_labels: [ ㊀, ㊁, ㊂, ㊃, ㊄, ㊅, ㊆, ㊇, ㊈ ]  # 自定义候选序号显示符，可自定修改，如要显示阿拉伯数字，直接注释掉这行（在前面加#号）
 
