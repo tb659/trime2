@@ -698,6 +698,15 @@ public class TrimeService extends InputMethodService {
         // 调试日志：打印事件修饰键掩码
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onEvent:2 " + event.getMask());
 
+        // 0. 处理候选词选择
+        // 如果事件中包含了候选词选择索引（send为数值），则直接选择对应位置的候选词
+        int selectCandidate = event.getSelectCandidate();
+        if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onEvent:selectCandidate " + selectCandidate);
+        if (selectCandidate > 0) {
+            selectPagedCandidate(selectCandidate - 1);
+            return;
+        }
+
         // 1. 处理直接提交文本的情况
         // 如果事件中包含了需要直接提交的文本（例如点击候选词上屏），则优先处理
         String commitText = event.getCommit();

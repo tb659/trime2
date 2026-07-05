@@ -90,6 +90,9 @@ public class Event {
     /** 直接提交的字符串，按下按键后直接提交的内容 */
     private String commit;
 
+    /** 候选词选择索引，用于直接选择第N个候选词，-1表示未设置 */
+    private int selectCandidate = -1;
+
     /** Shift锁定行为，定义Shift键的锁定方式，如"click"（单击锁定）等，默认为"click" */
     private String shiftLock = "click";
 
@@ -304,12 +307,18 @@ public class Event {
             description = m.get("description").optjstring("");
             shiftLock = m.get("shift_lock").optjstring("");
             commit = m.get("commit").optjstring("");
-            String send = m.get("send").optjstring("");
+            LuaValue sendLv = m.get("send");
+            String send = sendLv.optjstring("");
             if (TextUtils.isEmpty(send) && !TextUtils.isEmpty(command))
                 send = "function"; // command默认发function
-            int[] sends = parseSend(send);
-            code = sends[0];
-            mask = sends[1];
+
+            if (!TextUtils.isEmpty(send) && TextUtils.isDigitsOnly(send)) {
+                selectCandidate = Integer.parseInt(send);
+            } else {
+                int[] sends = parseSend(send);
+                code = sends[0];
+                mask = sends[1];
+            }
             parseLabel();
             text = m.get("text").optjstring("");
             if (code < 0 && TextUtils.isEmpty(text)){
@@ -367,14 +376,19 @@ public class Event {
         description = m.get("description").optjstring("");
         shiftLock = m.get("shift_lock").optjstring("");
         commit = m.get("commit").optjstring("");
-        String send = m.get("send").optjstring("");
+        LuaValue sendLv = m.get("send");
+        String send = sendLv.optjstring("");
 
         if (TextUtils.isEmpty(send) && !TextUtils.isEmpty(command))
             send = "function"; // command默认发function
 
-        int[] sends = parseSend(send);
-        code = sends[0];
-        mask = sends[1];
+        if (!TextUtils.isEmpty(send) && TextUtils.isDigitsOnly(send)) {
+            selectCandidate = Integer.parseInt(send);
+        } else {
+            int[] sends = parseSend(send);
+            code = sends[0];
+            mask = sends[1];
+        }
         parseLabel();
 
         text = m.get("text").optjstring("");
@@ -466,6 +480,15 @@ public class Event {
      */
     public String getSelect() {
         return select;
+    }
+
+    /**
+     * 获取候选词选择索引。
+     *
+     * @return 候选词索引（1-based），-1表示未设置
+     */
+    public int getSelectCandidate() {
+        return selectCandidate;
     }
 
     /**
