@@ -95,6 +95,20 @@ local predict_count = 0      -- 当前连续预测轮次计数（从 1 开始）
 local is_predicting = false  -- 是否处于预测状态
 local pending_cands = nil    -- 缓存的预测候选列表，由 commit_cb 填充，Translator 读取
 
+-- ======================== 字头词表（兜底 fallback） ========================
+-- char_words.lua 由 script/generate_char_words.py 从虎码词库生成
+-- 映射：字符 → 以该字开头的常见词语列表
+-- 在 LevelDB 无数据时作为兜底查询源
+-- 仅对单字符上屏生效（取上屏文本的第一个 CJK 字查询）
+local _char_words_tbl = nil
+local function ensure_char_words()
+    if not _char_words_tbl then
+        local ok, result = pcall(require, "char_words")
+        if ok then _char_words_tbl = result else _char_words_tbl = {} end
+    end
+    return _char_words_tbl
+end
+
 -- ======================== 语气助词白名单 ========================
 -- 标点断句时，如果上屏文本的上文以这些字结尾，不重置记忆链
 -- 例如 "好的。" → "的"在白名单中，认为这是合法结束，不打断预测链
@@ -243,6 +257,8 @@ local function get_predictions(env, prev_commit)
     if not db then return nil end
     local cands = {}
     local seen = {}
+    -- 排除刚上屏的词本身，避免原地重复
+    seen[prev_commit] = true
     local now = os_time()
 
     -- 内部函数：查询指定前缀并清洗过期数据
@@ -336,6 +352,33 @@ local function get_predictions(env, prev_commit)
         for _, l in ipairs(lengths) do
             fetch_and_clean("P\t" .. table.concat(chars, "", #chars - l + 1, #chars) .. "\t", 1)
             if #cands > 0 then break end
+        end
+    end
+
+    -- 第五级：F-Gram — 字头→词语静态映射（兜底）
+    -- 当 LevelDB 中没有任何匹配数据时，从预生成字头词表中查询
+    -- char_words.lua 由 script/generate_char_words.py 从虎码词库生成
+    -- 对新用户首次使用时尤为关键（此时 LevelDB 为空）
+    -- 返回的是去掉首字的"后缀"（如"明晚"→"晚"），上屏后自然与前文组成完整词语
+    if #cands < CONFIG.MAX_CANDIDATES then
+        local chars = get_utf8_chars(prev_commit)
+        local first_char = chars[1]
+        if first_char and is_chinese_char(first_char) and #chars == 1 then
+            local fw = ensure_char_words()
+            local fallback_list = fw[first_char]
+            if fallback_list then
+                for _, w in ipairs(fallback_list) do
+                    local w_chars = get_utf8_chars(w)
+                    if #w_chars >= 2 then
+                        local suffix = table.concat(w_chars, "", 2, #w_chars)
+                        if not seen[suffix] then
+                            insert(cands, { word = suffix, weight = 0.05, db_key = "F\t" .. w })
+                            seen[suffix] = true
+                            if #cands >= CONFIG.MAX_CANDIDATES then break end
+                        end
+                    end
+                end
+            end
         end
     end
 
