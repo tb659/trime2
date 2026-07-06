@@ -1,14 +1,7 @@
 #下面的 #号 是注释符，注释了就无效了，删掉即可生效
-
 patch:
-  translator/dictionary: tiger.extended #引入增补自定词典，这个不要改动
-  translator/enable_completion: true # 编码提示，默认关闭，删掉行首的#号，即可开启
-  speller/max_code_length: 99 # 最大99码上屏
 
-  menu/page_size: 30 # 自定义候选个数，可修改。若要改成5个，行首加上#号注释即可（Rime默认就是5个）
-  # menu/alternative_select_labels: [ ㊀, ㊁, ㊂, ㊃, ㊄, ㊅, ㊆, ㊇, ㊈ ]  # 自定义候选序号显示符，可自定修改，如要显示阿拉伯数字，直接注释掉这行（在前面加#号）
-
+  style/preedit_type: input # 嵌入首选项内容(字词)。有4个选项可设：input 嵌入输入码 | composition 嵌入编码 | preview 嵌入首选项 | preview_all 嵌入全部内容
   style/horizontal: true # 默认是false竖排显示，删掉行首的#号，可横排显示（横排建议把上面这行注释掉）
   style/vertical_auto_reverse: false # 竖排候选框超长时，自动倒序 默认启用，若想关闭，将该行行首的#删掉
   # style/inline_preedit: false # 嵌入编码模式，默认是true开启，若想关闭，取消注释即可（删除前面的#号）
-  style/preedit_type: input # 嵌入首选项内容(字词)。有4个选项可设：input 嵌入输入码 | composition 嵌入编码 | preview 嵌入首选项 | preview_all 嵌入全部内容

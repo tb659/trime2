@@ -103,7 +103,7 @@ speller:
   alphabet: "[zyxwvutsrqponmlkjihgfedcba]" # 定义本方案输入键
   auto_clear: max_length # 3种选择， manual|auto|max_length 空码按下一键确认清屏|空码自动清|达到最长码时后码顶上清屏
   auto_select: true # 自动上屛〔true或false〕
-  max_code_length: 4 # 形码最大码长，超过则顶字上屛〔number〕
+  max_code_length: 99 # 形码最大码长，超过则顶字上屛〔number〕
   # initials: "abcdefghijklmnopqrstuvwxyz;'" # 定义仅限作始码之键
   # finals: "abcdefghijklmnopqrstuvwxyz;'" # 定义仅限作末码之键
   # use_space: true # 以空格作输入码〔true或false〕
@@ -112,14 +112,14 @@ speller:
   # 若要添加四码上屏功能，在  ^;\w+ 后面 加上  |^\w{4}$  即可
 
 translator:
-  dictionary: tigress # 翻译器将调取此字典文件
+  dictionary: tiger.extended # 翻译器将调取此字典文件
   enable_charset_filter: false # 是否开启字符集过滤〔仅table_translator有效。启用cjk_minifier后可适用于script_translator〕
   enable_encoder: false # 是否开启自动造词〔仅table_translator有效〕
   enable_sentence: false # 是否开启自动造句
   encode_commit_history: false # 是否对已上屛词自动成词〔仅table_translator有效〕
   max_phrase_length: 4 # 最大自动成词词长〔仅table_translator有效〕
   enable_user_dict: false # 是否开启用户搜索〔用户记录动态词频、用户词搜索〕
-  enable_completion: false # 提前显示尚未输入完整码的字〔仅table_translator有效〕
+  enable_completion: true # 提前显示尚未输入完整码的字〔仅table_translator有效〕
   enable_correction: false # 实现自动纠错〔仅script_translator有效〕
   comment_format: # 提示代码自定义
     - "xform/~/ /" # 去掉编码提示前的~号
