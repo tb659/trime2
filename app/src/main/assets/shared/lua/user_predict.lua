@@ -355,28 +355,42 @@ local function get_predictions(env, prev_commit)
         end
     end
 
-    -- 第五级：F-Gram — 字头→词语静态映射（兜底）
+    -- 第五级：F-Gram — 字尾→词语静态映射（兜底）
     -- 当 LevelDB 中没有任何匹配数据时，从预生成字头词表中查询
     -- char_words.lua 由 script/generate_char_words.py 从虎码词库生成
-    -- 对新用户首次使用时尤为关键（此时 LevelDB 为空）
-    -- 返回的是去掉首字的"后缀"（如"明晚"→"晚"），上屏后自然与前文组成完整词语
+    -- 取上屏文本的末 1~5 字逐级查表（长前缀优先），返回去掉首字的"后缀"
+    -- 例如 明→晚(明晚)  明晚→上(晚上)  人生自古→谁无死(人生自古谁无死)
+    -- 后缀上屏后自然与前文组成完整词语
     if #cands < CONFIG.MAX_CANDIDATES then
         local chars = get_utf8_chars(prev_commit)
-        local first_char = chars[1]
-        if first_char and is_chinese_char(first_char) and #chars == 1 then
-            local fw = ensure_char_words()
-            local fallback_list = fw[first_char]
-            if fallback_list then
-                for _, w in ipairs(fallback_list) do
-                    local w_chars = get_utf8_chars(w)
-                    if #w_chars >= 2 then
-                        local suffix = table.concat(w_chars, "", 2, #w_chars)
-                        if not seen[suffix] then
-                            insert(cands, { word = suffix, weight = 0.05, db_key = "F\t" .. w })
-                            seen[suffix] = true
-                            if #cands >= CONFIG.MAX_CANDIDATES then break end
+        local n_chars = #chars
+        local fw = ensure_char_words()
+        -- 从最长前缀开始尝试（最多 5 字）
+        local max_f_prefix = math_min(n_chars, 5)
+        for plen = max_f_prefix, 1, -1 do
+            local prefix = table.concat(chars, "", n_chars - plen + 1, n_chars)
+            -- 逐个字符检查是否全中文
+            local pchars = get_utf8_chars(prefix)
+            local all_cjk = true
+            for _, pc in ipairs(pchars) do
+                if not is_chinese_char(pc) then all_cjk = false; break end
+            end
+            if all_cjk then
+                local fallback_list = fw[prefix]
+                if fallback_list then
+                    for _, w in ipairs(fallback_list) do
+                        local w_chars = get_utf8_chars(w)
+                        local w_len = #w_chars
+                        if w_len > plen then
+                            local suffix = table.concat(w_chars, "", plen + 1, w_len)
+                            if not seen[suffix] then
+                                insert(cands, { word = suffix, weight = 0.05, db_key = "F\t" .. w })
+                                seen[suffix] = true
+                                if #cands >= CONFIG.MAX_CANDIDATES then break end
+                            end
                         end
                     end
+                    if #cands > 0 then break end  -- 命中即停止
                 end
             end
         end
