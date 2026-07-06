@@ -7,6 +7,9 @@ function get_keyboard(id, alphabet)
     if id == "" then
         return keyboard
     end
+    if id == "stroke" then
+        return "stroke"
+    end
     if string.find(alphabet, "%d") then
         return "qwerty36"
     end

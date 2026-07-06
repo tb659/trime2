@@ -143,17 +143,21 @@ end
 local function load_config(env)
     local config = env.engine.schema.config
     if not config then return end
+
     CONFIG.MAX_CANDIDATES      = config:get_int("user_predict/max_candidates") or 5
     CONFIG.MAX_PREDICTIONS     = config:get_int("user_predict/max_predictions") or 3
     CONFIG.EXPIRY_SECONDS      = (config:get_int("user_predict/expiry_days") or 90) * 86400
     CONFIG.MAX_MEMORY_BRANCHES = config:get_int("user_predict/max_memory_branches") or 15
     CONFIG.DECAY_RATE          = config:get_double("user_predict/decay_rate") or 0.85
+
     CONFIG.INTERNAL_FIRST_MIN_LEN = config:get_int("user_predict/internal_first_min_len") or 2
     CONFIG.INTERNAL_FIRST_MAX_LEN = config:get_int("user_predict/internal_first_max_len") or 10
     CONFIG.INTERNAL_FIRST_WEIGHT = config:get_double("user_predict/internal_first_weight") or 0.35
+
     CONFIG.INTERNAL_PAIR_MIN_LEN = config:get_int("user_predict/internal_pair_min_len") or 4
     CONFIG.INTERNAL_PAIR_MAX_LEN = config:get_int("user_predict/internal_pair_max_len") or 10
     CONFIG.INTERNAL_PAIR_WEIGHT = config:get_double("user_predict/internal_pair_weight") or 1.0
+
     local timeout_val = config:get_int("user_predict/context_timeout")
     if timeout_val ~= nil then CONFIG.CONTEXT_TIMEOUT_MS = timeout_val end
     local whitelist_str = config:get_string("user_predict/particle_whitelist")
