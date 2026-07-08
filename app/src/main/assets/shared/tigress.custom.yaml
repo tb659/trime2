@@ -1,249 +1,38 @@
-schema:
-  author:
-    - {}
-  dependencies:
-    - core2022 #自定义字集工具方案
-    - pinyin_simp # 拼音方案
-    - easy_english # 英文
-  description: |
-    虎码官方词库
-    敲 ` 鍵進入拼音反查
-  name: "虎码官方词库"
-  schema_id: tigress
-  version: 0.9
+#下面的 #号 是注释符，注释了就无效了，删掉即可生效
+patch:
 
-switches: # 0 默认关，1 默认开
-  - name: ascii_mode
-    reset: 0
-    states: [中文, 西文] #中英文状态
-  - name: extended_char #自定义字集
-    reset: 1
-    states: [全字, 常用]
-  - name: pinyin #拼音滤镜
-    reset: 0
-    states: [拼, pīn]
-  - name: ascii_punct
-    reset: 0
-    states: [。，, ．，]
-  - name: chaifen
-    reset: 0
-    states: [拆隐, 拆显]
-  - name: emoji_cn #emoji滤镜
-    reset: 0
-    states: [🈚, 🈶]
-  - name: simplification #简转繁滤镜
-    reset: 0
-    states: [简中, 繁中]
-  - name: full_shape
-    reset: 0
-    states: [半角, 全角]
-  - name: charset_comment_filter #字符集提示
-    reset: 0
-    states: [U区关, U区开]
-  - name: udpf_switch
-    reset: 0
-    states: [U编关, U编开]
-  - name: prediction
-    reset: 1
-    states: ["🕳 关", "🔮 开"]
+  style/preedit_type: input # 嵌入首选项内容(字词)。有4个选项可设：input 嵌入输入码 | composition 嵌入编码 | preview 嵌入首选项 | preview_all 嵌入全部内容
+  style/horizontal: true # 默认是false竖排显示，删掉行首的#号，可横排显示（横排建议把上面这行注释掉）
+  style/vertical_auto_reverse: false # 竖排候选框超长时，自动倒序 默认启用，若想关闭，将该行行首的#删掉
+  # style/inline_preedit: false # 嵌入编码模式，默认是true开启，若想关闭，取消注释即可（删除前面的#号）
 
-engine:
-  processors: # 组件处理按键消息
-    - ascii_composer # 处理西文模式及中西文切
-    - recognizer # 与matcher搭配，处理符合特定规则的输入码，如网址、反查等tags
-    - key_binder # 在特定条件下将按键绑定到其他按键，如重定义逗号、句号为候选翻页、切换快捷键等
-    - speller # 删除内存，接受字符按键，编辑输入
-    - punctuator # 句读处理器，将单个字符快捷键直接映射为标点符号或文字
-    # - lua_processor # 使用lua自定义按键，后接@+lua函数名 lua函数名即用户文件夹rime.lua中函数名，参数为(key, env)
-    - lua_processor@exe_processor # 网页浏览器
-    - selector # 选字处理器，处理数字选字键〔可以换成其他哦〕、上、下定位候选、换页
-    - navigator # 处理输入栏内部的移动
-    - express_editor # 编辑器，处理空格、回车上屏、回退键
-    # - fluid_editor # 句式编辑器，用于以空格断词、回车上屏的【注音】、【语句流】等输入方案，替换express_editor
-    # - chord_composer # 和弦作曲家或曰并击处理器，用于【宫保拼音】等多键并击的输入方案
-  segmentors: # 组件识别不同的内容类型，将输入码分段并加上tag
-    - ascii_segmentor # 标识西文段落〔比喻如在西文模式下〕字母直接上屛
-    - matcher # 表达recognizer标志符合特定规则的段落，如网址、反查等，加上特定tag
-    - affix_segmentor@easy_english # 用户自定义tag 单击可加载多个实例，后接@+tag名称
-    - abc_segmentor # 符号惯用的文字段落，加上abc这个tag
-    - punct_segmentor # 符号句读句子〔键入标点符号用〕加上punct这个tag
-    - fallback_segmentor # 其他标识未标识文字
-  translators: # 组件翻译特定类型的编码段为一组候选文字
-    # - echo_translator # 其他没有候选字时〔回显输入码输入码可以Shift+Enter上屛〕
-    - punct_translator # 配合punct_segmentor转换标点符号
-    - reverse_lookup_translator # 反查翻译器，用另一种编码方案查码
-    # - script_translator # 脚本翻译器，用于【仓颉】、【五笔】等基于脚本的输入方案 该可加载多个实例，后接@+翻译器名〔如：pinyin、jyutping等〕
-    - table_translator # 码表翻译器，用于仓颉、五笔等基于码表的输入方案 该可加载多个实例，后接@+翻译器名〔如：cangjie、wubi等〕
-    - table_translator@easy_english # 临时英文
-    # - history_translator # 历史翻译器
-    - history_translator@history # 历史翻译器
-    # - lua_translator # 使用lua自定义输入，例如动态输入当前日期、时间，后接@+lua函数名
-    - lua_translator@number_translator # 数字转大写
-    - lua_translator@calculator_translator # 简易计算器
-    - lua_translator@shijian_translator # 高级时间
+  translator/enable_encoder: true # 开启自动造词
+  translator/encode_commit_history: true # 对已上屏内容自动成词
+  translator/enable_user_dict: true # 开启用户词典，记录用户词和词频
+  translator/max_phrase_length: 10 # 自动造词最大词长
 
-  filters: # 组件过滤转换的结果，皆系过滤器可使用开关调节
-    - lua_filter@core2022 # 自定义字集过滤lua；放在最上面完美解决简繁滤镜出错的问题
-    # - lua_filter@dz_ci  # 过滤词组lua，单字模式
-    # - charset_filter@utf8
-    # - charset_filter@gbk
-    # - charset_filter@gb2312
-    # - charset_filter@big5
-    # - simplifier #使用字转换
-    - simplifier@simplification #简繁滤镜
-    # - simplifier@fanjian  #繁简滤镜
-    - simplifier@pinyin #拼音滤镜
-    - simplifier@chaifen #拆分滤镜
-    - simplifier@emoji_cn #表情滤镜
-    - lua_filter@charset_comment_filter # Unicode分区提示滤镜
-    - lua_filter@lua_unicode_display_filter # Unicode编码显示
-    - uniquifier # 过滤的重复候选字，有可能来自simplifier
-    # - cjk_minifier # 字符集过滤〔仅用于script_translator，使之支持extended_charset开关〕
-    # - single_char_filter # 单字过滤器，如加载此组件，则屛敝搜索中的词组〔仅table_translator有效〕
-    - reverse_lookup_filter@reverse_lookup # 反查词典滤镜
+  engine/processors/@before 0: lua_processor@*user_predict*P    # 监听上屏事件，管理记忆链，写入自训练数据库
+  engine/translators/@before 0: lua_translator@*user_predict*T  # 注入占位符生成预测候选
+  engine/filters/@before 0: lua_filter@*user_predict*F          # 输入过程中根据预测调频
 
-speller:
-  alphabet: "[zyxwvutsrqponmlkjihgfedcba]" # 定义本方案输入键
-  auto_clear: max_length # 3种选择， manual|auto|max_length 空码按下一键确认清屏|空码自动清|达到最长码时后码顶上清屏
-  auto_select: true # 自动上屛〔true或false〕
-  max_code_length: 99 # 形码最大码长，超过则顶字上屛〔number〕
-  # initials: "abcdefghijklmnopqrstuvwxyz;'" # 定义仅限作始码之键 形码（虎码）一般用不到这两个选项，所以注释掉了。它们主要用于拼音类方案，比如限制声母只能出现在开头、韵母只能出现在结尾。
-  # finals: "abcdefghijklmnopqrstuvwxyz;'" # 定义仅限作末码之键 形码（虎码）一般用不到这两个选项，所以注释掉了。它们主要用于拼音类方案，比如限制声母只能出现在开头、韵母只能出现在结尾。
-  # use_space: true # 以空格作输入码〔true或false〕
-  # delimiter: " '" # 上屛时的音节间分音符
-  #  auto_select_pattern: ^;\w+ # 自动上屏规则  对 [;] 引导的编码实行候选唯一自动上屏
-  # 若要添加四码上屏功能，在  ^;\w+ 后面 加上  |^\w{4}$  即可
+  sync_dir: '/sdcard/rime-sync'
 
-translator:
-  dictionary: tigress.extended # 翻译器将调取此字典文件
-  enable_charset_filter: false # 是否开启字符集过滤〔仅table_translator有效。启用cjk_minifier后可适用于script_translator〕
-  enable_encoder: false # 是否开启自动造词〔仅table_translator有效〕
-  enable_sentence: false # 是否开启自动造句
-  encode_commit_history: false # 是否对已上屛词自动成词〔仅table_translator有效〕
-  max_phrase_length: 4 # 最大自动成词词长〔仅table_translator有效〕
-  enable_user_dict: false # 是否开启用户搜索〔用户记录动态词频、用户词搜索〕
-  enable_completion: true # 提前显示尚未输入完整码的字〔仅table_translator有效〕
-  enable_correction: false # 实现自动纠错〔仅script_translator有效〕
-  comment_format: # 提示代码自定义
-    - "xform/~/ /" # 去掉编码提示前的~号
-  # sentence_over_completion: false # 在无全码答案而无需逐键提示时也开启智能组句〔仅table_translator有效〕
-  # strict_spelling: false  # 配合speller中的fuzz规则，仅以畧拼码组词〔仅table_translator有效〕
-  # disable_user_dict_for_patterns: false # 禁止某些编码录入用户字典
-  # prism:由此设定主翻译器的speller生成的棱镜文件名，或此副编译器调用的棱镜名
-  # user_dict: 设置用户搜索名
-  # db_class: 设置用户搜索类型，可设置tabledb〔文本〕或userdb〔二进制〕
-  # preedit_format: # 上屛码习俗
-  # - "xform/^/ /" # 提示前面 +间距
-  # spelling_hints: # 设置多少字以内选定标注完整带调拼音〔仅script_translator有效〕
-  # always_show_comments: # 始终显示提示码〔仅script_translator有效〕
-  # initial_quality: # 设置此翻译器出字优先级
-  # tag: # 设定此翻译器针对的tag。可不塡，不塡则仅针对abc
-  # prefix: # 设置此翻译器的出口标志，可不塡，不塡则无出口
-  # suffix: # 设置此翻译器的尾缀标识，可不塡，不塡则无尾缀
-  # tips: # 设置此翻译器的输入前提示符，可不塡，不塡则无提示符
-  # closing_tips:# 设置此翻译器的结束输入提示符，可不塡，不塡则无提示符
-  # contextual_suggestions: # 是否使用语言模型优化输出结果〔需配合grammar使用〕
-  # max_homophones: # 最大同音簇长度〔需配grammar用〕
-  # max_homographs: # 最大同形簇长度〔需饲养grammar使用〕
+  user_predict:
+    db_name: predict                      # LevelDB 数据库名称
+    max_candidates: 100                   # 每次最多显示几个预测候选
+    max_predictions: 100                  # 连续预测最大次数
+    expiry_days: 3650                     # 条目过期天数
+    max_memory_branches: 20               # 查询分支上限
+    decay_rate: 0.85                      # 时间衰减系数 (每日)
 
-# 识别器
-recognizer:
-  import_preset: default
-  patterns: # 配合segmentor并prefix完成suffix段落划分、tag分配
-    punct: "^/([0-9]0?|[A-Za-z]+)$"
-    # uppercase: "" #中文状态大写锁定直接上屏
-    reverse_lookup: "^`[a-z]*'?$"
-    easy_english: "^~[A-Z|a-z]*`?$"
-    expression: "^=.*$"
+    internal_first_min_len: 2             # 首字续写学习最短词长
+    internal_first_max_len: 6             # 首字续写学习最长词长
+    internal_first_weight: 0.45           # 首字续写学习权重
 
-# 键绑定器
-key_binder:
-  import_preset: default
+    internal_pair_min_len: 4              # 前 2 字续写学习最短词长
+    internal_pair_max_len: 6              # 前 2 字续写学习最长词长
+    internal_pair_weight: 0.8             # 前 2 字续写学习权重
 
-# 标点符号
-punctuator:
-  import_preset: symbols # 由外部统一文件导入
+    context_timeout: 5000                 # 上下文超时毫秒数
 
-# segmentors/affix_segmentor 临时英文
-easy_english:
-  dictionary: easy_english
-  tag: easy_english
-  prefix: "~"
-  tips: 〔En〕
-  enable_completion: true
-  enable_sentence: false
-  initial_quality: -1
-  preedit_format:
-    - "xlit|_| |"
-  comment_format: #去掉编码提示前的~号
-    - "xform/~/ /"
-
-# translators/history_translator 临时历史
-history:
-  input: z # 触发此翻译器的字串
-  size: 1 # 设置候选记录量，默认: 0 继续(commit_record最大存储量 20）
-  initial_quality: 999 # 权重
-
-# filters/simplifier 简繁(+部分异体)滤镜
-simplification: #⇩四选一
-  opencc_config: st_tu.json # 简 ➡ 繁·异（秃版标准）
-  # opencc_config: s2tw.json    # 简 ➡ 台湾正体
-  # opencc_config: s2hk.json    # 简 ➡ 香港繁体
-  # opencc_config: s2twp.json  # 简 ➡ 台湾正体（含常用词汇如：软体→軟體、鼠标→滑鼠）
-  option_name: simplification
-  tips: all #all字词|char字
-
-# filters/simplifier 繁简滤镜
-# fanjian:
-# opencc_config: t2s.json   # 繁 ➡ 简（OpenCC标准）
-# option_name: fanjian
-
-# filters/simplifier 拼音滤镜
-pinyin:
-  opencc_config: pinyin.json
-  option_name: pinyin
-  show_in_comment: true #作为注解在后面显示
-  comment_format:
-    - "xform/&nbsp;/ /"
-    - "xform/^/ /"
-    - "xform/（//"
-    - "xform/）//"
-  tips: char
-  tags:
-    - abc
-    - tiger
-    - tigress
-    # - reverse_lookup
-
-# filters/simplifier 拆分滤镜
-chaifen:
-  opencc_config: hu_cf.json
-  option_name: chaifen
-  show_in_comment: true
-  comment_format:
-    - "xform/&nbsp;/ /"
-  tags:
-    - abc
-    - tiger
-    - tigress
-    - reverse_lookup
-  tips: all #只给单字加滤镜，改为 char 。 词也显示，改为 all
-
-# filters/simplifier emoji表情滤镜
-emoji_cn:
-  opencc_config: emoji.json
-  option_name: emoji_cn
-  tips: all
-
-# filters/reverse_lookup_filter 反查
-reverse_lookup:
-  dictionary: pinyin_simp
-  prefix: "`"
-  tips: "〔拼音〕"
-  preedit_format:
-    - "xform/([nl])v/$1ü/"
-    - "xform/([nl])ue/$1üe/"
-    - "xform/([jqxy])v/$1u/"
-  comment_format:
-    - "xform/^/ /"
-  # suffix: "'"
+    particle_whitelist: '吧,呢,吗,啦,嘛,呀,哈,哇,啊'
