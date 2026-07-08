@@ -85,7 +85,7 @@ local CONFIG = {
 }
 -- ======================== 全局状态变量 ========================
 -- 这些变量在三个 Lua 组件（P/T/F）之间共享，用于传递记忆链和预测结果
-local PH_CHAR = "~"         -- 单字符 ASCII 占位符，避免非 ASCII 输入触发 librime UTF-8 崩溃
+local PH_CHAR = "tyl"       -- ASCII 占位符，避免与 schema 现有规则冲突
 local HISTORY_MAX = 2        -- 历史记忆链深度（只记住最近 N 次上屏）
 
 local history = {}           -- 上屏历史文本数组，最多 HISTORY_MAX 个元素
@@ -801,10 +801,23 @@ function P.func(key, env)
     end
 
     -- ============ 预测状态下按键处理 ============
-    -- Space/Enter → 放行，让 Rime 正常选中提交预测候选
+    -- Space/Enter → 仅当存在已选中的预测候选时放行给 selector 处理
+    -- 否则说明输入区只剩占位符本身，绝不能让其原样上屏
     if is_predicting then
         if repr == "Return" or repr == "KP_Enter" or key.keycode == 0x20 then
-            return 2  -- 放行给 express_editor/selector 处理
+            local comp = ctx.composition
+            local has_predict_cand = false
+            if comp and not comp:empty() then
+                local seg = comp:back()
+                local cand = seg:get_candidate_at(seg.selected_index)
+                has_predict_cand = cand ~= nil and cand.type == "predict"
+            end
+            if has_predict_cand then
+                return 2  -- 放行给 express_editor/selector 处理
+            end
+            ctx:clear()
+            reset_memory_chain(env, "enter/space with no predict candidate")
+            return 1
         end
         -- 其他键 → 打断预测状态
         ctx:clear()

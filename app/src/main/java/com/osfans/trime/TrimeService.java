@@ -83,6 +83,8 @@ import java.util.regex.Pattern;
  * 处理按键事件、文本提交、主题切换等所有输入法相关操作。
  */
 public class TrimeService extends InputMethodService {
+    private static final String PREDICTION_PLACEHOLDER = "tyl";
+
     // ==================== 常量与静态变量 ====================
     // 日志标签，用于 Logcat 输出
     private static final String TAG = "TrimeService";
@@ -918,7 +920,16 @@ public class TrimeService extends InputMethodService {
      */
     public void onKey(int keyCode, int mask) {
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKey: " + keyCode);
-        if (handleKey(keyCode, mask)) return;
+        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
+                && isComposing() && mRime.getComposingText() != null
+                && mRime.getComposingText().contains(PREDICTION_PLACEHOLDER);
+        if (handleKey(keyCode, mask)) {
+            if (wasPredicting) {
+                InputConnection ic = getCurrentInputConnection();
+                if (ic != null) ic.deleteSurroundingText(1, 0);
+            }
+            return;
+        }
         if (keyCode >= Key.getSymbolStart()) {
             keyUpNeeded = false;
             commitText(Event.getDisplayLabel(keyCode));
@@ -1010,9 +1021,17 @@ public class TrimeService extends InputMethodService {
      */
     public void commitText(CharSequence text) {
         if (TextUtils.isEmpty(text)) return;
+        text = stripPredictionPlaceholder(text.toString());
+        if (TextUtils.isEmpty(text)) return;
         lastCommittedText = text;
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) ic.commitText(text, 1);
+    }
+
+    /** 去除预测占位符（{@link #PREDICTION_PLACEHOLDER}），避免其原样上屏或显示在编码区。 */
+    private static String stripPredictionPlaceholder(String s) {
+        if (s == null || !s.contains(PREDICTION_PLACEHOLDER)) return s;
+        return s.replace(PREDICTION_PLACEHOLDER, "");
     }
 
     /**
@@ -1032,7 +1051,7 @@ public class TrimeService extends InputMethodService {
      */
     private boolean commitText() {
         if (isComposing()) {
-            String text = mRime.getComposingText();
+            String text = stripPredictionPlaceholder(mRime.getComposingText());
             if (!TextUtils.isEmpty(text)) {
                 commitText(text);
             }
@@ -1118,8 +1137,15 @@ public class TrimeService extends InputMethodService {
                 e.printStackTrace();
             }
         }
+        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
+                && Rime.isComposing() && mRime.getComposingText() != null
+                && mRime.getComposingText().contains(PREDICTION_PLACEHOLDER);
         if (composeEvent(event) && onKeyEvent(event)) {
             if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKeyDown:2 " + keyCode);
+            if (wasPredicting) {
+                InputConnection ic = getCurrentInputConnection();
+                if (ic != null) ic.deleteSurroundingText(1, 0);
+            }
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -1308,7 +1334,8 @@ public class TrimeService extends InputMethodService {
         public void run() {
             // 在执行时再次获取最新的状态，确保 UI 与数据同步
             boolean isComp = mComposing;
-            showToolbarView(!isComp);
+            boolean hasCandidates = Rime.hasMenu();
+            showToolbarView(!isComp && !hasCandidates);
             mRootInputView.invalidateComposingKeys();
         }
     };
@@ -1333,7 +1360,8 @@ public class TrimeService extends InputMethodService {
     }
 
     private void updateComposing(RimeProto.Context.Composition data) {
-        setComposingText(data.getPreedit());
+        String preedit = stripPredictionPlaceholder(data.getPreedit());
+        setComposingText(preedit);
         mHandler.post(this::updateComposing);
     }
 
@@ -1377,7 +1405,7 @@ public class TrimeService extends InputMethodService {
                     break;
             }
             if (s == null) s = "";
-            if ("~".equals(s)) s = "";
+            s = stripPredictionPlaceholder(s);
             if (ic != null) {
                 CharSequence cs = ic.getSelectedText(0);
                 if (cs == null || !TextUtils.isEmpty(s)) ic.setComposingText(s, 1);
