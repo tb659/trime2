@@ -68,6 +68,18 @@ public class TrimeApplication extends Application {
      * @throws IOException 解压过程中发生IO异常
      */
     public void unApk(String dir, String extDir) throws IOException {
+        unApk(dir, extDir, (String[]) null);
+    }
+
+    /**
+     * 从APK文件中解压指定目录的资源到外部目录,跳过路径中包含指定后缀的目录段(如用户数据库目录)。
+     * 通过比较文件大小和MD5值来避免重复解压未变化的文件。
+     * @param dir APK中的目录路径（如"assets/lua"）
+     * @param extDir 外部存储的目标目录路径
+     * @param excludeDirSuffixes 需要跳过的目录名后缀(如".userdb"),路径中任一段以此后缀结尾则整项跳过
+     * @throws IOException 解压过程中发生IO异常
+     */
+    public void unApk(String dir, String extDir, String... excludeDirSuffixes) throws IOException {
         int i = dir.length() + 1; // 计算相对路径的起始位置（+1跳过路径分隔符）
         ZipFile zip = new ZipFile(getApplicationInfo().publicSourceDir); // 打开当前APK文件
         Enumeration<? extends ZipEntry> entries = zip.entries(); // 获取所有条目
@@ -77,6 +89,8 @@ public class TrimeApplication extends Application {
             if (name.indexOf(dir) != 0) // 只处理指定目录下的条目
                 continue;
             String path = name.substring(i); // 提取相对路径
+            if (isExcluded(path, excludeDirSuffixes)) // 跳过用户数据库等不应被覆盖的目录
+                continue;
             if (entry.isDirectory()) {
                 // 处理目录：创建对应的文件夹
                 File f = new File(extDir + File.separator + path);
@@ -141,6 +155,24 @@ public class TrimeApplication extends Application {
             }
         }
         zip.close(); // 关闭ZIP文件
+    }
+
+    /**
+     * 判断相对路径中是否包含以指定后缀结尾的目录段。
+     * @param path 相对路径(如"easy_english.userdb/CURRENT")
+     * @param excludeDirSuffixes 需要排除的目录名后缀
+     * @return true表示应跳过该条目
+     */
+    private boolean isExcluded(String path, String[] excludeDirSuffixes) {
+        if (excludeDirSuffixes == null || excludeDirSuffixes.length == 0)
+            return false;
+        for (String segment : path.split("/")) {
+            for (String suffix : excludeDirSuffixes) {
+                if (segment.endsWith(suffix))
+                    return true;
+            }
+        }
+        return false;
     }
 
     private void deleteDir(File dir) {

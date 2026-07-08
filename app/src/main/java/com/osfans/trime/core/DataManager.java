@@ -181,12 +181,19 @@ public class DataManager {
 
     /**
      * 同步数据。
-     * 从 APK 中解压共享数据、主题和脚本资源到相应目录,
+     * 从 APK 中解压共享数据到应用私有目录(sharedDataDir)以及 sdcard 用户数据目录(userDataDir),
+     * 并解压主题和脚本资源到相应目录,
      * 如果用户数据目录中没有 default.custom.yaml 且主题为 default,则创建默认配置。
      */
     public static void sync() {
         try {
             LuaApplication.getInstance().unApk("assets/shared",getSharedDataDir().getAbsolutePath());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
+            // 跳过 .userdb 目录,避免覆盖用户在 sdcard 端已积累的输入学习数据
+            LuaApplication.getInstance().unApk("assets/shared", Config.getUserDataDir(), ".userdb");
         } catch (Exception e) {
             e.printStackTrace();
         }
