@@ -93,7 +93,9 @@ local last_commit = ""       -- 最近一次上屏文本
 local last_commit_time = 0   -- 最近一次上屏的毫秒时间戳
 local predict_count = 0      -- 当前连续预测轮次计数（从 1 开始）
 local is_predicting = false  -- 是否处于预测状态
+local prediction_visible = false -- 是否正在显示上屏后的预测候选
 local pending_cands = nil    -- 缓存的预测候选列表，由 commit_cb 填充，Translator 读取
+local get_predictions        -- 前向声明，供退格回退逻辑复用
 
 -- ======================== 字头词表（兜底 fallback） ========================
 -- char_words.lua 由 script/generate_char_words.py 从虎码词库生成
@@ -138,6 +140,10 @@ local utf8_len = utf8 and utf8.len or function(str)
     return count
 end
 
+local function log_info(message)
+    print(message)
+end
+
 -- 从 schema YAML 加载 user_predict/* 配置项
 -- 在 P.init() 和 T.init() 时调用
 local function load_config(env)
@@ -171,13 +177,65 @@ end
 -- 重置记忆链：清空所有上下文状态
 -- 在语境超时、标点断句、外部打断等场景调用
 local function reset_memory_chain(env, reason)
+    log_info("user_predict reset: reason=" .. tostring(reason)
+        .. ", history=" .. tostring(#history)
+        .. ", last_commit=" .. tostring(last_commit)
+        .. ", predict_count=" .. tostring(predict_count)
+        .. ", visible=" .. tostring(prediction_visible))
     for i = 1, #history do history[i] = nil end
     last_commit = ""
     last_commit_time = 0
     predict_count = 0
     is_predicting = false
+    prediction_visible = false
     pending_cands = nil
     env.need_push = false
+    env.rewinding_prediction = false
+end
+
+local function set_prediction_visible(env, visible)
+    prediction_visible = visible
+end
+
+-- 预测态退格：同步回退一层已记录的上文，并基于新的上文重新生成预测。
+local function rewind_prediction_after_backspace(env, ctx)
+    log_info("user_predict backspace rewind: history=" .. tostring(#history)
+        .. ", last_commit=" .. tostring(last_commit)
+        .. ", visible=" .. tostring(prediction_visible))
+    env.just_committed = false
+    env.rewinding_prediction = true
+    ctx:clear()
+
+    if #history > 0 then remove(history) end
+    last_commit = history[#history] or ""
+    last_commit_time = rime_api and rime_api.get_time_ms and rime_api.get_time_ms() or (os_time() * 1000)
+    pending_cands = nil
+    env.need_push = false
+
+    if last_commit == "" or not ctx:get_option("prediction") then
+        predict_count = 0
+        is_predicting = false
+        set_prediction_visible(env, false)
+        env.rewinding_prediction = false
+        return 1
+    end
+
+    predict_count = math_max(predict_count - 1, 1)
+    pending_cands = get_predictions(env, last_commit)
+    log_info("user_predict backspace rewind result: new_last_commit=" .. tostring(last_commit)
+        .. ", pending=" .. tostring(pending_cands and #pending_cands or 0))
+    if pending_cands then
+        is_predicting = true
+        env.need_push = true
+        set_prediction_visible(env, true)
+    else
+        predict_count = 0
+        is_predicting = false
+        pending_cands = nil
+        set_prediction_visible(env, false)
+        env.rewinding_prediction = false
+    end
+    return 1
 end
 
 -- 获取 LevelDB 实例（带连接池）
@@ -255,7 +313,7 @@ end
 --   → P-Gram (模糊后缀匹配, ×1)
 -- 权重 = count × DECAY_RATE^age_days × multiplier
 -- 同时负责过期数据清理（查询时发现过期则删除）
-local function get_predictions(env, prev_commit)
+get_predictions = function(env, prev_commit)
     if not prev_commit or prev_commit == "" then return nil end
     local db = get_db(env)
     if not db then return nil end
@@ -455,7 +513,7 @@ local function clean_expired(env)
         end
         db:update("\0last_clean_time", tostring(now))
         if deleted > 0 then
-            log.info("user_predict: cleaned " .. deleted .. " expired entries")
+            log_info("user_predict: cleaned " .. deleted .. " expired entries")
         end
     end
 end
@@ -478,6 +536,7 @@ function P.init(env)
     local db = get_db(env)
     clean_expired(env)
     env.need_push = false         -- 是否需要注入占位符
+    env.rewinding_prediction = false -- 退格回退期间避免被 update_notifier 误判为外部清空
     env.last_written_keys = {}    -- 最近一次写库的 key-value 快照（用于回滚）
     env.just_committed = false    -- 是否刚上屏
 
@@ -486,6 +545,10 @@ function P.init(env)
     -- 在此回调中：记录上屏文本 → 更新记忆链 → 自训练写入 LevelDB → 查询预测候选
     env.commit_cb = function(ctx)
         local text = ctx:get_commit_text()
+        log_info("user_predict commit: text=" .. tostring(text)
+            .. ", last_commit=" .. tostring(last_commit)
+            .. ", predict_count=" .. tostring(predict_count)
+            .. ", is_predicting=" .. tostring(is_predicting))
 
         -- 过滤非汉字/非标点文本（如英文、数字、编码等不记录）
         if not is_valid_commit_text(text) then
@@ -646,6 +709,8 @@ function P.init(env)
                 insert(history, text)
                 if #history > HISTORY_MAX then remove(history, 1) end
                 last_commit = text
+                log_info("user_predict history push: size=" .. tostring(#history)
+                    .. ", last_commit=" .. tostring(last_commit))
             end
         end
 
@@ -666,11 +731,20 @@ function P.init(env)
             pending_cands = get_predictions(env, last_commit)
             if pending_cands then
                 env.need_push = true  -- 等 update_notifier 触发后注入占位符
+                set_prediction_visible(env, true)
+                log_info("user_predict pending ready: last_commit=" .. tostring(last_commit)
+                    .. ", pending=" .. tostring(#pending_cands)
+                    .. ", need_push=" .. tostring(env.need_push))
             else
+                log_info("user_predict pending empty: last_commit=" .. tostring(last_commit))
                 predict_count = 0; is_predicting = false; pending_cands = nil
+                set_prediction_visible(env, false)
             end
         else
+            log_info("user_predict skip pending: predict_count=" .. tostring(predict_count)
+                .. ", option=" .. tostring(ctx:get_option("prediction")))
             predict_count = 0; is_predicting = false; pending_cands = nil
+            set_prediction_visible(env, false)
         end
     end
 
@@ -680,9 +754,16 @@ function P.init(env)
     -- 同时负责：清理被用户操作打断的预测状态
     env.update_cb = function(ctx)
         local input = ctx.input or ""
+        log_info("user_predict update: input=" .. tostring(input)
+            .. ", need_push=" .. tostring(env.need_push)
+            .. ", rewinding=" .. tostring(env.rewinding_prediction)
+            .. ", is_predicting=" .. tostring(is_predicting)
+            .. ", visible=" .. tostring(prediction_visible)
+            .. ", pending=" .. tostring(pending_cands and #pending_cands or 0))
+        if input == PH_CHAR then is_predicting = true; set_prediction_visible(env, true) end
 
         -- 预测状态下输入为空且 need_push=false → 被外部清空，重置
-        if is_predicting and input ~= PH_CHAR and not env.need_push then
+        if is_predicting and input ~= PH_CHAR and not env.need_push and not env.rewinding_prediction then
             reset_memory_chain(env, "external input clear")
             ctx:clear()
         end
@@ -698,6 +779,9 @@ function P.init(env)
 
         if env.need_push and input == "" then
             env.need_push = false
+            env.rewinding_prediction = false
+            log_info("user_predict push placeholder: ph=" .. tostring(expected_ph)
+                .. ", pending=" .. tostring(pending_cands and #pending_cands or 0))
             ctx:push_input(expected_ph)
             ctx.caret_pos = expected_len
             return
@@ -708,19 +792,25 @@ function P.init(env)
         if s_find(input, PH_CHAR, 1, true) then
             if input ~= expected_ph then
                 local clean_text = string.gsub(input, PH_CHAR, "")
+                log_info("user_predict clean placeholder: input=" .. tostring(input)
+                    .. ", clean=" .. tostring(clean_text))
                 ctx:clear()
                 predict_count = 0
                 is_predicting = false
                 pending_cands = nil
+                set_prediction_visible(env, false)
                 if clean_text ~= "" then ctx:push_input(clean_text) end
                 return
             else
                 -- 光标准确位置保护：占位符不能参与实际输入
                 if ctx.caret_pos < expected_len then
+                    log_info("user_predict clear misplaced placeholder: caret=" .. tostring(ctx.caret_pos)
+                        .. ", expected=" .. tostring(expected_len))
                     ctx:clear()
                     predict_count = 0
                     is_predicting = false
                     pending_cands = nil
+                    set_prediction_visible(env, false)
                     return
                 end
             end
@@ -772,6 +862,10 @@ function P.func(key, env)
     -- 连续退格回滚：在 CONTEXT_TIMEOUT_MS 内快速连按退格
     -- 撤销最近 3 次数据库写入（恢复写入前的原始值）
     if repr == "BackSpace" then
+        log_info("user_predict backspace key: input=" .. tostring(input)
+            .. ", is_predicting=" .. tostring(is_predicting)
+            .. ", visible=" .. tostring(prediction_visible)
+            .. ", composing=" .. tostring(ctx:is_composing()))
         local current_time = rime_api and rime_api.get_time_ms and rime_api.get_time_ms() or (os_time() * 1000)
         local is_safe_to_undo = (not ctx:is_composing() or is_predicting)
         if is_safe_to_undo and env.undo_stack and #env.undo_stack > 0 then
@@ -793,10 +887,9 @@ function P.func(key, env)
         end
         env.just_committed = false
         -- 预测状态下退格 → 清空预测并消费按键
-        if is_predicting then
-            ctx:clear()
-            reset_memory_chain(env, "backspace clear prediction")
-            return 1
+        if is_predicting or prediction_visible or input == PH_CHAR then
+            log_info("user_predict backspace intercepted")
+            return rewind_prediction_after_backspace(env, ctx)
         end
     end
 
@@ -855,6 +948,9 @@ function T.func(input, seg, env)
     if not env.engine.context:get_option("prediction") then return end
     -- 只有输入为精确占位符时才产出预测候选
     if input == PH_CHAR and pending_cands then
+        log_info("user_predict translator triggered: pending=" .. tostring(#pending_cands))
+        is_predicting = true
+        set_prediction_visible(env, true)
         local count = 0
         for _, c in ipairs(pending_cands) do
             if count >= CONFIG.MAX_CANDIDATES then break end
@@ -864,6 +960,7 @@ function T.func(input, seg, env)
             yield(cand)
             count = count + 1
         end
+        log_info("user_predict translator yielded=" .. tostring(count))
     end
 end
 
@@ -891,8 +988,27 @@ end
 -- 如果候选词在预测列表中出现，将其提升到前面
 function F.func(input, env)
     local ctx = env.engine.context
-    -- 预测状态下不执行调频（由 Translator 全权处理）
-    if not ctx:get_option("prediction") or (ctx.input or "") == PH_CHAR then
+    local current_input = ctx.input or ""
+
+    -- 占位符阶段只保留预测候选，彻底屏蔽普通码表对 PH_CHAR 的翻译结果。
+    if current_input == PH_CHAR then
+        local predict_only_count = 0
+        local filtered_count = 0
+        for cand in input:iter() do
+            if cand.type == "predict" then
+                yield(cand)
+                predict_only_count = predict_only_count + 1
+            else
+                filtered_count = filtered_count + 1
+            end
+        end
+        log_info("user_predict filter placeholder: predict=" .. tostring(predict_only_count)
+            .. ", filtered=" .. tostring(filtered_count))
+        return
+    end
+
+    -- 非预测占位符阶段不执行调频（由 Translator 全权处理）
+    if not ctx:get_option("prediction") then
         for cand in input:iter() do yield(cand) end
         return
     end

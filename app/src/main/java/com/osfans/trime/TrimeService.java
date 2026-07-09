@@ -84,7 +84,6 @@ import java.util.regex.Pattern;
  */
 public class TrimeService extends InputMethodService {
     private static final String PREDICTION_PLACEHOLDER = "tyl";
-
     // ==================== 常量与静态变量 ====================
     // 日志标签，用于 Logcat 输出
     private static final String TAG = "TrimeService";
@@ -108,6 +107,8 @@ public class TrimeService extends InputMethodService {
     // ==================== 成员变量 - 标志位 ====================
     // 是否显示提取的候选词视图
     private boolean mShowExtractedCandidatesView = false;
+    // 是否正在显示上屏后的预测候选（独立于占位符是否仍留在 Rime context）
+    private boolean mPredictionCandidatesVisible = false;
     // 是否需要发送键释放事件
     private boolean keyUpNeeded;
     // Enter 键是否作为换行符
@@ -920,12 +921,17 @@ public class TrimeService extends InputMethodService {
      */
     public void onKey(int keyCode, int mask) {
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKey: " + keyCode);
-         final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL && isPredicting();
-        if (handleKey(keyCode, mask)) {
-            if (wasPredicting) {
-                InputConnection ic = getCurrentInputConnection();
-                if (ic != null) ic.deleteSurroundingText(1, 0);
-            }
+        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
+                && (hasPredictionPlaceholder(Rime.getRimeRawInput())
+                || isPredicting()
+                || mPredictionCandidatesVisible);
+        boolean handled = handleKey(keyCode, mask);
+        if (wasPredicting) {
+            InputConnection ic = getCurrentInputConnection();
+            if (ic != null) ic.deleteSurroundingText(1, 0);
+            return;
+        }
+        if (handled) {
             return;
         }
         if (keyCode >= Key.getSymbolStart()) {
@@ -1037,6 +1043,11 @@ public class TrimeService extends InputMethodService {
         return !TextUtils.isEmpty(s) && s.contains(PREDICTION_PLACEHOLDER);
     }
 
+    private void setPredictionCandidatesVisible(boolean visible) {
+        if (mPredictionCandidatesVisible == visible) return;
+        mPredictionCandidatesVisible = visible;
+    }
+
     /**
      * 提交文本并清空编码区。
      *
@@ -1140,13 +1151,21 @@ public class TrimeService extends InputMethodService {
                 e.printStackTrace();
             }
         }
-        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL && isPredicting();
+        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
+                && (hasPredictionPlaceholder(Rime.getRimeRawInput())
+                || isPredicting()
+                || mPredictionCandidatesVisible);
         if (composeEvent(event) && onKeyEvent(event)) {
             if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKeyDown:2 " + keyCode);
             if (wasPredicting) {
                 InputConnection ic = getCurrentInputConnection();
                 if (ic != null) ic.deleteSurroundingText(1, 0);
             }
+            return true;
+        }
+        if (wasPredicting) {
+            InputConnection ic = getCurrentInputConnection();
+            if (ic != null) ic.deleteSurroundingText(1, 0);
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -1283,7 +1302,12 @@ public class TrimeService extends InputMethodService {
         // 当用户输入按键导致预编辑字符串（高亮部分）发生变化时触发
         else if (message instanceof RimeMessage.CompositionMessage) {
             // 更新编码区显示的文本
-            updateComposing(((RimeMessage.CompositionMessage) message).getData());
+            RimeProto.Context.Composition composition = ((RimeMessage.CompositionMessage) message).getData();
+            updateComposing(composition);
+            String rawInput = Rime.getRimeRawInput();
+            String preedit = composition != null ? composition.getPreedit() : null;
+            boolean predictionVisible = hasPredictionPlaceholder(rawInput) || hasPredictionPlaceholder(preedit);
+            setPredictionCandidatesVisible(predictionVisible);
         }
         // 5. 处理候选词列表更新消息
         // 当候选词列表发生变化（如翻页、新候选词出现）时触发
@@ -1596,7 +1620,8 @@ public class TrimeService extends InputMethodService {
      * 仅在 {@link #isPredicting()} 为 true 时生效，供候选栏关闭按钮调用。
      */
     public void clearPredictionCandidates() {
-        if (!isPredicting()) return;
+        if (!isPredicting() && !mPredictionCandidatesVisible) return;
+        setPredictionCandidatesVisible(false);
         mRime.clearComposition();
         setComposingText("");
         setCandidatesViewShown(false);

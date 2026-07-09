@@ -11,9 +11,9 @@ patch:
   translator/enable_user_dict: true # 开启用户词典，记录用户词和词频
   translator/max_phrase_length: 10 # 自动造词最大词长
 
-  engine/processors/@before 0: lua_processor@*user_predict*P    # 监听上屏事件，管理记忆链，写入自训练数据库
-  engine/translators/@before 0: lua_translator@*user_predict*T  # 注入占位符生成预测候选
-  engine/filters/@before 0: lua_filter@*user_predict*F          # 输入过程中根据预测调频
+  engine/processors/@before 0: lua_processor@user_predict_processor    # 监听上屏事件，管理记忆链，写入自训练数据库
+  engine/translators/@before 0: lua_translator@user_predict_translator  # 注入占位符生成预测候选
+  engine/filters/@before 0: lua_filter@user_predict_filter              # 输入过程中根据预测调频
 
   sync_dir: '/sdcard/rime-sync'
 
