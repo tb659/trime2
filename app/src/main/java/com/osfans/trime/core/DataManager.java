@@ -181,8 +181,7 @@ public class DataManager {
 
     /**
      * 同步数据。
-     * 从 APK 中解压共享数据到应用私有目录(sharedDataDir)以及 sdcard 用户数据目录(userDataDir),
-     * 并解压主题和脚本资源到相应目录,
+     * 从 APK 中解压共享数据、主题和脚本资源到相应目录,
      * 如果用户数据目录中没有 default.custom.yaml 且主题为 default,则创建默认配置。
      */
     public static void sync() {
@@ -191,23 +190,17 @@ public class DataManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        try {
-            // 跳过 .userdb 目录,避免覆盖用户在 sdcard 端已积累的输入学习数据
-            LuaApplication.getInstance().unApk("assets/shared", Config.getUserDataDir(), ".userdb");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
         File f = new File(Config.getUserDataDir(), DEFAULT_CUSTOM_FILE_NAME);
         if(!f.exists()&&Config.getTheme().equals("default")){
             try {
                 LuaUtil.save(f.getAbsolutePath(),
-                        "patch:\n" +
-                        "  schema_list:\n" +
-                        "    - schema: pinyin_simp\n" +
-                        "    - schema: easy_english\n" +
-                        "    - schema: tiger\n" +
-                        "    - schema: tigress\n" +
-                        "    - schema: stroke\n"
+                "patch:\n" +
+                    "  schema_list:\n" +
+                    "    - schema: pinyin_simp\n" +
+                    "    - schema: easy_english\n" +
+                    "    - schema: tiger\n" +
+                    "    - schema: tigress\n" +
+                    "    - schema: stroke\n"
                 );
             } catch (Exception ignored) {}
         }
