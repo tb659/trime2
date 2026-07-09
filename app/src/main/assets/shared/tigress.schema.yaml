@@ -115,7 +115,7 @@ speller:
   # 若要添加四码上屏功能，在  ^;\w+ 后面 加上  |^\w{4}$  即可
 
 translator:
-  dictionary: tigress.extened # 翻译器将调取此字典文件
+  dictionary: tigress.extended # 翻译器将调取此字典文件
   enable_charset_filter: false # 是否开启字符集过滤〔仅table_translator有效。启用cjk_minifier后可适用于script_translator〕
   enable_encoder: false # 是否开启自动造词〔仅table_translator有效〕
   enable_sentence: false # 是否开启自动造句
