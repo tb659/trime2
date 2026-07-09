@@ -3,9 +3,9 @@
 -- 参考 amzxyz/rime-wanxiang (GPL-3.0) 的 user_predict.lua，适配 Trime Android
 --
 -- 架构分三层，通过 schema YAML 注册到 Rime 引擎：
---   Processor (P) — lua_processor@*user_predict*P  监听上屏/按键，维护记忆链
---   Translator (T) — lua_translator@*user_predict*T  输入 ››› 时生成预测候选
---   Filter (F) — lua_filter@*user_predict*F        输入过程中根据预测调频排序
+--   Processor (P) — lua_processor@user_predict_processor    监听上屏/按键，维护记忆链
+--   Translator (T) — lua_translator@user_predict_translator 输入占位符时生成预测候选
+--   Filter (F) — lua_filter@user_predict_filter             输入过程中根据预测调频排序
 --
 -- 核心设计：
 --   ① 瀑布流查询 S→2→1→P-Gram 逐级降级，命中即返回
@@ -16,9 +16,9 @@
 --  ======================= 配置项 ========================
 -- patch:
 --   # 1. 注册 Lua 组件
---   'engine/processors/@before 0': lua_processor@*user_predict*P    # 监听上屏事件，管理记忆链，写入自训练数据库
---   'engine/translators/@before 0': lua_translator@*user_predict*T  # 注入占位符生成预测候选
---   'engine/filters/@before 0': lua_filter@*user_predict*F          # 输入过程中根据预测调频
+--   'engine/processors/@before 0': lua_processor@user_predict_processor    # 监听上屏事件，管理记忆链，写入自训练数据库
+--   'engine/translators/@before 0': lua_translator@user_predict_translator  # 注入占位符生成预测候选
+--   'engine/filters/@before 0': lua_filter@user_predict_filter              # 输入过程中根据预测调频
 
 --   # 2. 添加预测开关
 --   'switches/+':
@@ -31,8 +31,8 @@
 --     # 上屏后候选栏显示最多 max_candidates 个预测候选
 --     # 选择预测候选 → 该词上屏 → 基于累计文本触发新一轮预测
 --     # 达到 max_predictions 次后停止预测
---     # 按任意键（除退格）打断预测链，恢复正常输入
---     # 连续退格可撤销最近 3 次数据库写入
+--     # 按任意键打断预测链，恢复正常输入
+--     # 退格仅做数据库撤销，不负责回显预测候选
 --   user_predict:
 --     db_name: lua/predict                # LevelDB 数据库名称
 --     max_candidates: 5                    # 每次最多显示几个预测候选
@@ -86,7 +86,7 @@ local CONFIG = {
 -- ======================== 全局状态变量 ========================
 -- 这些变量在三个 Lua 组件（P/T/F）之间共享，用于传递记忆链和预测结果
 local PH_CHAR = "tyl"       -- ASCII 占位符，避免与 schema 现有规则冲突
-local HISTORY_MAX = 2        -- 历史记忆链深度（只记住最近 N 次上屏）
+local HISTORY_MAX = 4        -- 历史记忆链深度；需覆盖连续预测链，供上下文学习与查询
 
 local history = {}           -- 上屏历史文本数组，最多 HISTORY_MAX 个元素
 local last_commit = ""       -- 最近一次上屏文本
@@ -95,7 +95,7 @@ local predict_count = 0      -- 当前连续预测轮次计数（从 1 开始）
 local is_predicting = false  -- 是否处于预测状态
 local prediction_visible = false -- 是否正在显示上屏后的预测候选
 local pending_cands = nil    -- 缓存的预测候选列表，由 commit_cb 填充，Translator 读取
-local get_predictions        -- 前向声明，供退格回退逻辑复用
+local get_predictions        -- 前向声明，供预测查询与过滤逻辑复用
 
 -- ======================== 字头词表（兜底 fallback） ========================
 -- char_words.lua 由 script/generate_char_words.py 从虎码词库生成
@@ -140,10 +140,6 @@ local utf8_len = utf8 and utf8.len or function(str)
     return count
 end
 
-local function log_info(message)
-    print(message)
-end
-
 -- 从 schema YAML 加载 user_predict/* 配置项
 -- 在 P.init() 和 T.init() 时调用
 local function load_config(env)
@@ -166,6 +162,12 @@ local function load_config(env)
 
     local timeout_val = config:get_int("user_predict/context_timeout")
     if timeout_val ~= nil then CONFIG.CONTEXT_TIMEOUT_MS = timeout_val end
+    local history_depth = config:get_int("user_predict/history_depth")
+    if history_depth ~= nil and history_depth > 0 then
+        HISTORY_MAX = history_depth
+    else
+        HISTORY_MAX = math_max(4, CONFIG.MAX_PREDICTIONS + 1)
+    end
     local whitelist_str = config:get_string("user_predict/particle_whitelist")
     if whitelist_str and whitelist_str ~= "" then
         local t = {}
@@ -177,11 +179,6 @@ end
 -- 重置记忆链：清空所有上下文状态
 -- 在语境超时、标点断句、外部打断等场景调用
 local function reset_memory_chain(env, reason)
-    log_info("user_predict reset: reason=" .. tostring(reason)
-        .. ", history=" .. tostring(#history)
-        .. ", last_commit=" .. tostring(last_commit)
-        .. ", predict_count=" .. tostring(predict_count)
-        .. ", visible=" .. tostring(prediction_visible))
     for i = 1, #history do history[i] = nil end
     last_commit = ""
     last_commit_time = 0
@@ -190,52 +187,10 @@ local function reset_memory_chain(env, reason)
     prediction_visible = false
     pending_cands = nil
     env.need_push = false
-    env.rewinding_prediction = false
 end
 
 local function set_prediction_visible(env, visible)
     prediction_visible = visible
-end
-
--- 预测态退格：同步回退一层已记录的上文，并基于新的上文重新生成预测。
-local function rewind_prediction_after_backspace(env, ctx)
-    log_info("user_predict backspace rewind: history=" .. tostring(#history)
-        .. ", last_commit=" .. tostring(last_commit)
-        .. ", visible=" .. tostring(prediction_visible))
-    env.just_committed = false
-    env.rewinding_prediction = true
-    ctx:clear()
-
-    if #history > 0 then remove(history) end
-    last_commit = history[#history] or ""
-    last_commit_time = rime_api and rime_api.get_time_ms and rime_api.get_time_ms() or (os_time() * 1000)
-    pending_cands = nil
-    env.need_push = false
-
-    if last_commit == "" or not ctx:get_option("prediction") then
-        predict_count = 0
-        is_predicting = false
-        set_prediction_visible(env, false)
-        env.rewinding_prediction = false
-        return 1
-    end
-
-    predict_count = math_max(predict_count - 1, 1)
-    pending_cands = get_predictions(env, last_commit)
-    log_info("user_predict backspace rewind result: new_last_commit=" .. tostring(last_commit)
-        .. ", pending=" .. tostring(pending_cands and #pending_cands or 0))
-    if pending_cands then
-        is_predicting = true
-        env.need_push = true
-        set_prediction_visible(env, true)
-    else
-        predict_count = 0
-        is_predicting = false
-        pending_cands = nil
-        set_prediction_visible(env, false)
-        env.rewinding_prediction = false
-    end
-    return 1
 end
 
 -- 获取 LevelDB 实例（带连接池）
@@ -513,19 +468,18 @@ local function clean_expired(env)
         end
         db:update("\0last_clean_time", tostring(now))
         if deleted > 0 then
-            log_info("user_predict: cleaned " .. deleted .. " expired entries")
         end
     end
 end
 
 -- ====================================================================
 --   Processor (P) — 物理按键截取与逻辑分发
---   注册名：lua_processor@*user_predict*P
+--   注册名：lua_processor@user_predict_processor
 --   功能：
 --     ① commit_notifier → 监听上屏事件，自训练写入 LevelDB
 --     ② update_notifier → 注入占位符 ››› 触发 Translator
 --     ③ delete_notifier → 处理前端删词同步
---     ④ P.func → 拦截 BackSpace 实现事务级回滚
+--     ④ P.func → 监听按键并维护数据库撤销栈
 -- ====================================================================
 local P = {}
 
@@ -536,7 +490,6 @@ function P.init(env)
     local db = get_db(env)
     clean_expired(env)
     env.need_push = false         -- 是否需要注入占位符
-    env.rewinding_prediction = false -- 退格回退期间避免被 update_notifier 误判为外部清空
     env.last_written_keys = {}    -- 最近一次写库的 key-value 快照（用于回滚）
     env.just_committed = false    -- 是否刚上屏
 
@@ -545,11 +498,6 @@ function P.init(env)
     -- 在此回调中：记录上屏文本 → 更新记忆链 → 自训练写入 LevelDB → 查询预测候选
     env.commit_cb = function(ctx)
         local text = ctx:get_commit_text()
-        log_info("user_predict commit: text=" .. tostring(text)
-            .. ", last_commit=" .. tostring(last_commit)
-            .. ", predict_count=" .. tostring(predict_count)
-            .. ", is_predicting=" .. tostring(is_predicting))
-
         -- 过滤非汉字/非标点文本（如英文、数字、编码等不记录）
         if not is_valid_commit_text(text) then
             reset_memory_chain(env, "non-Chinese text")
@@ -709,12 +657,10 @@ function P.init(env)
                 insert(history, text)
                 if #history > HISTORY_MAX then remove(history, 1) end
                 last_commit = text
-                log_info("user_predict history push: size=" .. tostring(#history)
-                    .. ", last_commit=" .. tostring(last_commit))
             end
         end
 
-        -- ============ 回滚栈 ============
+        -- ============ 撤销栈 ============
         -- 每次写库后保存快照到 undo_stack，最多 3 级
         env.undo_stack = env.undo_stack or {}
         if next(env.last_written_keys) then
@@ -732,17 +678,11 @@ function P.init(env)
             if pending_cands then
                 env.need_push = true  -- 等 update_notifier 触发后注入占位符
                 set_prediction_visible(env, true)
-                log_info("user_predict pending ready: last_commit=" .. tostring(last_commit)
-                    .. ", pending=" .. tostring(#pending_cands)
-                    .. ", need_push=" .. tostring(env.need_push))
             else
-                log_info("user_predict pending empty: last_commit=" .. tostring(last_commit))
                 predict_count = 0; is_predicting = false; pending_cands = nil
                 set_prediction_visible(env, false)
             end
         else
-            log_info("user_predict skip pending: predict_count=" .. tostring(predict_count)
-                .. ", option=" .. tostring(ctx:get_option("prediction")))
             predict_count = 0; is_predicting = false; pending_cands = nil
             set_prediction_visible(env, false)
         end
@@ -754,16 +694,10 @@ function P.init(env)
     -- 同时负责：清理被用户操作打断的预测状态
     env.update_cb = function(ctx)
         local input = ctx.input or ""
-        log_info("user_predict update: input=" .. tostring(input)
-            .. ", need_push=" .. tostring(env.need_push)
-            .. ", rewinding=" .. tostring(env.rewinding_prediction)
-            .. ", is_predicting=" .. tostring(is_predicting)
-            .. ", visible=" .. tostring(prediction_visible)
-            .. ", pending=" .. tostring(pending_cands and #pending_cands or 0))
         if input == PH_CHAR then is_predicting = true; set_prediction_visible(env, true) end
 
         -- 预测状态下输入为空且 need_push=false → 被外部清空，重置
-        if is_predicting and input ~= PH_CHAR and not env.need_push and not env.rewinding_prediction then
+        if is_predicting and input ~= PH_CHAR and not env.need_push then
             reset_memory_chain(env, "external input clear")
             ctx:clear()
         end
@@ -779,9 +713,6 @@ function P.init(env)
 
         if env.need_push and input == "" then
             env.need_push = false
-            env.rewinding_prediction = false
-            log_info("user_predict push placeholder: ph=" .. tostring(expected_ph)
-                .. ", pending=" .. tostring(pending_cands and #pending_cands or 0))
             ctx:push_input(expected_ph)
             ctx.caret_pos = expected_len
             return
@@ -792,8 +723,6 @@ function P.init(env)
         if s_find(input, PH_CHAR, 1, true) then
             if input ~= expected_ph then
                 local clean_text = string.gsub(input, PH_CHAR, "")
-                log_info("user_predict clean placeholder: input=" .. tostring(input)
-                    .. ", clean=" .. tostring(clean_text))
                 ctx:clear()
                 predict_count = 0
                 is_predicting = false
@@ -804,8 +733,6 @@ function P.init(env)
             else
                 -- 光标准确位置保护：占位符不能参与实际输入
                 if ctx.caret_pos < expected_len then
-                    log_info("user_predict clear misplaced placeholder: caret=" .. tostring(ctx.caret_pos)
-                        .. ", expected=" .. tostring(expected_len))
                     ctx:clear()
                     predict_count = 0
                     is_predicting = false
@@ -858,14 +785,9 @@ function P.func(key, env)
         env.just_committed = false
     end
 
-    -- ============ BackSpace 回滚 ============
-    -- 连续退格回滚：在 CONTEXT_TIMEOUT_MS 内快速连按退格
-    -- 撤销最近 3 次数据库写入（恢复写入前的原始值）
+    -- ============ BackSpace 撤销 ============
+    -- 在 CONTEXT_TIMEOUT_MS 内快速连按退格时，可撤销最近 3 次数据库写入。
     if repr == "BackSpace" then
-        log_info("user_predict backspace key: input=" .. tostring(input)
-            .. ", is_predicting=" .. tostring(is_predicting)
-            .. ", visible=" .. tostring(prediction_visible)
-            .. ", composing=" .. tostring(ctx:is_composing()))
         local current_time = rime_api and rime_api.get_time_ms and rime_api.get_time_ms() or (os_time() * 1000)
         local is_safe_to_undo = (not ctx:is_composing() or is_predicting)
         if is_safe_to_undo and env.undo_stack and #env.undo_stack > 0 then
@@ -886,11 +808,6 @@ function P.func(key, env)
             end
         end
         env.just_committed = false
-        -- 预测状态下退格 → 清空预测并消费按键
-        if is_predicting or prediction_visible or input == PH_CHAR then
-            log_info("user_predict backspace intercepted")
-            return rewind_prediction_after_backspace(env, ctx)
-        end
     end
 
     -- ============ 预测状态下按键处理 ============
@@ -931,7 +848,7 @@ end
 
 -- ====================================================================
 --   Translator (T) — 预测候选生成
---   注册名：lua_translator@*user_predict*T
+--   注册名：lua_translator@user_predict_translator
 --   当 Processor 注入占位符 ››› 后，此翻译器从 pending_cands 生成候选
 -- ====================================================================
 local T = {}
@@ -948,7 +865,6 @@ function T.func(input, seg, env)
     if not env.engine.context:get_option("prediction") then return end
     -- 只有输入为精确占位符时才产出预测候选
     if input == PH_CHAR and pending_cands then
-        log_info("user_predict translator triggered: pending=" .. tostring(#pending_cands))
         is_predicting = true
         set_prediction_visible(env, true)
         local count = 0
@@ -960,7 +876,6 @@ function T.func(input, seg, env)
             yield(cand)
             count = count + 1
         end
-        log_info("user_predict translator yielded=" .. tostring(count))
     end
 end
 
@@ -968,7 +883,7 @@ function T.fini(env) end
 
 -- ====================================================================
 --   Filter (F) — 输入过程调频
---   注册名：lua_filter@*user_predict*F
+--   注册名：lua_filter@user_predict_filter
 --   在常规输入中，根据上下文预测提升匹配候选的排序位置
 -- ====================================================================
 local F = {}
@@ -992,18 +907,9 @@ function F.func(input, env)
 
     -- 占位符阶段只保留预测候选，彻底屏蔽普通码表对 PH_CHAR 的翻译结果。
     if current_input == PH_CHAR then
-        local predict_only_count = 0
-        local filtered_count = 0
         for cand in input:iter() do
-            if cand.type == "predict" then
-                yield(cand)
-                predict_only_count = predict_only_count + 1
-            else
-                filtered_count = filtered_count + 1
-            end
+            if cand.type == "predict" then yield(cand) end
         end
-        log_info("user_predict filter placeholder: predict=" .. tostring(predict_only_count)
-            .. ", filtered=" .. tostring(filtered_count))
         return
     end
 
@@ -1074,7 +980,7 @@ function F.fini(env) end
 
 -- ======================== 模块导出 ========================
 -- librime-lua 自动根据注册名加载对应组件
---   lua_processor@*user_predict*P  → P (Processor)
---   lua_translator@*user_predict*T  → T (Translator)
---   lua_filter@*user_predict*F      → F (Filter)
+--   lua_processor@user_predict_processor    → P (Processor)
+--   lua_translator@user_predict_translator  → T (Translator)
+--   lua_filter@user_predict_filter          → F (Filter)
 return { P = P, T = T, F = F }

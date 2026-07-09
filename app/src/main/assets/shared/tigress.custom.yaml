@@ -19,6 +19,10 @@ patch:
 
   user_predict:
     db_name: predict                      # LevelDB 数据库名称
+
+    history_depth: 99                     # 历史记录深度
+    context_timeout: 5000                 # 上下文超时毫秒数
+
     max_candidates: 100                   # 每次最多显示几个预测候选
     max_predictions: 100                  # 连续预测最大次数
     expiry_days: 3650                     # 条目过期天数
@@ -32,7 +36,5 @@ patch:
     internal_pair_min_len: 4              # 前 2 字续写学习最短词长
     internal_pair_max_len: 6              # 前 2 字续写学习最长词长
     internal_pair_weight: 0.8             # 前 2 字续写学习权重
-
-    context_timeout: 5000                 # 上下文超时毫秒数
 
     particle_whitelist: '吧,呢,吗,啦,嘛,呀,哈,哇,啊'

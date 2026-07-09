@@ -921,16 +921,7 @@ public class TrimeService extends InputMethodService {
      */
     public void onKey(int keyCode, int mask) {
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKey: " + keyCode);
-        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
-                && (hasPredictionPlaceholder(Rime.getRimeRawInput())
-                || isPredicting()
-                || mPredictionCandidatesVisible);
         boolean handled = handleKey(keyCode, mask);
-        if (wasPredicting) {
-            InputConnection ic = getCurrentInputConnection();
-            if (ic != null) ic.deleteSurroundingText(1, 0);
-            return;
-        }
         if (handled) {
             return;
         }
@@ -1151,21 +1142,8 @@ public class TrimeService extends InputMethodService {
                 e.printStackTrace();
             }
         }
-        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
-                && (hasPredictionPlaceholder(Rime.getRimeRawInput())
-                || isPredicting()
-                || mPredictionCandidatesVisible);
         if (composeEvent(event) && onKeyEvent(event)) {
             if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKeyDown:2 " + keyCode);
-            if (wasPredicting) {
-                InputConnection ic = getCurrentInputConnection();
-                if (ic != null) ic.deleteSurroundingText(1, 0);
-            }
-            return true;
-        }
-        if (wasPredicting) {
-            InputConnection ic = getCurrentInputConnection();
-            if (ic != null) ic.deleteSurroundingText(1, 0);
             return true;
         }
         return super.onKeyDown(keyCode, event);
