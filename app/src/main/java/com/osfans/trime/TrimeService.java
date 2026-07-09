@@ -920,9 +920,7 @@ public class TrimeService extends InputMethodService {
      */
     public void onKey(int keyCode, int mask) {
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKey: " + keyCode);
-        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
-                && isComposing() && mRime.getComposingText() != null
-                && mRime.getComposingText().contains(PREDICTION_PLACEHOLDER);
+         final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL && isPredicting();
         if (handleKey(keyCode, mask)) {
             if (wasPredicting) {
                 InputConnection ic = getCurrentInputConnection();
@@ -1034,6 +1032,11 @@ public class TrimeService extends InputMethodService {
         return s.replace(PREDICTION_PLACEHOLDER, "");
     }
 
+    /** 判断字符串是否包含预测占位符。 */
+    private static boolean hasPredictionPlaceholder(String s) {
+        return !TextUtils.isEmpty(s) && s.contains(PREDICTION_PLACEHOLDER);
+    }
+
     /**
      * 提交文本并清空编码区。
      *
@@ -1137,9 +1140,7 @@ public class TrimeService extends InputMethodService {
                 e.printStackTrace();
             }
         }
-        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL
-                && Rime.isComposing() && mRime.getComposingText() != null
-                && mRime.getComposingText().contains(PREDICTION_PLACEHOLDER);
+        final boolean wasPredicting = keyCode == KeyEvent.KEYCODE_DEL && isPredicting();
         if (composeEvent(event) && onKeyEvent(event)) {
             if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKeyDown:2 " + keyCode);
             if (wasPredicting) {
@@ -1573,6 +1574,33 @@ public class TrimeService extends InputMethodService {
      */
     private boolean isComposing() {
         return Rime.isComposing();
+    }
+
+    /**
+     * 判断当前是否处于"上屏后联想候选"状态（编码区仅为预测占位符 {@link #PREDICTION_PLACEHOLDER}）。
+     * 用于区分"正在真实输入"与"上屏后候选栏靠占位符维持显示"这两种 isComposing()==true 的场景。
+     *
+     * @return true 如果正在展示联想候选，false 否则。
+     */
+    public boolean isPredicting() {
+        RimeProto.Context.Composition composition = mRime.getCompositionCached();
+        String preedit = composition != null ? composition.getPreedit() : null;
+        return isComposing()
+                && (hasPredictionPlaceholder(Rime.getRimeRawInput())
+                || hasPredictionPlaceholder(mRime.getComposingText())
+                || hasPredictionPlaceholder(preedit));
+    }
+
+    /**
+     * 清除联想候选并关闭候选栏。
+     * 仅在 {@link #isPredicting()} 为 true 时生效，供候选栏关闭按钮调用。
+     */
+    public void clearPredictionCandidates() {
+        if (!isPredicting()) return;
+        mRime.clearComposition();
+        setComposingText("");
+        setCandidatesViewShown(false);
+        showToolbarView(true);
     }
 
     /**

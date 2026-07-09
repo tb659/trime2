@@ -49,6 +49,8 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
     private RecyclerView mListView;
     /** 隐藏/展开按钮 */
     private KeyView mHide;
+    /** 隐藏/展开按钮的默认文案(非联想候选状态使用) */
+    private String mDefaultHideText;
     /** 候选词适配器 */
     private FloatCandidateAdapter mAdapter;
     /** 工具栏视图 */
@@ -135,6 +137,7 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
 
         mHide.setContentDescription("更多候选");
         mHide.setOnClickListener(this);
+        mDefaultHideText = mHide.getText() != null ? mHide.getText().toString() : "▽"; // 记录默认文案,联想候选态需临时替换
         mHide.setMinimumWidth(height);
         root.addView(mListView, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(mHide, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, height));
@@ -167,10 +170,25 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
      */
     @Override
     public void onClick(View v) {
-        if (mAdapter.getItemCount()>0)
+        if (mTrime.isPredicting()) {
+            mTrime.clearPredictionCandidates(); // 清除联想候选并关闭候选栏
+        } else if (mAdapter.getItemCount()>0)
             mTrime.showExtractedCandidatesView(true); // 显示展开候选词视图
         else
             mTrime.requestHideSelf(0); // 隐藏输入法
+    }
+
+    /**
+     * 根据是否处于联想候选状态,刷新隐藏/展开按钮的文案与描述。
+     */
+    private void refreshHideButton() {
+        if (mTrime.isPredicting()) {
+            mHide.setText("✕");
+            mHide.setContentDescription("清除候选并关闭候选栏");
+        } else {
+            mHide.setText(mDefaultHideText);
+            mHide.setContentDescription("更多候选");
+        }
     }
 
 
@@ -183,6 +201,7 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
             mListView.post(this::update);
             return;
         }
+        refreshHideButton(); // 刷新展开/关闭按钮状态
         CandidatesManager.reset();
         mAdapter.setData(CandidatesManager.next(5));
         mListView.scrollToPosition(0);
@@ -206,6 +225,7 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
      * 如果有高亮候选词则定位到该位置,否则重新加载数据。
      */
     public void show() {
+        refreshHideButton(); // 刷新展开/关闭按钮状态
         int mIdx = Rime.getHighlightRimeCandidate();
         if (mIdx > 0) {
             mAdapter.setIdx(mIdx);
