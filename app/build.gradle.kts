@@ -38,9 +38,9 @@ android {
         // 从 localProperties 读取
         val keyPath = localProperties.getProperty("signKeyFile")
         
-        println("DEBUG: signKeyFile = $keyPath")
-        println("DEBUG: signKeyStorePwd = ${localProperties.getProperty("signKeyStorePwd")}")
-        println("DEBUG: signKeyAlias = ${localProperties.getProperty("signKeyAlias")}")
+        // println("DEBUG: signKeyFile = $keyPath")
+        // println("DEBUG: signKeyStorePwd = ${localProperties.getProperty("signKeyStorePwd")}")
+        // println("DEBUG: signKeyAlias = ${localProperties.getProperty("signKeyAlias")}")
 
         if (!keyPath.isNullOrBlank()) {
             create("myCustomConfig") {
