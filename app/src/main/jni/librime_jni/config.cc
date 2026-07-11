@@ -67,14 +67,28 @@ Java_com_osfans_trime_core_RimeConfig_getRimeConfigInt(JNIEnv* env,
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_osfans_trime_core_RimeConfig_getRimeConfigString(JNIEnv* env,
-                                                          jclass /* thiz */,
-                                                          jlong peer,
-                                                          jstring key) {
+                                                           jclass /* thiz */,
+                                                           jlong peer,
+                                                           jstring key) {
   auto api = rime_get_api();
   const char* value = api->config_get_cstring(
       reinterpret_cast<RimeConfig*>(peer), CString(env, key));
   if (!value) return nullptr;
   return env->NewStringUTF(value);
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_osfans_trime_core_RimeConfig_getRimeConfigBool(JNIEnv* env,
+                                                        jclass /* thiz */,
+                                                        jlong peer,
+                                                        jstring key) {
+  auto api = rime_get_api();
+  Bool value;
+  if (!api->config_get_bool(reinterpret_cast<RimeConfig*>(peer), CString(env, key),
+                            &value)) {
+    return nullptr;
+  }
+  return env->NewObject(GlobalRef->Boolean, GlobalRef->BooleanInit, value == True);
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL

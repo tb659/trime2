@@ -55,8 +55,8 @@ import com.osfans.trime.theme.Style;
 import com.osfans.trime.theme.ThemeManager;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Map;
+
 
 /**
  * 编码区组件，用于显示已输入的按键编码信息。
@@ -65,6 +65,8 @@ import java.util.Map;
  */
 @SuppressLint("AppCompatCustomView")
 public class Composition extends TextView {
+    // 日志标签，用于 Logcat 输出
+    private static final String TAG = "Composition";
     // 键盘文本尺寸相关属性（单位：像素）
     private int key_text_size, text_size, label_text_size, candidate_text_size, comment_text_size;
     // 文本颜色相关属性（ARGB 格式）
@@ -136,12 +138,6 @@ public class Composition extends TextView {
         super(context);
         reset();
     }
-
-
-    // 日志标签，用于 Logcat 输出时标识来源
-    private final String TAG = "rime";
-
-
     /**
      * 添加云输入候选词到编码区显示。
      * 该方法会根据配置的最大条目数和最小长度限制来决定是否添加该词条。
@@ -725,11 +721,14 @@ public class Composition extends TextView {
         if (action == MotionEvent.ACTION_UP) {
             int n = getOffsetForPosition(event.getX(), event.getY());
             if (composition_pos[0] <= n && n <= composition_pos[1]) {
-                String s =
-                        getText().toString().substring(n, composition_pos[1]).replace(" ", "").replace("‸", "");
-                n = Rime.getRimeRawInput().length() - s.length(); // 从右侧定位光标位置
-                TrimeService.getInstance().getRime().moveCursorPos(n);
-                TrimeService.getInstance().updateComposing();
+                String compositionText = getText().toString().substring(composition_pos[0], n);
+                int cursor = countEffectiveCompositionChars(compositionText);
+                int inputLength = Rime.getRimeRawInput().length();
+                cursor = Math.max(0, Math.min(cursor, inputLength));
+                TrimeService trime = TrimeService.getInstance();
+                trime.setPendingCompositionCaret(cursor);
+                trime.getRime().moveCursorPos(cursor);
+                trime.updateComposing();
                 return true;
             }
             // 处理拖动事件：如果允许移动且为移动或按下动作
@@ -758,6 +757,17 @@ public class Composition extends TextView {
         }
 
         return super.onTouchEvent(event);
+    }
+
+    private static int countEffectiveCompositionChars(String text) {
+        if (TextUtils.isEmpty(text)) return 0;
+        int count = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == ' ' || ch == '‸') continue;
+            count++;
+        }
+        return count;
     }
 
     /**
@@ -993,7 +1003,19 @@ public class Composition extends TextView {
         RimeProto.Context.Composition r = mRimeContext.getComposition();
         // 获取预编辑文本字符串
         String s = r.getPreedit();
+        int selectionStart = r.getSelStart();
+        int selectionEnd = r.getSelEnd();
+        if (TextUtils.isEmpty(s) && mRimeContext != null) {
+            String input = mRimeContext.getInput();
+            if (!TextUtils.isEmpty(input)) {
+                s = input;
+                int caret = Math.max(0, Math.min(mRimeContext.getCaretPos(), s.length()));
+                selectionStart = caret;
+                selectionEnd = caret;
+            }
+        }
         if (isPredictionPlaceholderComposition()) return;
+        if (TextUtils.isEmpty(s)) return;
         
         // 定义起始和结束位置变量
         int start, end;
@@ -1031,7 +1053,10 @@ public class Composition extends TextView {
         // 记录预编辑文本在缓冲区中的起始和结束索引，用于后续光标定位
         composition_pos[0] = start;
         composition_pos[1] = end;
-        
+        int compositionLength = composition_pos[1] - composition_pos[0];
+        selectionStart = Math.max(0, Math.min(selectionStart, compositionLength));
+        selectionEnd = Math.max(selectionStart, Math.min(selectionEnd, compositionLength));
+
         // 设置预编辑文本的基础样式（如下划线、颜色等，由 CompositionSpan 定义）
         ss.setSpan(new CompositionSpan(), start, end, span);
         // 设置预编辑文本的字体大小
@@ -1048,9 +1073,9 @@ public class Composition extends TextView {
         }
         
         // 计算选中部分的起始位置：预编辑文本起始位置 + Rime 选区起始偏移
-        start = composition_pos[0] + r.getSelStart();
+        start = composition_pos[0] + selectionStart;
         // 计算选中部分的结束位置：预编辑文本起始位置 + Rime 选区结束偏移
-        end = composition_pos[0] + r.getSelEnd();
+        end = composition_pos[0] + selectionEnd;
         
         // 为选中部分设置高亮前景色
         ss.setSpan(new ForegroundColorSpan(hilited_text_color), start, end, span);
@@ -1085,12 +1110,8 @@ public class Composition extends TextView {
         int start_num = 0;
         // 从 Rime 上下文菜单中获取候选词数组
         RimeProto.Candidate[] candidates = mRimeContext.getMenu().getCandidates();
-        // 如果处于调试模式，打印候选词数组信息到日志
-        if (BuildConfig.DEBUG) Log.w(TAG, "appendCandidates: "+ Arrays.toString(candidates));
         // 如果候选词数组为空或长度为 0，直接返回起始索引 0
         if (candidates == null || candidates.length == 0) return start_num;
-        // 创建一个临时 ArrayList（当前代码中未实际使用，可能是遗留代码）
-        ArrayList tmp = new ArrayList();
         // 获取配置的前缀分隔符（例如候选词列表前的符号或空格）
         String sep = m.getString("start");
         // 根据配置决定是否使用游标高亮：如果使用，则获取高亮候选词的索引；否则设为 -1
@@ -1559,6 +1580,9 @@ public class Composition extends TextView {
         if (r == null) return 0;
         // 获取预编辑文本字符串
         String s = r.getPreedit();
+        if (TextUtils.isEmpty(s)) {
+            s = mRimeContext.getInput();
+        }
         // 如果既没有预编辑文本，也不是预测占位符态，则无需显示编码区
         if (TextUtils.isEmpty(s) && !isPredictionPlaceholderComposition()) return 0;
         // 暂时设置为单行显示，后续根据内容长度可能调整
@@ -1626,6 +1650,12 @@ public class Composition extends TextView {
                 //measure(0, 0);
                 //setMinWidth(getMeasuredWidth());
                 //setMinHeight(getMeasuredHeight());
+            }
+            if(BuildConfig.DEBUG){
+                Log.i(TAG, "setWindow:s "+ss);
+                Log.i(TAG, "setWindow:w "+getWidth());
+                Log.i(TAG, "setWindow:m "+getMaxWidth());
+                Log.i(TAG, "setWindow:w2 "+getMeasuredWidth());
             }
             /*if(BuildConfig.DEBUG){
                 Log.i(TAG, "setWindow:s "+ss);

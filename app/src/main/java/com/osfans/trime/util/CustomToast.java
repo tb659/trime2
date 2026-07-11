@@ -109,9 +109,14 @@ public class CustomToast {
                 popupWindow.setElevation(0);
             }
 
-            // 在指定位置显示 PopupWindow
-            // 使用 Gravity.CENTER 让系统自动居中，然后应用偏移量
-            popupWindow.showAtLocation(getContentView(context), Gravity.CENTER, 0, 0);
+            // 在输入法窗口中优先贴近顶部显示，避免被键盘本体遮挡。
+            int gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
+            int yOffset = dpToPx(context, 96);
+            if (aboveKeyboard && context instanceof android.inputmethodservice.InputMethodService) {
+                gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+                yOffset = dpToPx(context, 16);
+            }
+            popupWindow.showAtLocation(getContentView(context), gravity, 0, yOffset);
 
             // 保存当前 PopupWindow 的弱引用，以便后续可以关闭它
             currentPopupRef = new WeakReference<>(popupWindow);
@@ -181,5 +186,9 @@ public class CustomToast {
      */
     public static void dismiss() {
         mainHandler.post(CustomToast::dismissCurrent);
+    }
+
+    private static int dpToPx(Context context, int dp) {
+        return Math.round(dp * context.getResources().getDisplayMetrics().density);
     }
 }

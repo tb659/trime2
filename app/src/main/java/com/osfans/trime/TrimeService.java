@@ -30,6 +30,8 @@ import android.view.ViewParent;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.ExtractedText;
+import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
@@ -111,6 +113,8 @@ public class TrimeService extends InputMethodService {
     private boolean mPredictionCandidatesVisible = false;
     // 是否需要发送键释放事件
     private boolean keyUpNeeded;
+    // 点击 composition 后待在下一次按键前同步到 Rime 的光标位。
+    private int mPendingCompositionCaret = -1;
     // Enter 键是否作为换行符
     private boolean enterAsLineBreak;
     // 回车键的动作标签（搜索/发送/下一个等）
@@ -948,6 +952,7 @@ public class TrimeService extends InputMethodService {
         //    return true;
         //if(keyCode==KeyEvent.KEYCODE_DPAD_RIGHT&&mRootInputView.nextCandidate())
         //    return true;
+        applyPendingCompositionCaret();
         if (onRimeKey(Event.getRimeEvent(keyCode, mask))) {
             keyUpNeeded = true;
         } else if (handleAction(keyCode, mask) || handleOption(keyCode) || handleEnter(keyCode) || handleBack(keyCode)) {
@@ -959,6 +964,17 @@ public class TrimeService extends InputMethodService {
             return false;
         }
         return true;
+    }
+
+    private void applyPendingCompositionCaret() {
+        if (mPendingCompositionCaret < 0 || !Rime.isComposing()) return;
+        int caret = mPendingCompositionCaret;
+        mPendingCompositionCaret = -1;
+        mRime.moveCursorPos(caret);
+    }
+
+    public void setPendingCompositionCaret(int caret) {
+        mPendingCompositionCaret = Math.max(caret, 0);
     }
 
     /**
@@ -1230,8 +1246,7 @@ public class TrimeService extends InputMethodService {
      * @param message Rime 引擎发送的消息对象，包含不同类型的状态或数据变更通知。
      */
     private void handleRimeMessage(RimeMessage<?> message) {
-        // 记录调试日志：打印消息类型和数据内容
-        Log.w("rime", "handleRimeMessage:1 " + message.getClass() + ":" + message.getData());
+        logRimeMessage(message);
 
         // 1. 处理文本提交消息
         // 当 Rime 引擎确定需要上屏一段文本时（如用户选择候选词或确认输入），触发此分支
@@ -1242,8 +1257,9 @@ public class TrimeService extends InputMethodService {
         // 2. 处理输入方案切换消息
         // 当用户切换输入法方案（如从拼音切换到五笔）时触发
         else if (message instanceof RimeMessage.SchemaMessage) {
+            RimeMessage.SchemaMessage schemaMessage = (RimeMessage.SchemaMessage) message;
             // 获取新方案的 ID，并通知根视图更新键盘布局和状态显示
-            mRootInputView.setSchema(((RimeMessage.SchemaMessage) message).getData().getId());
+            mRootInputView.setSchema(schemaMessage.getData().getId());
             initInlinePreedit();
         }
         // 3. 处理部署（同步/编译配置）完成消息
@@ -1331,6 +1347,8 @@ public class TrimeService extends InputMethodService {
     }
 
     private boolean mComposing;
+    // 仅在 composition 摘要变化时输出一次调试日志，避免刷屏。
+    private String mLastCompositionLog = "";
     // 1. 复用 Runnable，避免 GC 压力
     private final Runnable mStatusRunnable = new Runnable() {
         @Override
@@ -1363,55 +1381,112 @@ public class TrimeService extends InputMethodService {
     }
 
     private void updateComposing(RimeProto.Context.Composition data) {
-        String preedit = stripPredictionPlaceholder(data.getPreedit());
+        String preedit = data != null ? stripPredictionPlaceholder(data.getPreedit()) : "";
         setComposingText(preedit);
         mHandler.post(this::updateComposing);
     }
 
-    private void initInlinePreedit() {
-        String schemaId = Rime.getCurrentRimeSchema();
-        if (TextUtils.isEmpty(schemaId)) return;
-        try (RimeConfig config = RimeConfig.openSchema(schemaId)) {
-            String preeditType = config.getString("style/preedit_type");
-            if (TextUtils.isEmpty(preeditType)) return;
-            switch (preeditType) {
-                case "preview":
-                    inlinePreedit = InlineModeType.INLINE_PREVIEW;
-                    break;
-                case "composition":
-                    inlinePreedit = InlineModeType.INLINE_COMPOSITION;
-                    break;
-                case "input":
-                    inlinePreedit = InlineModeType.INLINE_INPUT;
-                    break;
-                default:
-                    inlinePreedit = InlineModeType.INLINE_NONE;
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "initInlinePreedit: " + e.getMessage());
+    private void logRimeMessage(RimeMessage<?> message) {
+        if (!BuildConfig.DEBUG) return;
+        if (message instanceof RimeMessage.CompositionMessage) {
+            RimeProto.Context.Composition composition = ((RimeMessage.CompositionMessage) message).getData();
+            RimeProto.Context context = Rime.getRimeContext();
+            String preedit = composition != null ? stripPredictionPlaceholder(composition.getPreedit()) : "";
+            String rawInput = context != null ? context.getInput() : "";
+            int caret = context != null ? context.getCaretPos() : 0;
+            String visibleText = TextUtils.isEmpty(preedit) ? rawInput : preedit;
+            String summary = "composition: text='" + visibleText + "', preedit='" + preedit
+                    + "', rawInput='" + rawInput + "', caret=" + caret;
+            if (summary.equals(mLastCompositionLog)) return;
+            mLastCompositionLog = summary;
+            Log.d(TAG, summary);
+            return;
         }
+        Log.d(TAG, "handleRimeMessage: " + message.getClass().getSimpleName() + ":" + message.getData());
+    }
+
+    private void initInlinePreedit() {
+        inlinePreedit = InlineModeType.INLINE_NONE;
+        String schemaId = Rime.getCurrentRimeSchema();
+        if (!TextUtils.isEmpty(schemaId)) {
+            try (RimeConfig config = RimeConfig.openSchema(schemaId)) {
+                Boolean inlinePreeditEnabled = config.getBool("style/inline_preedit");
+                if (!Boolean.FALSE.equals(inlinePreeditEnabled)) {
+                    String preeditType = config.getString("style/preedit_type");
+                    if (!TextUtils.isEmpty(preeditType)) {
+                        switch (preeditType.trim()) {
+                            case "preview":
+                            case "preview_all":
+                                inlinePreedit = InlineModeType.INLINE_PREVIEW;
+                                break;
+                            case "composition":
+                                inlinePreedit = InlineModeType.INLINE_COMPOSITION;
+                                break;
+                            case "input":
+                                inlinePreedit = InlineModeType.INLINE_INPUT;
+                                break;
+                            default:
+                                inlinePreedit = InlineModeType.INLINE_NONE;
+                                break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "initInlinePreedit: " + e.getMessage());
+            }
+        }
+        if (mRootInputView != null) {
+            mRootInputView.setInlinePreeditMode(inlinePreedit);
+        }
+    }
+
+    public InlineModeType getInlinePreeditMode() {
+        return inlinePreedit;
     }
 
     public void updateComposing() {
         InputConnection ic = getCurrentInputConnection();
         if (inlinePreedit != InlineModeType.INLINE_NONE) {
             String s = null;
+            int cursor = 0;
             switch (inlinePreedit) {
                 case INLINE_PREVIEW:
                     s = mRime.getComposingText();
+                    RimeProto.Context.Composition previewComposition = mRime.getCompositionCached();
+                    cursor = previewComposition != null ? previewComposition.getCursorPos() : 0;
                     break;
                 case INLINE_COMPOSITION:
-                    s = mRime.getCompositionCached().getPreedit();
+                    RimeProto.Context.Composition composition = mRime.getCompositionCached();
+                    s = composition != null ? composition.getPreedit() : null;
+                    cursor = composition != null ? composition.getCursorPos() : 0;
                     break;
                 case INLINE_INPUT:
                     s = Rime.getRimeRawInput();
+                    RimeProto.Context context = Rime.getRimeContext();
+                    cursor = context != null ? context.getCaretPos() : 0;
                     break;
             }
             if (s == null) s = "";
+            int placeholderIndex = s.indexOf(PREDICTION_PLACEHOLDER);
+            if (placeholderIndex >= 0) {
+                if (cursor > placeholderIndex) {
+                    cursor = Math.max(placeholderIndex, cursor - PREDICTION_PLACEHOLDER.length());
+                }
+                s = stripPredictionPlaceholder(s);
+            }
+            cursor = Math.max(0, Math.min(cursor, s.length()));
             s = stripPredictionPlaceholder(s);
             if (ic != null) {
                 CharSequence cs = ic.getSelectedText(0);
-                if (cs == null || !TextUtils.isEmpty(s)) ic.setComposingText(s, 1);
+                if (cs == null || !TextUtils.isEmpty(s)) {
+                    ic.setComposingText(s, 1);
+                    ExtractedText extractedText = ic.getExtractedText(new ExtractedTextRequest(), 0);
+                    if (extractedText != null) {
+                        int selectionEnd = extractedText.selectionEnd;
+                        int targetSelection = Math.max(0, selectionEnd - (s.length() - cursor));
+                        ic.setSelection(targetSelection, targetSelection);
+                    }
+                }
             }
         }
     }

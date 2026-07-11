@@ -77,6 +77,16 @@ public final class RimeConfig implements AutoCloseable {
     }
 
     /**
+     * 从配置中获取布尔值。
+     *
+     * @param key 配置键。
+     * @return 布尔值，如果键未找到或不是布尔值则返回 null。
+     */
+    public Boolean getBool(String key) {
+        return getRimeConfigBool(peer, key);
+    }
+
+    /**
      * 通过遍历列表项路径获取配置项列表。
      *
      * @param key 指向列表结构的配置键。
@@ -220,6 +230,15 @@ public final class RimeConfig implements AutoCloseable {
      * @return 字符串值,失败返回 null。
      */
     private static native String getRimeConfigString(long peer, String key);
+
+    /**
+     * 从配置中获取布尔值(JNI)。
+     *
+     * @param peer JNI 对等指针。
+     * @param key 配置键。
+     * @return 布尔值，失败返回 null。
+     */
+    private static native Boolean getRimeConfigBool(long peer, String key);
 
     /**
      * 获取配置列表项路径数组(JNI)。

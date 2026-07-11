@@ -29,6 +29,8 @@ import com.osfans.trime.candidate.CandidatesManager;
 import com.osfans.trime.candidate.ExpandedCandidateView;
 import com.osfans.trime.core.CandidateItem;
 import com.osfans.trime.core.Rime;
+import com.osfans.trime.core.RimeProto;
+import com.osfans.trime.enums.InlineModeType;
 import com.osfans.trime.keyboard.ClipboardKeyboardView;
 import com.osfans.trime.keyboard.FloatKeyboard;
 import com.osfans.trime.keyboard.KeyView;
@@ -714,13 +716,27 @@ public class RootInputView extends FrameLayout {
 
     private boolean mHasComposition;
     private boolean mHideComposition;
+    private boolean mHideCompositionByInlinePreedit;
+
+    private String getVisibleCompositionText() {
+        if (!TextUtils.isEmpty(mLastComposingText)) {
+            return mLastComposingText;
+        }
+        RimeProto.Context context = Rime.getRimeContext();
+        if (context == null) {
+            return "";
+        }
+        String input = context.getInput();
+        return input == null ? "" : input;
+    }
+
     // 2. 复用 Runnable，避免频繁 GC 产生内存抖动
     private final Runnable mComposingRunnable = new Runnable() {
         @Override
         public void run() {
-            String s = mLastComposingText;
+            String s = getVisibleCompositionText();
 
-            if (TextUtils.isEmpty(s) || mHideComposition) {
+            if (TextUtils.isEmpty(s) || mHideComposition || mHideCompositionByInlinePreedit) {
                 mPreedit.setVisibility(View.INVISIBLE);
             } else {
                 mPreedit.setVisibility(View.VISIBLE);
@@ -759,6 +775,15 @@ public class RootInputView extends FrameLayout {
         mLastComposingText = s;
 
         // 4. 防抖处理：移除旧任务，确保主线程只处理最后一次更新
+        mHandler.removeCallbacks(mComposingRunnable);
+        mHandler.post(mComposingRunnable);
+    }
+
+    public void setInlinePreeditMode(InlineModeType mode) {
+        mHideCompositionByInlinePreedit = mode != InlineModeType.INLINE_NONE;
+        if (mode == InlineModeType.INLINE_NONE) {
+            mHideComposition = false;
+        }
         mHandler.removeCallbacks(mComposingRunnable);
         mHandler.post(mComposingRunnable);
     }
@@ -968,6 +993,7 @@ public class RootInputView extends FrameLayout {
                 String soft_cursor_key = "soft_cursor";
                 Rime.setRimeOption(soft_cursor_key, true); //软光标
                 setTheme(Config.getTheme());
+                setInlinePreeditMode(TrimeService.getInstance().getInlinePreeditMode());
                 //mInputView.setKeyboard(id);
                 //mCandidateView.setSchema(id);
             }
