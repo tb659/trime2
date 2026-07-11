@@ -604,6 +604,11 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         }));
     }
 
+    public boolean learnRawInput(String text) {
+        if (TextUtils.isEmpty(text)) return false;
+        return Boolean.TRUE.equals(withRimeContext(() -> learnRimeRawInput(text)));
+    }
+
     /**
      * 清除当前组字内容(取消输入)。
      */
@@ -1141,6 +1146,8 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
      * @return 原始输入字符串。
      */
     public static native String getRimeRawInput();
+
+    public static native boolean learnRimeRawInput(String text);
 
     /**
      * 获取光标位置(原生方法)。

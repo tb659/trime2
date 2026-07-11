@@ -153,15 +153,7 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
         holder.itemView.setOnClickListener(v -> {
             int position = holder.getBindingAdapterPosition(); // 获取当前实时位置
             if (position != RecyclerView.NO_POSITION && mData != null) {
-                CandidateItem item = mData.get(position);
-                if (item.getIndex() == -1) {
-                    // index 为 -1 表示直接提交文本
-                    TrimeService.getInstance().commitText(item.getText());
-                    TrimeService.getInstance().setCandidates(null);
-                } else {
-                    // 正常候选词,通知 Rime 引擎选择
-                    TrimeService.getInstance().selectCandidate(item.getIndex());
-                }
+                TrimeService.getInstance().selectCandidateItem(mData.get(position));
             }
         });
         return holder;

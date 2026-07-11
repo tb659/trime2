@@ -67,6 +67,7 @@ import java.util.Map;
 public class Composition extends TextView {
     // 日志标签，用于 Logcat 输出
     private static final String TAG = "Composition";
+    private static final char SOFT_CURSOR = '‸';
     // 键盘文本尺寸相关属性（单位：像素）
     private int key_text_size, text_size, label_text_size, candidate_text_size, comment_text_size;
     // 文本颜色相关属性（ARGB 格式）
@@ -618,7 +619,7 @@ public class Composition extends TextView {
          */
         @Override
         public void onClick(View tv) {
-            TrimeService.getInstance().selectPagedCandidate(index);
+            TrimeService.getInstance().selectPagedCandidateFromUi(index);
         }
 
         /**
@@ -764,10 +765,16 @@ public class Composition extends TextView {
         int count = 0;
         for (int i = 0; i < text.length(); i++) {
             char ch = text.charAt(i);
-            if (ch == ' ' || ch == '‸') continue;
+            if (ch == ' ' || ch == SOFT_CURSOR) continue;
             count++;
         }
         return count;
+    }
+
+    private static String withSoftCursor(String text, int caret) {
+        if (text == null) return "";
+        int safeCaret = Math.max(0, Math.min(caret, text.length()));
+        return text.substring(0, safeCaret) + SOFT_CURSOR + text.substring(safeCaret);
     }
 
     /**
@@ -998,6 +1005,8 @@ public class Composition extends TextView {
         // 如果配置为末尾内容置顶且当前缓冲区已有内容，先添加换行符
         if (end_top && ss.length() > 2)
             ss.append("\n");
+        TrimeService trime = TrimeService.getInstance();
+        if (trime != null && trime.shouldHideCompositionDuringPrediction()) return;
         
         // 获取 Rime 上下文中的预编辑信息
         RimeProto.Context.Composition r = mRimeContext.getComposition();
@@ -1005,16 +1014,19 @@ public class Composition extends TextView {
         String s = r.getPreedit();
         int selectionStart = r.getSelStart();
         int selectionEnd = r.getSelEnd();
-        if (TextUtils.isEmpty(s) && mRimeContext != null) {
-            String input = mRimeContext.getInput();
+        String input = mRimeContext != null ? mRimeContext.getInput() : null;
+        if (TrimeService.isPredictionPlaceholderOnly(s, input)) return;
+        String visibleText = TrimeService.resolveVisibleCompositionText(s, input);
+        if (TrimeService.shouldPreferRawInputForComposition(input) || TextUtils.isEmpty(s)) {
             if (!TextUtils.isEmpty(input)) {
-                s = input;
-                int caret = Math.max(0, Math.min(mRimeContext.getCaretPos(), s.length()));
+                int caret = Math.max(0, Math.min(mRimeContext.getCaretPos(), input.length()));
+                s = withSoftCursor(input, caret);
                 selectionStart = caret;
                 selectionEnd = caret;
             }
+        } else {
+            s = visibleText;
         }
-        if (isPredictionPlaceholderComposition()) return;
         if (TextUtils.isEmpty(s)) return;
         
         // 定义起始和结束位置变量
@@ -1090,8 +1102,9 @@ public class Composition extends TextView {
 
     private boolean isPredictionPlaceholderComposition() {
         if (mRimeContext == null || mRimeContext.getComposition() == null) return false;
-        return "~".equals(mRimeContext.getComposition().getPreedit())
-                && "~".equals(mRimeContext.getInput());
+        return TrimeService.isPredictionPlaceholderOnly(
+                mRimeContext.getComposition().getPreedit(),
+                mRimeContext.getInput());
     }
 
     /**
@@ -1572,6 +1585,8 @@ public class Composition extends TextView {
     public int setWindow(int length) {
         // 如果视图不可见，则直接返回 0，不进行任何操作
         if (getVisibility() != View.VISIBLE) return 0;
+        TrimeService trime = TrimeService.getInstance();
+        if (trime != null && trime.shouldHideCompositionDuringPrediction()) return 0;
         // 获取当前的 Rime 输入法上下文数据
         mRimeContext = Rime.getRimeContext();
         // 从上下文中获取预编辑信息对象
@@ -1580,8 +1595,12 @@ public class Composition extends TextView {
         if (r == null) return 0;
         // 获取预编辑文本字符串
         String s = r.getPreedit();
-        if (TextUtils.isEmpty(s)) {
-            s = mRimeContext.getInput();
+        String input = mRimeContext.getInput();
+        if (TrimeService.isPredictionPlaceholderOnly(s, input)) return 0;
+        if (TrimeService.shouldPreferRawInputForComposition(input) || TextUtils.isEmpty(s)) {
+            s = input;
+        } else {
+            s = TrimeService.resolveVisibleCompositionText(s, input);
         }
         // 如果既没有预编辑文本，也不是预测占位符态，则无需显示编码区
         if (TextUtils.isEmpty(s) && !isPredictionPlaceholderComposition()) return 0;

@@ -719,6 +719,10 @@ public class RootInputView extends FrameLayout {
     private boolean mHideCompositionByInlinePreedit;
 
     private String getVisibleCompositionText() {
+        TrimeService trime = TrimeService.getInstance();
+        if (trime != null && trime.shouldHideCompositionDuringPrediction()) {
+            return "";
+        }
         if (!TextUtils.isEmpty(mLastComposingText)) {
             return mLastComposingText;
         }
@@ -726,8 +730,8 @@ public class RootInputView extends FrameLayout {
         if (context == null) {
             return "";
         }
-        String input = context.getInput();
-        return input == null ? "" : input;
+        String preedit = context.getComposition() != null ? context.getComposition().getPreedit() : "";
+        return TrimeService.resolveVisibleCompositionText(preedit, context.getInput());
     }
 
     // 2. 复用 Runnable，避免频繁 GC 产生内存抖动
@@ -735,6 +739,13 @@ public class RootInputView extends FrameLayout {
         @Override
         public void run() {
             String s = getVisibleCompositionText();
+            TrimeService trime = TrimeService.getInstance();
+            if (trime != null && trime.shouldHideCompositionDuringPrediction()) {
+                mPreedit.setVisibility(View.INVISIBLE);
+                mPreedit.setText("");
+                mStartIdx = 0;
+                return;
+            }
 
             if (TextUtils.isEmpty(s) || mHideComposition || mHideCompositionByInlinePreedit) {
                 mPreedit.setVisibility(View.INVISIBLE);

@@ -710,6 +710,12 @@ public class TrimeService extends InputMethodService {
         int selectCandidate = event.getSelectCandidate();
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onEvent:selectCandidate " + selectCandidate);
         if (selectCandidate > 0) {
+            // 当预输入区含有字母时，数字键追加到预输入区而不是选择候选词
+            if (shouldAppendDigitToComposition() && isDigitSelectionEvent(event)) {
+                int keyCode = KeyEvent.KEYCODE_0 + selectCandidate;
+                handleKey(keyCode, 0);
+                return;
+            }
             selectPagedCandidate(selectCandidate - 1);
             return;
         }
@@ -952,6 +958,9 @@ public class TrimeService extends InputMethodService {
         //    return true;
         //if(keyCode==KeyEvent.KEYCODE_DPAD_RIGHT&&mRootInputView.nextCandidate())
         //    return true;
+        if (commitRawInputCompositionIfNeeded(keyCode)) {
+            return true;
+        }
         applyPendingCompositionCaret();
         if (onRimeKey(Event.getRimeEvent(keyCode, mask))) {
             keyUpNeeded = true;
@@ -971,6 +980,98 @@ public class TrimeService extends InputMethodService {
         int caret = mPendingCompositionCaret;
         mPendingCompositionCaret = -1;
         mRime.moveCursorPos(caret);
+    }
+
+    private boolean shouldAppendDigitToComposition() {
+        if (!isComposing()) {
+            return false;
+        }
+        String rawInput = Rime.getRimeRawInput();
+        return containsAsciiLetter(rawInput);
+    }
+
+    private boolean isDigitSelectionEvent(Event event) {
+        if (event == null) {
+            return false;
+        }
+        String raw = event.getRawText();
+        if (!TextUtils.isEmpty(raw) && raw.length() == 1 && Character.isDigit(raw.charAt(0))) {
+            return true;
+        }
+        String label = event.getLabel();
+        return !TextUtils.isEmpty(label) && label.length() == 1 && Character.isDigit(label.charAt(0));
+    }
+
+    private boolean shouldCommitRawInputComposition() {
+        return shouldPreferRawInputForComposition(Rime.getRimeRawInput());
+    }
+
+    private boolean commitRawInputCompositionIfNeeded(int keyCode) {
+        if ((keyCode != KeyEvent.KEYCODE_SPACE && keyCode != KeyEvent.KEYCODE_ENTER)
+                || !shouldCommitRawInputComposition()) {
+            return false;
+        }
+        commitRawInputComposition();
+        return true;
+    }
+
+    private void commitRawInputComposition() {
+        commitRawInputComposition(stripPredictionPlaceholder(Rime.getRimeRawInput()));
+    }
+
+    private void commitRawInputComposition(String rawInput) {
+        rawInput = stripPredictionPlaceholder(rawInput);
+        if (TextUtils.isEmpty(rawInput)) {
+            return;
+        }
+        commitTextAndClearComposition(rawInput);
+        if (shouldPreferRawInputForComposition(rawInput)) {
+            mRime.learnRawInput(rawInput);
+        }
+    }
+
+    static boolean shouldPreferRawInputForComposition(String rawInput) {
+        return containsAsciiLetter(rawInput) && containsAsciiDigit(rawInput);
+    }
+
+    static String resolveVisibleCompositionText(String preedit, String rawInput) {
+        String normalizedRawInput = stripPredictionPlaceholder(rawInput);
+        if (shouldPreferRawInputForComposition(normalizedRawInput)) {
+            return normalizedRawInput;
+        }
+        String normalizedPreedit = stripPredictionPlaceholder(preedit);
+        return TextUtils.isEmpty(normalizedPreedit) ? normalizedRawInput : normalizedPreedit;
+    }
+
+    static boolean isPredictionPlaceholderOnly(String preedit, String rawInput) {
+        return (hasPredictionPlaceholder(preedit) || hasPredictionPlaceholder(rawInput))
+                && TextUtils.isEmpty(resolveVisibleCompositionText(preedit, rawInput));
+    }
+
+    private static boolean containsAsciiLetter(String text) {
+        if (TextUtils.isEmpty(text)) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsAsciiDigit(String text) {
+        if (TextUtils.isEmpty(text)) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch >= '0' && ch <= '9') {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void setPendingCompositionCaret(int caret) {
@@ -1063,6 +1164,7 @@ public class TrimeService extends InputMethodService {
     public void commitTextAndClearComposition(CharSequence text) {
         commitText(text);
         mRime.clearComposition();
+        clearDisplayedComposition();
     }
 
     /**
@@ -1077,8 +1179,17 @@ public class TrimeService extends InputMethodService {
                 commitText(text);
             }
             mRime.clearComposition();
+            clearDisplayedComposition();
         }
         return false; // 原有逻辑返回 false
+    }
+
+    private void clearDisplayedComposition() {
+        setComposingText("");
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.finishComposingText();
+        }
     }
 
     /**
@@ -1381,8 +1492,8 @@ public class TrimeService extends InputMethodService {
     }
 
     private void updateComposing(RimeProto.Context.Composition data) {
-        String preedit = data != null ? stripPredictionPlaceholder(data.getPreedit()) : "";
-        setComposingText(preedit);
+        String preedit = data != null ? data.getPreedit() : "";
+        setComposingText(resolveVisibleCompositionText(preedit, Rime.getRimeRawInput()));
         mHandler.post(this::updateComposing);
     }
 
@@ -1391,10 +1502,10 @@ public class TrimeService extends InputMethodService {
         if (message instanceof RimeMessage.CompositionMessage) {
             RimeProto.Context.Composition composition = ((RimeMessage.CompositionMessage) message).getData();
             RimeProto.Context context = Rime.getRimeContext();
-            String preedit = composition != null ? stripPredictionPlaceholder(composition.getPreedit()) : "";
+            String preedit = composition != null ? composition.getPreedit() : "";
             String rawInput = context != null ? context.getInput() : "";
             int caret = context != null ? context.getCaretPos() : 0;
-            String visibleText = TextUtils.isEmpty(preedit) ? rawInput : preedit;
+            String visibleText = resolveVisibleCompositionText(preedit, rawInput);
             String summary = "composition: text='" + visibleText + "', preedit='" + preedit
                     + "', rawInput='" + rawInput + "', caret=" + caret;
             if (summary.equals(mLastCompositionLog)) return;
@@ -1449,6 +1560,7 @@ public class TrimeService extends InputMethodService {
         if (inlinePreedit != InlineModeType.INLINE_NONE) {
             String s = null;
             int cursor = 0;
+            RimeProto.Context context = Rime.getRimeContext();
             switch (inlinePreedit) {
                 case INLINE_PREVIEW:
                     s = mRime.getComposingText();
@@ -1461,10 +1573,14 @@ public class TrimeService extends InputMethodService {
                     cursor = composition != null ? composition.getCursorPos() : 0;
                     break;
                 case INLINE_INPUT:
-                    s = Rime.getRimeRawInput();
-                    RimeProto.Context context = Rime.getRimeContext();
+                    s = context != null ? context.getInput() : Rime.getRimeRawInput();
                     cursor = context != null ? context.getCaretPos() : 0;
                     break;
+            }
+            String rawInput = context != null ? context.getInput() : Rime.getRimeRawInput();
+            if (shouldPreferRawInputForComposition(rawInput)) {
+                s = rawInput;
+                cursor = context != null ? context.getCaretPos() : cursor;
             }
             if (s == null) s = "";
             int placeholderIndex = s.indexOf(PREDICTION_PLACEHOLDER);
@@ -1477,8 +1593,9 @@ public class TrimeService extends InputMethodService {
             cursor = Math.max(0, Math.min(cursor, s.length()));
             s = stripPredictionPlaceholder(s);
             if (ic != null) {
-                CharSequence cs = ic.getSelectedText(0);
-                if (cs == null || !TextUtils.isEmpty(s)) {
+                if (TextUtils.isEmpty(s)) {
+                    ic.finishComposingText();
+                } else {
                     ic.setComposingText(s, 1);
                     ExtractedText extractedText = ic.getExtractedText(new ExtractedTextRequest(), 0);
                     if (extractedText != null) {
@@ -1619,6 +1736,14 @@ public class TrimeService extends InputMethodService {
         mRime.selectCandidate(index);
     }
 
+    public void selectCandidateFromUi(int index) {
+        if (shouldCommitRawInputComposition()) {
+            commitRawInputComposition();
+            return;
+        }
+        mRime.selectCandidate(index);
+    }
+
     /**
      * 选择分页后的候选词。
      *
@@ -1626,6 +1751,30 @@ public class TrimeService extends InputMethodService {
      */
     public void selectPagedCandidate(int index) {
         mRime.selectPagedCandidate(index);
+    }
+
+    public void selectPagedCandidateFromUi(int index) {
+        if (shouldCommitRawInputComposition()) {
+            commitRawInputComposition();
+            return;
+        }
+        mRime.selectPagedCandidate(index);
+    }
+
+    public void selectCandidateItem(CandidateItem item) {
+        if (item == null) {
+            return;
+        }
+        if (item.getIndex() == -1) {
+            String rawInput = stripPredictionPlaceholder(item.getText());
+            if (shouldPreferRawInputForComposition(rawInput)) {
+                commitRawInputComposition(rawInput);
+            } else {
+                commitTextAndClearComposition(rawInput);
+            }
+            return;
+        }
+        selectCandidateFromUi(item.getIndex());
     }
 
     /**
@@ -1668,6 +1817,10 @@ public class TrimeService extends InputMethodService {
                 || hasPredictionPlaceholder(preedit));
     }
 
+    public boolean shouldHideCompositionDuringPrediction() {
+        return mPredictionCandidatesVisible || isPredicting();
+    }
+
     /**
      * 清除联想候选并关闭候选栏。
      * 仅在 {@link #isPredicting()} 为 true 时生效，供候选栏关闭按钮调用。
@@ -1676,7 +1829,7 @@ public class TrimeService extends InputMethodService {
         if (!isPredicting() && !mPredictionCandidatesVisible) return;
         setPredictionCandidatesVisible(false);
         mRime.clearComposition();
-        setComposingText("");
+        clearDisplayedComposition();
         setCandidatesViewShown(false);
         showToolbarView(true);
     }

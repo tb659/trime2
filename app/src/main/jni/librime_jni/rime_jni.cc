@@ -4,8 +4,14 @@
 
 #include <rime_api.h>
 
+#include <memory>
 #include <string>
 #include <vector>
+
+#include <rime/dict/dictionary.h>
+#include <rime/dict/user_dictionary.h>
+#include <rime/schema.h>
+#include <rime/ticket.h>
 
 #include "jni-utils.h"
 #include "objconv.h"
@@ -118,6 +124,43 @@ class Rime {
   std::string rawInput() {
     auto cStr = rime->get_input(session());
     return cStr ? cStr : "";
+  }
+
+  bool learnRawInput(std::string_view text) {
+    if (text.empty()) {
+      return false;
+    }
+    std::string schema_id = currentSchemaId();
+    if (schema_id.empty() || schema_id == ".default") {
+      return false;
+    }
+
+    rime::Schema schema(schema_id);
+    if (!schema.config()) {
+      return false;
+    }
+    rime::Ticket ticket(&schema, "translator");
+
+    auto user_dictionary = rime::UserDictionary::Require("user_dictionary");
+    if (!user_dictionary) {
+      return false;
+    }
+    std::unique_ptr<rime::UserDictionary> user_dict(user_dictionary->Create(ticket));
+    if (!user_dict || !user_dict->Load() || user_dict->readonly()) {
+      return false;
+    }
+
+    if (auto dictionary = rime::Dictionary::Require("dictionary")) {
+      std::unique_ptr<rime::Dictionary> dict(dictionary->Create(ticket));
+      if (dict && dict->Load()) {
+        user_dict->Attach(dict->primary_table(), dict->prism());
+      }
+    }
+
+    rime::DictEntry entry;
+    entry.text = std::string(text);
+    entry.custom_code = std::string(text);
+    return user_dict->UpdateEntry(entry, 1);
   }
 
   size_t caretPosition() { return rime->get_caret_pos(session()); }
@@ -351,6 +394,14 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_osfans_trime_core_Rime_getRimeRawInput(JNIEnv *env,
                                                 jclass /* thiz */) {
   return env->NewStringUTF(Rime::Instance().rawInput().data());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_osfans_trime_core_Rime_learnRimeRawInput(JNIEnv *env,
+                                                  jclass /* thiz */,
+                                                  jstring text) {
+  std::string raw_text = CString(env, text);
+  return Rime::Instance().learnRawInput(raw_text);
 }
 
 extern "C" JNIEXPORT jint JNICALL
