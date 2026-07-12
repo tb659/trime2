@@ -814,6 +814,22 @@ public class TrimeService extends InputMethodService {
                         // 显示部署弹窗
                         showDeployDialog();
                     }
+                    else {
+                        String resolvedOption = option;
+                        if (!TextUtils.isEmpty(option)) {
+                            try {
+                                resolvedOption = String.format(option,
+                                        getActiveText(1),
+                                        getActiveText(2),
+                                        getActiveText(3),
+                                        getActiveText(4)
+                                );
+                            } catch (java.util.IllegalFormatException e) {
+                                resolvedOption = option;
+                            }
+                        }
+                        textToSend = Function.handle(this, command, resolvedOption);
+                    }
                     // 如果命令执行后返回了文本，则提交该文本
                     if (textToSend != null) {
                         commitText(textToSend);
@@ -1370,8 +1386,9 @@ public class TrimeService extends InputMethodService {
         else if (message instanceof RimeMessage.SchemaMessage) {
             RimeMessage.SchemaMessage schemaMessage = (RimeMessage.SchemaMessage) message;
             // 获取新方案的 ID，并通知根视图更新键盘布局和状态显示
-            mRootInputView.setSchema(schemaMessage.getData().getId());
             initInlinePreedit();
+            mRootInputView.setSchema(schemaMessage.getData().getId());
+            updateComposing(mRime.getCompositionCached());
         }
         // 3. 处理部署（同步/编译配置）完成消息
         // 当用户执行“部署”操作，Rime 重新加载配置文件后触发
@@ -1396,8 +1413,9 @@ public class TrimeService extends InputMethodService {
                             mHandler.postDelayed(this, 10);
                         } else {
                             // 获取到方案 ID 后，更新根视图的键盘布局
-                            mRootInputView.setSchema(Rime.getCurrentRimeSchema());
                             initInlinePreedit();
+                            mRootInputView.setSchema(Rime.getCurrentRimeSchema());
+                            updateComposing(mRime.getCompositionCached());
                         }
                     }
                 }, 10);
@@ -1791,6 +1809,27 @@ public class TrimeService extends InputMethodService {
      */
     public void deploy() {
         mRime.deploy();
+    }
+
+    /**
+     * 同步 Rime 用户资料。
+     *
+     * @return true 表示同步成功。
+     */
+    public boolean syncUserData() {
+        return mRime.syncUserData();
+    }
+
+    public void showStatusDialog(String title) {
+        AlertDialog dialog = new AlertDialog.Builder(this, Config.getDialogTheme())
+                .setTitle(title)
+                .setPositiveButton(getString(android.R.string.ok), null)
+                .create();
+        if (getToken() != null) {
+            showWidthDialog(dialog);
+        } else {
+            dialog.show();
+        }
     }
 
     /**

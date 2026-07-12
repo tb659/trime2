@@ -39,6 +39,7 @@ flex_box = {
         {
             direction = "row",
             keys = {
+                { click = "Sync" },
                 { click = "Theme_settings" },
                 { click = "Color_settings" },
                 -- { click = "AddPhrase" },
