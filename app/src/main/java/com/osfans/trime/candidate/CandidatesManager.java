@@ -118,6 +118,7 @@ public class CandidatesManager {
     public static ArrayList<CandidateItem> next(int pageSize) {
         ArrayList<CandidateItem> resultList = new ArrayList<>(); // 结果列表
         int searchedCount = 0; // 已检索的原始候选词计数
+        final String rawInput = Rime.getRimeRawInput();
 
         // 局部变量缓存,提高循环内的访问效率
         final String currentFilterStroke = mFilterStroke;
@@ -134,7 +135,12 @@ public class CandidatesManager {
                 String text = cand.getText();
                 boolean isMatch = true;
 
-                if (!TextUtils.isEmpty(text)) {
+                // 开关关闭时，从候选数据层统一隐藏 mixed completion 候选，确保所有候选视图行为一致。
+                if (TrimeService.shouldHideMixedWordCandidate(text, rawInput)) {
+                    isMatch = false;
+                }
+
+                if (isMatch && !TextUtils.isEmpty(text)) {
                     // 1. 单字过滤逻辑
                     if (isFilterCharEnabled && text.length() > 1) {
                         isMatch = false; // 多字词被过滤

@@ -86,6 +86,7 @@ import java.util.regex.Pattern;
  */
 public class TrimeService extends InputMethodService {
     private static final String PREDICTION_PLACEHOLDER = "tyl";
+    private static final String RAW_INPUT_CANDIDATE_OPTION = "show_raw_input_candidate";
     // ==================== 常量与静态变量 ====================
     // 日志标签，用于 Logcat 输出
     private static final String TAG = "TrimeService";
@@ -1050,6 +1051,74 @@ public class TrimeService extends InputMethodService {
         return containsAsciiLetter(rawInput) && containsAsciiDigit(rawInput);
     }
 
+    /**
+     * 当前方案是否允许把 mixed rawInput 临时补显示为候选项。
+     * 这个开关只影响候选区展示，不影响 mixed 输入上屏、学习和快捷选词分流。
+     */
+    public static boolean shouldShowRawInputCandidate(String rawInput) {
+        return shouldPreferRawInputForComposition(rawInput)
+                && Rime.getRimeOption(RAW_INPUT_CANDIDATE_OPTION);
+    }
+
+    /**
+     * 当前 mixed 输入是否需要作为一个临时候选项补到候选栏。
+     * 开关开启后，即便已经存在普通候选，也应把当前 rawInput 显示出来；
+     * 但若候选列表中已经有同文项，则不重复补充。
+     */
+    public static boolean shouldInjectRawInputCandidate(
+            String rawInput, ArrayList<CandidateItem> visibleItems) {
+        if (!Rime.isComposing() || !shouldShowRawInputCandidate(rawInput)) {
+            return false;
+        }
+        if (visibleItems == null) {
+            return true;
+        }
+        for (CandidateItem item : visibleItems) {
+            if (item != null && TextUtils.equals(stripPredictionPlaceholder(item.getText()), rawInput)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 当前方案是否要求把 mixed rawInput 从候选区隐藏。
+     * 这不仅拦截 Java 侧补出来的 raw 候选，也用于过滤 Rime 直接返回的同文候选。
+     */
+    public static boolean shouldHideRawInputCandidate(String rawInput) {
+        return shouldPreferRawInputForComposition(rawInput)
+                && !Rime.getRimeOption(RAW_INPUT_CANDIDATE_OPTION);
+    }
+
+    /**
+     * 当候选显隐开关关闭时，隐藏这类“字母+数字”的 mixed 自造词候选。
+     * 不要求候选文本必须与当前 rawInput 完全相等；像输入 tb 时出现的 completion 候选 tb659 也应一并隐藏。
+     */
+    public static boolean shouldHideMixedWordCandidate(String candidateText, String rawInput) {
+        if (TextUtils.isEmpty(candidateText)
+                || Rime.getRimeOption(RAW_INPUT_CANDIDATE_OPTION)
+                || !containsAsciiLetter(candidateText)
+                || !containsAsciiDigit(candidateText)) {
+            return false;
+        }
+        if (TextUtils.isEmpty(rawInput)) {
+            return true;
+        }
+        return containsAsciiLetter(rawInput) && candidateText.startsWith(rawInput);
+    }
+
+    /**
+     * 解析编码区应显示的可见文本。
+     *
+     * 当原始输入（rawInput）同时包含英文字母和数字（即"混合输入"）时，
+     * 优先返回原始输入作为显示文本，以便用户直接看到混合编码内容。
+     * 否则返回预编辑文本（preedit），若预编辑为空则退回原始输入。
+     * 两个参数均会先去除预测占位符（{@link #PREDICTION_PLACEHOLDER}）。
+     *
+     * @param preedit Rime 引擎返回的预编辑/组合文本。
+     * @param rawInput 用户实际按键的原始输入字符串。
+     * @return 编码区应展示的可见文本。
+     */
     static String resolveVisibleCompositionText(String preedit, String rawInput) {
         String normalizedRawInput = stripPredictionPlaceholder(rawInput);
         if (shouldPreferRawInputForComposition(normalizedRawInput)) {
@@ -1059,11 +1128,28 @@ public class TrimeService extends InputMethodService {
         return TextUtils.isEmpty(normalizedPreedit) ? normalizedRawInput : normalizedPreedit;
     }
 
+    /**
+     * 判断预编辑文本是否仅包含预测占位符而无可显示内容。
+     *
+     * 当 preedit 或 rawInput 中存在占位符（如"tyl"），但经过
+     * {@link #resolveVisibleCompositionText} 解析后没有可显示的文本时返回 true。
+     * 用于在 UI 层面决定是否隐藏编码区——仅含占位符的编码区不应向用户展示。
+     *
+     * @param preedit Rime 引擎返回的预编辑文本。
+     * @param rawInput 用户实际按键的原始输入。
+     * @return true 如果仅含占位符且无可显示内容，false 否则。
+     */
     static boolean isPredictionPlaceholderOnly(String preedit, String rawInput) {
         return (hasPredictionPlaceholder(preedit) || hasPredictionPlaceholder(rawInput))
                 && TextUtils.isEmpty(resolveVisibleCompositionText(preedit, rawInput));
     }
 
+    /**
+     * 判断文本中是否包含任意 ASCII 字母（a-z 或 A-Z）。
+     *
+     * @param text 待检测的字符串。
+     * @return true 如果包含至少一个英文字母，false 如果为空或不含字母。
+     */
     private static boolean containsAsciiLetter(String text) {
         if (TextUtils.isEmpty(text)) {
             return false;
@@ -1077,6 +1163,12 @@ public class TrimeService extends InputMethodService {
         return false;
     }
 
+    /**
+     * 判断文本中是否包含任意 ASCII 数字（0-9）。
+     *
+     * @param text 待检测的字符串。
+     * @return true 如果包含至少一个数字，false 如果为空或不含数字。
+     */
     private static boolean containsAsciiDigit(String text) {
         if (TextUtils.isEmpty(text)) {
             return false;

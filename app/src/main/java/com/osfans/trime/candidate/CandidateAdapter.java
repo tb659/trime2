@@ -297,13 +297,25 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         mIdx = 0; // 重置选中索引
         oldIdx = 0;
         mData.clear(); // 清空旧数据
-        if (next.isEmpty() && Rime.isComposing() && !TextUtils.isEmpty(Rime.getRimeRawInput())) {
-            // 无候选词且正在编码时，显示原始输入码作为候选（点击直接上屏）
-            mData.add(new CandidateItem(Rime.getRimeRawInput()));
-        } else {
-            mData.addAll(next); // 添加新数据
-            if (!next.isEmpty())
-                Rime.highlightRimeCandidate(next.get(0).getIndex()); // 高亮第一个候选词
+        String rawInput = Rime.getRimeRawInput();
+        ArrayList<CandidateItem> visibleItems = next;
+        if (TrimeService.shouldHideRawInputCandidate(rawInput) && !next.isEmpty()) {
+            // 开关关闭时，同时过滤 Rime 直接返回的 mixed completion 候选，避免只拦住同文 raw 候选而拦不住 tb -> tb659 这类前缀补全。
+            visibleItems = new ArrayList<>();
+            for (CandidateItem item : next) {
+                if (item == null
+                        || !TrimeService.shouldHideMixedWordCandidate(item.getText(), rawInput)) {
+                    visibleItems.add(item);
+                }
+            }
+        }
+        if (TrimeService.shouldInjectRawInputCandidate(rawInput, visibleItems)) {
+            // a1显 开启后，始终把当前 mixed rawInput 补到候选栏，避免前面已有普通候选时看不到新自造词。
+            mData.add(new CandidateItem(rawInput));
+        }
+        mData.addAll(visibleItems); // 添加过滤后的候选数据
+        if (!mData.isEmpty() && mData.get(0).getIndex() >= 0) {
+            Rime.highlightRimeCandidate(mData.get(0).getIndex()); // 仅高亮真实的 Rime 候选
         }
         notifyDataSetChanged(); // 通知数据更新
     }
@@ -377,7 +389,10 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
                 notifyItemChanged(mIdx);
             }
         },50);*/
-        Rime.highlightRimeCandidate(mData.get(mIdx).getIndex()); // 通知 Rime 高亮
+        int index = mData.get(mIdx).getIndex();
+        if (index >= 0) {
+            Rime.highlightRimeCandidate(index); // 通知 Rime 高亮
+        }
     }
 
     /**

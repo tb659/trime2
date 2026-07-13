@@ -34,6 +34,12 @@ switches: # 0 默认关，1 默认开
   - name: simplification #简转繁滤镜
     reset: 0
     states: [简中, 繁中]
+  - name: show_raw_input_candidate
+    reset: 0
+    states: [a1隐, a1显]
+  - name: prediction
+    reset: 1
+    states: [联想隐, 联想显]
   - name: full_shape
     reset: 0
     states: [半角, 全角]
@@ -43,9 +49,6 @@ switches: # 0 默认关，1 默认开
   - name: udpf_switch
     reset: 0
     states: [U编关, U编开]
-  - name: prediction
-    reset: 1
-    states: ["🕳 关", "🔮 开"]
 
 engine:
   processors: # 组件处理按键消息

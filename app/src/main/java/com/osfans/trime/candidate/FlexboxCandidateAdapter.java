@@ -201,6 +201,10 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
     @SuppressLint("NotifyDataSetChanged")
     public void setData(ArrayList<CandidateItem> next) {
         mData.clear(); // 清空旧数据
+        String rawInput = com.osfans.trime.core.Rime.getRimeRawInput();
+        if (TrimeService.shouldInjectRawInputCandidate(rawInput, next)) {
+            mData.add(new CandidateItem(rawInput));
+        }
         mData.addAll(next); // 添加新数据
         notifyDataSetChanged(); // 通知数据更新
     }

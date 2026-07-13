@@ -246,9 +246,13 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
         oldIdx = 0;
         mMaxWidth=0; // 重置最大宽度
         mData.clear(); // 清空旧数据
+        String rawInput = Rime.getRimeRawInput();
+        if (TrimeService.shouldInjectRawInputCandidate(rawInput, next)) {
+            mData.add(new CandidateItem(rawInput));
+        }
         mData.addAll(next); // 添加新数据
-        if (!next.isEmpty())
-            Rime.highlightRimeCandidate(next.get(0).getIndex()); // 高亮第一个候选词
+        if (!mData.isEmpty() && mData.get(0).getIndex() >= 0)
+            Rime.highlightRimeCandidate(mData.get(0).getIndex()); // 高亮第一个候选词
         notifyDataSetChanged(); // 通知数据更新
     }
 
@@ -310,7 +314,10 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
                 notifyItemChanged(mIdx);
             }
         },50);*/
-        Rime.highlightRimeCandidate(mData.get(mIdx).getIndex()); // 通知 Rime 高亮
+        int index = mData.get(mIdx).getIndex();
+        if (index >= 0) {
+            Rime.highlightRimeCandidate(index); // 通知 Rime 高亮
+        }
     }
 
     /**
