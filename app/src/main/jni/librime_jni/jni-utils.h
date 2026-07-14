@@ -164,7 +164,7 @@ class GlobalRefSingleton {
     CandidateItem = reinterpret_cast<jclass>(env->NewGlobalRef(
         env->FindClass("com/osfans/trime/core/CandidateItem")));
     CandidateItemInit = env->GetMethodID(
-        CandidateItem, "<init>", "(Ljava/lang/String;Ljava/lang/String;)V");
+        CandidateItem, "<init>", "(Ljava/lang/String;Ljava/lang/String;Z)V");
 
     CandidateProto = reinterpret_cast<jclass>(env->NewGlobalRef(
         env->FindClass("com/osfans/trime/core/RimeProto$Candidate")));

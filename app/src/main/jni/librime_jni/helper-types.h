@@ -3,6 +3,7 @@
 #include <rime_api.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 class SchemaItem {
@@ -28,8 +29,16 @@ class CandidateItem {
  public:
   std::string text;
   std::string comment;
+  bool selfCreated = false;
 
   explicit CandidateItem(const RimeCandidate &candidate)
       : text(candidate.text),
-        comment(candidate.comment ? candidate.comment : "") {}
+         comment(candidate.comment ? candidate.comment : "") {}
+
+  CandidateItem(std::string text_value,
+                std::string comment_value,
+                bool is_self_created)
+      : text(std::move(text_value)),
+        comment(std::move(comment_value)),
+        selfCreated(is_self_created) {}
 };

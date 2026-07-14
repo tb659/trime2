@@ -135,7 +135,8 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
     public void onBindViewHolder(@NonNull FlexboxCandidateAdapter.CandidateViewHolder holder, int position) {
         final CandidateItem data = mData.get(position);
         boolean hideComment = Config.is_hide_comment();
-        if (TextUtils.isEmpty(data.getComment())|| hideComment) {
+        boolean showComment = !TextUtils.isEmpty(data.getComment()) && (!hideComment || data.isSelfCreated());
+        if (!showComment) {
             holder.tvComment.setVisibility(View.GONE);
         } else {
             holder.tvComment.setVisibility(View.VISIBLE);
@@ -145,7 +146,7 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
         holder.tvText.setText(data.getText());
         int pl = holder.itemView.getPaddingLeft();
         int pr = holder.itemView.getPaddingRight();
-        holder.itemView.setPadding(pl, hideComment ? 0 : ThemeManager.dp2px(6), pr, hideComment ? 0 : ThemeManager.dp2px(6));
+        holder.itemView.setPadding(pl, showComment ? ThemeManager.dp2px(6) : 0, pr, showComment ? ThemeManager.dp2px(6) : 0);
         holder.itemView.setContentDescription(data.getText());
         // 2. 强制处理宽度更新
         holder.itemView.post(() -> {

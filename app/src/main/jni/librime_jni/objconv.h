@@ -45,7 +45,8 @@ inline std::vector<std::string> stringArrayToStringVector(JNIEnv* env,
 inline jobject rimeCandidateItemToJObject(JNIEnv* env,
                                           const CandidateItem& item) {
   return env->NewObject(GlobalRef->CandidateItem, GlobalRef->CandidateItemInit,
-                        *JString(env, item.text), *JString(env, item.comment));
+                        *JString(env, item.text), *JString(env, item.comment),
+                        item.selfCreated);
 }
 
 inline jobjectArray rimeCandidateListToJObjectArray(

@@ -12,11 +12,15 @@ import java.util.Objects;
  * 表示输入法候选区中的一个候选词,包含文本和注释信息。
  */
 public class CandidateItem {
+    /** 自造词标识文本。 */
+    private static final String SELF_CREATED_MARKER = "☯";
     // ==================== 成员变量 ====================
     /** 候选词文本 */
     private final String text;
     /** 候选词注释(如拼音、释义等) */
     private final String comment;
+    /** 候选词是否来自用户词典/自造词链路。 */
+    private final boolean selfCreated;
     /** 候选词索引位置 */
     private int mIndex=-1;
 
@@ -26,7 +30,7 @@ public class CandidateItem {
      * @param text 候选词文本。
      */
     public CandidateItem(String text) {
-        this(text, "");
+        this(text, "", false);
     }
 
     /**
@@ -36,8 +40,20 @@ public class CandidateItem {
      * @param comment 候选词注释,如果为 null 则使用空字符串。
      */
     public CandidateItem(String text, String comment) {
+        this(text, comment, false);
+    }
+
+    /**
+     * 构造函数(文本、注释和自造词标记)。
+     *
+     * @param text 候选词文本。
+     * @param comment 候选词注释,如果为 null 则使用空字符串。
+     * @param selfCreated true 表示该候选来自用户词典/自造词链路。
+     */
+    public CandidateItem(String text, String comment, boolean selfCreated) {
         this.text = text;
         this.comment = (comment != null) ? comment : "";
+        this.selfCreated = selfCreated;
     }
 
     /**
@@ -55,6 +71,33 @@ public class CandidateItem {
      * @return 候选词注释。
      */
     public String getComment() {
+        if (!selfCreated) {
+            return comment;
+        }
+        if (comment.isEmpty()) {
+            return SELF_CREATED_MARKER;
+        }
+        if (comment.contains(SELF_CREATED_MARKER)) {
+            return comment;
+        }
+        return comment + " " + SELF_CREATED_MARKER;
+    }
+
+    /**
+     * 候选是否为自造词。
+     *
+     * @return true 表示该候选来自用户词典或 Java 补出的 learned mixed completion。
+     */
+    public boolean isSelfCreated() {
+        return selfCreated;
+    }
+
+    /**
+     * 获取原始注释内容（不附加小太极标识）。
+     *
+     * @return 原始注释文本。
+     */
+    public String getRawComment() {
         return comment;
     }
 
@@ -88,7 +131,9 @@ public class CandidateItem {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         CandidateItem that = (CandidateItem) o;
-        return Objects.equals(text, that.text) && Objects.equals(comment, that.comment);
+        return selfCreated == that.selfCreated
+                && Objects.equals(text, that.text)
+                && Objects.equals(comment, that.comment);
     }
 
     /**
@@ -99,7 +144,7 @@ public class CandidateItem {
      */
     @Override
     public int hashCode() {
-        return Objects.hash(text, comment);
+        return Objects.hash(text, comment, selfCreated);
     }
 
     /**

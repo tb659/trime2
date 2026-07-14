@@ -22,6 +22,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.osfans.trime.Config;
 import com.osfans.trime.TrimeService;
 import com.osfans.trime.core.CandidateItem;
 import com.osfans.trime.core.Rime;
@@ -162,8 +163,10 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
     @Override
     public void onBindViewHolder(@NonNull CandidateViewHolder holder, int position) {
         final CandidateItem data = mData.get(position);
+        boolean hideComment = Config.is_hide_comment();
+        boolean showComment = !TextUtils.isEmpty(data.getComment()) && (!hideComment || data.isSelfCreated());
         // 处理注释为空的情况，隐藏 View 节省空间
-        if (TextUtils.isEmpty(data.getComment())) {
+        if (!showComment) {
             holder.tvComment.setVisibility(View.GONE);
             holder.tvComment.setText(data.getComment());
         } else {

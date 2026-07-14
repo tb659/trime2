@@ -1237,7 +1237,7 @@ public class TrimeService extends InputMethodService {
                 continue;
             }
             seenTexts.add(text);
-            result.add(new CandidateItem(text));
+            result.add(new CandidateItem(text, "", true));
         }
         return result;
     }

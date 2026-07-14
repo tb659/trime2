@@ -10,6 +10,10 @@
 
 #include <rime/dict/dictionary.h>
 #include <rime/dict/user_dictionary.h>
+#include <rime/candidate.h>
+#include <rime/context.h>
+#include <rime/menu.h>
+#include <rime/service.h>
 #include <rime/schema.h>
 #include <rime/ticket.h>
 
@@ -29,6 +33,19 @@ static void declare_librime_module_dependencies() {
   rime_require_module_octagram();
   rime_require_module_predict();
 }
+
+namespace {
+
+bool isSelfCreatedCandidate(const rime::an<rime::Candidate>& candidate) {
+  auto genuine = rime::Candidate::GetGenuineCandidate(candidate);
+  if (!genuine) {
+    return false;
+  }
+  const auto& type = genuine->type();
+  return type == "user_phrase" || type == "user_table";
+}
+
+}  // namespace
 
 class Rime {
  public:
@@ -267,19 +284,32 @@ class Rime {
 
   std::vector<CandidateItem> getCandidates(int startIndex, int limit) {
     std::vector<CandidateItem> result;
-    result.reserve(limit);
-    RimeCandidateListIterator iter{};
-    if (rime->candidate_list_from_index(session(), &iter, startIndex)) {
-      int count = 0;
-      while (rime->candidate_list_next(&iter)) {
-        if (count >= limit) break;
-        const CandidateItem item(iter.candidate);
-        result.emplace_back(item);
-        ++count;
-      }
-      rime->candidate_list_end(&iter);
+    if (startIndex < 0 || limit <= 0) {
+      return result;
     }
-    return std::move(result);
+    result.reserve(limit);
+
+    auto current_session = rime::Service::instance().GetSession(session(false));
+    if (!current_session || !current_session->context()) {
+      return result;
+    }
+    auto& composition = current_session->context()->composition();
+    if (composition.empty() || !composition.back().menu) {
+      return result;
+    }
+    auto menu = composition.back().menu;
+    size_t start = static_cast<size_t>(startIndex);
+    size_t requested = start + static_cast<size_t>(limit);
+    menu->Prepare(requested);
+    for (size_t i = start; i < requested; ++i) {
+      auto candidate = menu->GetCandidateAt(i);
+      if (!candidate) {
+        break;
+      }
+      result.emplace_back(candidate->text(), candidate->comment(),
+                          isSelfCreatedCandidate(candidate));
+    }
+    return result;
   }
 
   void exit() {
