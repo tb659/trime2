@@ -163,6 +163,74 @@ class Rime {
     return user_dict->UpdateEntry(entry, 1);
   }
 
+  std::vector<std::string> queryRawInputCompletions(std::string_view prefix,
+                                                    size_t limit) {
+    std::vector<std::string> result;
+    if (prefix.empty() || limit == 0) {
+      return result;
+    }
+
+    std::string schema_id = currentSchemaId();
+    if (schema_id.empty() || schema_id == ".default") {
+      return result;
+    }
+
+    rime::Schema schema(schema_id);
+    if (!schema.config()) {
+      return result;
+    }
+    rime::Ticket ticket(&schema, "translator");
+
+    auto user_dictionary = rime::UserDictionary::Require("user_dictionary");
+    if (!user_dictionary) {
+      return result;
+    }
+    std::unique_ptr<rime::UserDictionary> user_dict(user_dictionary->Create(ticket));
+    if (!user_dict || !user_dict->Load()) {
+      return result;
+    }
+
+    if (auto dictionary = rime::Dictionary::Require("dictionary")) {
+      std::unique_ptr<rime::Dictionary> dict(dictionary->Create(ticket));
+      if (dict && dict->Load()) {
+        user_dict->Attach(dict->primary_table(), dict->prism());
+      }
+    }
+
+    rime::UserDictEntryIterator iter;
+    user_dict->LookupWords(&iter, std::string(prefix), true, limit, nullptr);
+    // mixed completion 走的是 Java 侧补候选链，这里直接按用户实际提交次数排序，
+    // 再用 Rime 已计算出的 weight 兜底，确保 tb659 / tb56 这类词能稳定动态调频。
+    struct WeightedCompletionEntry {
+      std::string text;
+      int commit_count;
+      double weight;
+    };
+    std::vector<WeightedCompletionEntry> weighted_entries;
+    for (auto entry = iter.Peek(); entry; entry = iter.Next() ? iter.Peek() : nullptr) {
+      if (!entry || entry->text.empty()) {
+        continue;
+      }
+      weighted_entries.push_back(
+          {entry->text, entry->commit_count, entry->weight});
+    }
+    std::stable_sort(
+        weighted_entries.begin(), weighted_entries.end(),
+        [](const auto& lhs, const auto& rhs) {
+          if (lhs.commit_count != rhs.commit_count) {
+            return lhs.commit_count > rhs.commit_count;
+          }
+          if (lhs.weight != rhs.weight) {
+            return lhs.weight > rhs.weight;
+          }
+          return lhs.text < rhs.text;
+        });
+    for (const auto& item : weighted_entries) {
+      result.emplace_back(item.text);
+    }
+    return result;
+  }
+
   size_t caretPosition() { return rime->get_caret_pos(session()); }
 
   void setCaretPosition(size_t caretPos) {
@@ -402,6 +470,21 @@ Java_com_osfans_trime_core_Rime_learnRimeRawInput(JNIEnv *env,
                                                   jstring text) {
   std::string raw_text = CString(env, text);
   return Rime::Instance().learnRawInput(raw_text);
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_osfans_trime_core_Rime_queryRimeRawInputCompletions(
+    JNIEnv *env, jclass /* thiz */, jstring prefix, jint limit) {
+  std::string raw_prefix = CString(env, prefix);
+  size_t query_limit = limit > 0 ? static_cast<size_t>(limit) : 0;
+  auto result = Rime::Instance().queryRawInputCompletions(
+      raw_prefix, query_limit);
+  auto array = env->NewObjectArray(static_cast<jsize>(result.size()),
+                                   GlobalRef->String, nullptr);
+  for (jsize i = 0; i < static_cast<jsize>(result.size()); ++i) {
+    env->SetObjectArrayElement(array, i, JString(env, result[i]));
+  }
+  return array;
 }
 
 extern "C" JNIEXPORT jint JNICALL

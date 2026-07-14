@@ -16,6 +16,12 @@ switches:
   - name: ascii_mode
     reset: 0
     states: [中文, 西文]
+  - name: show_raw_input_candidate
+    reset: 0
+    states: [a1隐, a1显]
+  - name: prediction
+    reset: 1
+    states: [联想隐, 联想显]
 
 engine:
   processors:

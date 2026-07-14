@@ -78,6 +78,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -96,6 +97,7 @@ public class TrimeService extends InputMethodService {
     private static final long PREDICTION_REFRESH_RETRY_DELAY_MS = 96L;
     private static final int PREDICTION_REFRESH_MAX_RETRIES = 2;
     private static final int PREDICTION_CONTEXT_LIMIT = 128;
+    private static final int RAW_INPUT_COMPLETION_LIMIT = 8;
     // user_predict 的 1-Gram / P-Gram 主要围绕最近 1~4 个汉字建模，
     // 删后重预测把整段长尾串喂进去会明显拉低命中率，这里对齐到 4 字窗口。
     private static final int PREDICTION_ANCHOR_MAX_CHARS = 4;
@@ -129,6 +131,10 @@ public class TrimeService extends InputMethodService {
     private int mPredictionRefreshRevision = 0;
     private long mPredictionRequestRevision = System.currentTimeMillis();
     private int mPredictionRefreshRetries = 0;
+    // 当前方案的 speller/alphabet 是否显式接受数字；仅这类方案允许把数字继续并入编码串。
+    private boolean mSchemaAcceptsDigitInSpeller = false;
+    // 当候选栏首位是 Java 补出来的 mixed 临时候选时，记录其文本，供空格/回车优先上屏。
+    private String mPreferredRawInputCandidate = "";
     // 记录最近一次删除键触发的时间戳。
     // 删后预测不会在每次 Backspace 后立刻无条件弹出，而是要结合主题里的
     // repeat_click_time 判断当前是“正常点删”还是“长按/快速连删”。
@@ -1033,14 +1039,28 @@ public class TrimeService extends InputMethodService {
         mRime.moveCursorPos(caret);
     }
 
+    /**
+     * 当前编码中的数字按键是否应继续并入 Rime composition。
+     *
+     * <p>只有方案的 `speller/alphabet` 明确接受数字时，才把数字当成编码继续送给 Rime；
+     * 否则仍按候选序号处理，避免在 `pinyin_simp` 这类纯字母拼写方案里把 `tb6` 误扩展成混合编码链。</p>
+     */
     private boolean shouldAppendDigitToComposition() {
         if (!isComposing()) {
+            return false;
+        }
+        if (!mSchemaAcceptsDigitInSpeller) {
             return false;
         }
         String rawInput = Rime.getRimeRawInput();
         return containsAsciiLetter(rawInput);
     }
 
+    /**
+     * 事件是否表现为单个数字键。
+     *
+     * <p>这里同时兼容 `rawText` 与 `label`，因为不同键盘主题/按键定义会把数字放在不同字段里。</p>
+     */
     private boolean isDigitSelectionEvent(Event event) {
         if (event == null) {
             return false;
@@ -1053,10 +1073,34 @@ public class TrimeService extends InputMethodService {
         return !TextUtils.isEmpty(label) && label.length() == 1 && Character.isDigit(label.charAt(0));
     }
 
-    private boolean shouldCommitRawInputComposition() {
-        return shouldPreferRawInputForComposition(Rime.getRimeRawInput());
+    /**
+     * 解析当前应优先上屏的 mixed 文本。
+     *
+     * <p>候选首位若是 Java 侧补出来的 `tb659`，空格/回车必须优先提交它；
+     * 若当前没有显式记录的首位 mixed 候选，则退回到 Rime 原始输入本身。</p>
+     */
+    private String resolvePreferredRawInputCandidate() {
+        String preferred = stripPredictionPlaceholder(mPreferredRawInputCandidate);
+        if (shouldPreferRawInputForComposition(preferred)) {
+            return preferred;
+        }
+        String rawInput = stripPredictionPlaceholder(Rime.getRimeRawInput());
+        if (shouldPreferRawInputForComposition(rawInput)) {
+            return rawInput;
+        }
+        return "";
     }
 
+    /**
+     * 当前是否存在需要由 Java 侧优先提交的 mixed composition。
+     */
+    private boolean shouldCommitRawInputComposition() {
+        return !TextUtils.isEmpty(resolvePreferredRawInputCandidate());
+    }
+
+    /**
+     * 在空格/回车落到 Rime 默认选词前，优先提交 Java 侧记录的 mixed 候选。
+     */
     private boolean commitRawInputCompositionIfNeeded(int keyCode) {
         if ((keyCode != KeyEvent.KEYCODE_SPACE && keyCode != KeyEvent.KEYCODE_ENTER)
                 || !shouldCommitRawInputComposition()) {
@@ -1066,10 +1110,16 @@ public class TrimeService extends InputMethodService {
         return true;
     }
 
+    /**
+     * 提交当前优先 mixed 候选。
+     */
     private void commitRawInputComposition() {
-        commitRawInputComposition(stripPredictionPlaceholder(Rime.getRimeRawInput()));
+        commitRawInputComposition(resolvePreferredRawInputCandidate());
     }
 
+    /**
+     * 直接提交指定的 mixed 文本，并在满足条件时写回 user_dict 做后续调频。
+     */
     private void commitRawInputComposition(String rawInput) {
         rawInput = stripPredictionPlaceholder(rawInput);
         if (TextUtils.isEmpty(rawInput)) {
@@ -1081,8 +1131,32 @@ public class TrimeService extends InputMethodService {
         }
     }
 
+    /**
+     * 文本是否属于需要走 mixed 特殊提交链的“字母+数字”输入。
+     */
     static boolean shouldPreferRawInputForComposition(String rawInput) {
         return containsAsciiLetter(rawInput) && containsAsciiDigit(rawInput);
+    }
+
+    /**
+     * 统一过滤当前候选面板里应当隐藏的 mixed 候选。
+     *
+     * <p>当 `a1显/a1隐` 关闭时，不仅要拦当前 rawInput 本身，也要拦住 Rime 或 user_dict
+     * 返回的 `tb -> tb659` 这类前缀 mixed completion，确保三种候选面板行为一致。</p>
+     */
+    public static ArrayList<CandidateItem> filterVisibleCandidateItems(
+            String rawInput, ArrayList<CandidateItem> candidateItems) {
+        if (candidateItems == null || candidateItems.isEmpty()
+                || !shouldHideRawInputCandidate(rawInput)) {
+            return candidateItems;
+        }
+        ArrayList<CandidateItem> visibleItems = new ArrayList<>();
+        for (CandidateItem item : candidateItems) {
+            if (item == null || !shouldHideMixedWordCandidate(item.getText(), rawInput)) {
+                visibleItems.add(item);
+            }
+        }
+        return visibleItems;
     }
 
     /**
@@ -1113,6 +1187,71 @@ public class TrimeService extends InputMethodService {
             }
         }
         return true;
+    }
+
+    /**
+     * 查询并构造“已学习 mixed 词”的前缀补全候选。
+     *
+     * <p>`a1显` 原本只会补当前输入本身，例如输入 `tb659` 时显示 `tb659`；
+     * 但像输入前缀 `tb` 时，当前输入还不含数字，旧逻辑不会去查此前学过的 `tb659`。
+     * 这里直接从当前方案的 user_dict 按前缀查询 mixed completion，再把命中的 `tb659`
+     * 之类临时候选补回候选栏。</p>
+     *
+     * @param rawInput 当前输入框里的原始输入前缀。
+     * @param visibleItems 当前已经准备显示的候选列表，用于去重。
+     * @return 需要额外补到候选栏的 mixed completion 列表；没有命中时返回空列表。
+     */
+    public static ArrayList<CandidateItem> getLearnedRawInputCandidates(
+            String rawInput, ArrayList<CandidateItem> visibleItems) {
+        ArrayList<CandidateItem> result = new ArrayList<>();
+        rawInput = stripPredictionPlaceholder(rawInput);
+        if (!Rime.isComposing()
+                || !Rime.getRimeOption(RAW_INPUT_CANDIDATE_OPTION)
+                || TextUtils.isEmpty(rawInput)
+                || !containsAsciiLetter(rawInput)) {
+            return result;
+        }
+        LinkedHashSet<String> seenTexts = new LinkedHashSet<>();
+        seenTexts.add(rawInput);
+        if (visibleItems != null) {
+            for (CandidateItem item : visibleItems) {
+                if (item == null) {
+                    continue;
+                }
+                String text = stripPredictionPlaceholder(item.getText());
+                if (!TextUtils.isEmpty(text) && !seenTexts.contains(text)) {
+                    seenTexts.add(text);
+                }
+            }
+        }
+        String[] completions = Rime.queryRimeRawInputCompletions(rawInput, RAW_INPUT_COMPLETION_LIMIT);
+        if (completions == null || completions.length == 0) {
+            return result;
+        }
+        for (String completion : completions) {
+            String text = stripPredictionPlaceholder(completion);
+            if (TextUtils.isEmpty(text)
+                    || !text.startsWith(rawInput)
+                    || !shouldPreferRawInputForComposition(text)
+                    || seenTexts.contains(text)) {
+                continue;
+            }
+            seenTexts.add(text);
+            result.add(new CandidateItem(text));
+        }
+        return result;
+    }
+
+    /**
+     * 设置当前候选栏首位的 mixed 临时候选文本。
+     *
+     * <p>当候选首位来自 Java 侧补充而非 Rime 内部真实候选时，空格/回车需要优先提交这个文本，
+     * 否则 Rime 仍会按自身高亮去提交真实候选，出现“界面首位是 tb659，空格却上屏了体”这类错位。</p>
+     *
+     * @param text 当前应优先上屏的 mixed 候选；为空时清除该优先项。
+     */
+    public void setPreferredRawInputCandidate(String text) {
+        mPreferredRawInputCandidate = text != null ? text : "";
     }
 
     /**
@@ -2034,9 +2173,12 @@ public class TrimeService extends InputMethodService {
 
     private void initInlinePreedit() {
         inlinePreedit = InlineModeType.INLINE_NONE;
+        mSchemaAcceptsDigitInSpeller = false;
         String schemaId = Rime.getCurrentRimeSchema();
         if (!TextUtils.isEmpty(schemaId)) {
             try (RimeConfig config = RimeConfig.openSchema(schemaId)) {
+                mSchemaAcceptsDigitInSpeller = schemaAlphabetAcceptsDigit(
+                        config.getString("speller/alphabet"));
                 Boolean inlinePreeditEnabled = config.getBool("style/inline_preedit");
                 if (!Boolean.FALSE.equals(inlinePreeditEnabled)) {
                     String preeditType = config.getString("style/preedit_type");
@@ -2065,6 +2207,21 @@ public class TrimeService extends InputMethodService {
         if (mRootInputView != null) {
             mRootInputView.setInlinePreeditMode(inlinePreedit);
         }
+    }
+
+    /**
+     * 方案的 `speller/alphabet` 是否显式包含数字。
+     */
+    private static boolean schemaAlphabetAcceptsDigit(String alphabet) {
+        if (TextUtils.isEmpty(alphabet)) {
+            return false;
+        }
+        for (int i = 0; i < alphabet.length(); i++) {
+            if (Character.isDigit(alphabet.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public InlineModeType getInlinePreeditMode() {

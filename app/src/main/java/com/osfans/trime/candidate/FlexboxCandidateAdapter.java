@@ -202,10 +202,15 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
     public void setData(ArrayList<CandidateItem> next) {
         mData.clear(); // 清空旧数据
         String rawInput = com.osfans.trime.core.Rime.getRimeRawInput();
-        if (TrimeService.shouldInjectRawInputCandidate(rawInput, next)) {
+        ArrayList<CandidateItem> visibleItems = TrimeService.filterVisibleCandidateItems(rawInput, next);
+        mData.addAll(TrimeService.getLearnedRawInputCandidates(rawInput, visibleItems));
+        if (TrimeService.shouldInjectRawInputCandidate(rawInput, visibleItems)) {
             mData.add(new CandidateItem(rawInput));
         }
-        mData.addAll(next); // 添加新数据
+        CandidateItem preferredMixedCandidate = !mData.isEmpty() ? mData.get(0) : null;
+        TrimeService.getInstance().setPreferredRawInputCandidate(
+                preferredMixedCandidate != null ? preferredMixedCandidate.getText() : "");
+        mData.addAll(visibleItems); // 添加过滤后的候选数据
         notifyDataSetChanged(); // 通知数据更新
     }
 

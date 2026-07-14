@@ -1,0 +1,35 @@
+# 下面的 #号 是注释符，注释了就无效了，删掉即可生效
+patch:
+
+  engine/processors/@before 0: lua_processor@user_predict_processor    # 监听上屏事件，维护记忆链并写入预测库
+  engine/translators/@before 0: lua_translator@user_predict_translator  # 上屏后注入占位符，生成预测候选
+  engine/filters/@before 0: lua_filter@user_predict_filter              # 输入过程中按上下文提升候选排序
+
+  translator/enable_encoder: true            # 开启自动造词，保留 mixed 输入后续学习能力
+  translator/encode_commit_history: true     # 对已上屏内容自动成词，便于后续预测与词频积累
+  translator/enable_user_dict: true          # 开启用户词典，让 mixed 输入与普通上屏都能写入当前方案词典
+  translator/user_dict: shared_trime         # 与虎码共用同一个 user_dict 文件，先统一用户词与词频存储
+  translator/enable_completion: true         # 允许按编码前缀取回 user_dict 候选，例如输入 tb 召回已学习的 tb659
+  translator/max_phrase_length: 10           # 自动造词最大词长
+
+  user_predict:
+    db_name: predict                      # 与现有方案共用同一个预测库，保留已学习上下文
+
+    history_depth: 99                     # 历史记录深度
+    context_timeout: 5000                 # 上下文超时毫秒数
+
+    max_candidates: 100                   # 每次最多显示几个预测候选
+    max_predictions: 100                  # 连续预测最大次数
+    expiry_days: 3650                     # 条目过期天数
+    max_memory_branches: 20               # 查询分支上限
+    decay_rate: 0.85                      # 时间衰减系数（每日）
+
+    internal_first_min_len: 2             # 首字续写学习最短词长
+    internal_first_max_len: 6             # 首字续写学习最长词长
+    internal_first_weight: 0.45           # 首字续写学习权重
+
+    internal_pair_min_len: 4              # 前 2 字续写学习最短词长
+    internal_pair_max_len: 6              # 前 2 字续写学习最长词长
+    internal_pair_weight: 0.8             # 前 2 字续写学习权重
+
+    particle_whitelist: '吧,呢,吗,啦,嘛,呀,哈,哇,啊'

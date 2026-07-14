@@ -610,6 +610,22 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
     /**
+     * 按当前方案的 user_dict 前缀查询 mixed rawInput 补全项。
+     *
+     * <p>该接口主要服务于 `a1显`：像输入 `tb` 时，把此前学习过的 `tb659` 这类字母+数字词
+     * 直接从 user_dict 中查回并补到候选栏，而不依赖主码表本身支持这种编码。</p>
+     *
+     * @param prefix 当前输入前缀。
+     * @param limit  最多返回多少条结果。
+     * @return 匹配到的补全项数组；没有结果时返回空数组。
+     */
+    public String[] queryRawInputCompletions(String prefix, int limit) {
+        if (TextUtils.isEmpty(prefix) || limit <= 0) return new String[0];
+        String[] result = queryRimeRawInputCompletions(prefix, limit);
+        return result != null ? result : new String[0];
+    }
+
+    /**
      * 清除当前组字内容(取消输入)。
      */
     @Override
@@ -1148,6 +1164,8 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     public static native String getRimeRawInput();
 
     public static native boolean learnRimeRawInput(String text);
+
+    public static native String[] queryRimeRawInputCompletions(String prefix, int limit);
 
     /**
      * 获取光标位置(原生方法)。

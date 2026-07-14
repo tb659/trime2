@@ -247,10 +247,15 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
         mMaxWidth=0; // 重置最大宽度
         mData.clear(); // 清空旧数据
         String rawInput = Rime.getRimeRawInput();
-        if (TrimeService.shouldInjectRawInputCandidate(rawInput, next)) {
+        ArrayList<CandidateItem> visibleItems = TrimeService.filterVisibleCandidateItems(rawInput, next);
+        mData.addAll(TrimeService.getLearnedRawInputCandidates(rawInput, visibleItems));
+        if (TrimeService.shouldInjectRawInputCandidate(rawInput, visibleItems)) {
             mData.add(new CandidateItem(rawInput));
         }
-        mData.addAll(next); // 添加新数据
+        CandidateItem preferredMixedCandidate = !mData.isEmpty() ? mData.get(0) : null;
+        TrimeService.getInstance().setPreferredRawInputCandidate(
+                preferredMixedCandidate != null ? preferredMixedCandidate.getText() : "");
+        mData.addAll(visibleItems); // 添加过滤后的候选数据
         if (!mData.isEmpty() && mData.get(0).getIndex() >= 0)
             Rime.highlightRimeCandidate(mData.get(0).getIndex()); // 高亮第一个候选词
         notifyDataSetChanged(); // 通知数据更新

@@ -298,21 +298,16 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         oldIdx = 0;
         mData.clear(); // 清空旧数据
         String rawInput = Rime.getRimeRawInput();
-        ArrayList<CandidateItem> visibleItems = next;
-        if (TrimeService.shouldHideRawInputCandidate(rawInput) && !next.isEmpty()) {
-            // 开关关闭时，同时过滤 Rime 直接返回的 mixed completion 候选，避免只拦住同文 raw 候选而拦不住 tb -> tb659 这类前缀补全。
-            visibleItems = new ArrayList<>();
-            for (CandidateItem item : next) {
-                if (item == null
-                        || !TrimeService.shouldHideMixedWordCandidate(item.getText(), rawInput)) {
-                    visibleItems.add(item);
-                }
-            }
-        }
+        ArrayList<CandidateItem> visibleItems = TrimeService.filterVisibleCandidateItems(rawInput, next);
+        ArrayList<CandidateItem> learnedRawInputItems = TrimeService.getLearnedRawInputCandidates(rawInput, visibleItems);
+        mData.addAll(learnedRawInputItems);
         if (TrimeService.shouldInjectRawInputCandidate(rawInput, visibleItems)) {
             // a1显 开启后，始终把当前 mixed rawInput 补到候选栏，避免前面已有普通候选时看不到新自造词。
             mData.add(new CandidateItem(rawInput));
         }
+        CandidateItem preferredMixedCandidate = !mData.isEmpty() ? mData.get(0) : null;
+        TrimeService.getInstance().setPreferredRawInputCandidate(
+                preferredMixedCandidate != null ? preferredMixedCandidate.getText() : "");
         mData.addAll(visibleItems); // 添加过滤后的候选数据
         if (!mData.isEmpty() && mData.get(0).getIndex() >= 0) {
             Rime.highlightRimeCandidate(mData.get(0).getIndex()); // 仅高亮真实的 Rime 候选
