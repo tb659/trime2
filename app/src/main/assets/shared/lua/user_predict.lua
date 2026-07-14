@@ -96,6 +96,8 @@ local is_predicting = false  -- 是否处于预测状态
 local prediction_visible = false -- 是否正在显示上屏后的预测候选
 local pending_cands = nil    -- 缓存的预测候选列表，由 commit_cb 填充，Translator 读取
 local get_predictions        -- 前向声明，供预测查询与过滤逻辑复用
+local last_external_request_revision = 0 -- 最近一次消费的外部删后重预测请求版本
+local set_prediction_visible -- 前向声明，供外部重预测入口复用
 
 -- ======================== 字头词表（兜底 fallback） ========================
 -- char_words.lua 由 script/generate_char_words.py 从虎码词库生成
@@ -109,6 +111,32 @@ local function ensure_char_words()
         if ok then _char_words_tbl = result else _char_words_tbl = {} end
     end
     return _char_words_tbl
+end
+
+-- 删后重预测走共享请求文件桥接：Java 会同时写 shared/build/user 三处，这里按脚本所在目录向上回溯多级兜底读取。
+local function get_request_file_paths()
+    local src = debug and debug.getinfo and debug.getinfo(1, "S").source or ""
+    if s_sub(src, 1, 1) == "@" then src = s_sub(src, 2) end
+    local dir = s_match(src, "^(.*[\\/])") or ""
+    if dir == "" then return { "user_predict_request.txt" } end
+    local paths = {
+        dir .. "user_predict_request.txt",
+        dir .. "../user_predict_request.txt",
+        dir .. "../../user_predict_request.txt",
+        dir .. "../../../user_predict_request.txt",
+        dir .. "../../../lua/user_predict_request.txt",
+        dir .. "../lua/user_predict_request.txt",
+        dir .. "../../lua/user_predict_request.txt",
+    }
+    local unique = {}
+    local result = {}
+    for _, path in ipairs(paths) do
+        if not unique[path] then
+            unique[path] = true
+            insert(result, path)
+        end
+    end
+    return result
 end
 
 -- ======================== 语气助词白名单 ========================
@@ -176,6 +204,50 @@ local function load_config(env)
     end
 end
 
+-- 读取并消费一条外部重预测请求；revision 用来忽略旧请求或重复请求。
+local function read_external_prediction_request()
+    for _, path in ipairs(get_request_file_paths()) do
+        local file = io.open(path, "r")
+        if file then
+            local revision_line = file:read("*l")
+            local anchor = file:read("*a")
+            file:close()
+            local revision = tonumber(revision_line)
+            if revision and revision > last_external_request_revision and anchor then
+                anchor = string.gsub(anchor, "^%s+", "")
+                anchor = string.gsub(anchor, "%s+$", "")
+                if anchor ~= "" then
+                    last_external_request_revision = revision
+                    os.remove(path)
+                    return anchor
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- 用 Java 提供的删后锚点临时重建 history/last_commit，再复用现有 get_predictions 流程。
+local function activate_external_prediction(env, anchor)
+    if not anchor or anchor == "" then return false end
+    for i = 1, #history do history[i] = nil end
+    insert(history, anchor)
+    last_commit = anchor
+    last_commit_time = rime_api and rime_api.get_time_ms and rime_api.get_time_ms() or (os_time() * 1000)
+    predict_count = 1
+    pending_cands = get_predictions(env, anchor)
+    if pending_cands then
+        is_predicting = true
+        set_prediction_visible(env, true)
+        return true
+    end
+    predict_count = 0
+    is_predicting = false
+    pending_cands = nil
+    set_prediction_visible(env, false)
+    return false
+end
+
 -- 重置记忆链：清空所有上下文状态
 -- 在语境超时、标点断句、外部打断等场景调用
 local function reset_memory_chain(env, reason)
@@ -189,7 +261,26 @@ local function reset_memory_chain(env, reason)
     env.need_push = false
 end
 
-local function set_prediction_visible(env, visible)
+-- schema deploy/reload 后显式清空文件级共享状态，避免旧 env 的预测链残留到新一轮输入。
+local function reset_runtime_state(env)
+    reset_memory_chain(env, "runtime init")
+    last_external_request_revision = 0
+end
+
+-- 提交完成后优先立即注入占位符，减少 deploy/reload 后首轮 update_notifier
+-- 时序不稳定导致的预测丢失；若当前上下文还不能安全注入，则退回到 update_cb 兜底。
+local function push_prediction_placeholder(ctx, env)
+    if not ctx or not pending_cands then return false end
+    local input = ctx.input or ""
+    if input ~= "" then return false end
+    local expected_len = utf8_len(PH_CHAR) or 1
+    env.need_push = false
+    ctx:push_input(PH_CHAR)
+    ctx.caret_pos = expected_len
+    return true
+end
+
+set_prediction_visible = function(env, visible)
     prediction_visible = visible
 end
 
@@ -489,6 +580,7 @@ function P.init(env)
     load_config(env)
     local db = get_db(env)
     clean_expired(env)
+    reset_runtime_state(env)
     env.need_push = false         -- 是否需要注入占位符
     env.last_written_keys = {}    -- 最近一次写库的 key-value 快照（用于回滚）
     env.just_committed = false    -- 是否刚上屏
@@ -676,8 +768,9 @@ function P.init(env)
         if predict_count <= CONFIG.MAX_PREDICTIONS and ctx:get_option("prediction") then
             pending_cands = get_predictions(env, last_commit)
             if pending_cands then
-                env.need_push = true  -- 等 update_notifier 触发后注入占位符
+                env.need_push = true  -- 优先立即注入；若首轮时序不对，再由 update_notifier 兜底
                 set_prediction_visible(env, true)
+                push_prediction_placeholder(ctx, env)
             else
                 predict_count = 0; is_predicting = false; pending_cands = nil
                 set_prediction_visible(env, false)
@@ -694,10 +787,33 @@ function P.init(env)
     -- 同时负责：清理被用户操作打断的预测状态
     env.update_cb = function(ctx)
         local input = ctx.input or ""
-        if input == PH_CHAR then is_predicting = true; set_prediction_visible(env, true) end
+        local expected_ph = PH_CHAR
+        local expected_len = utf8_len(PH_CHAR) or 1
+        if input == PH_CHAR then
+            -- 删后重预测优先消费外部锚点；没有外部请求时再按原来的 pending_cands 逻辑显示预测。
+            local external_anchor = read_external_prediction_request()
+            if external_anchor then
+                if not activate_external_prediction(env, external_anchor) then
+                    ctx:clear()
+                    reset_memory_chain(env, "external prediction empty")
+                    return
+                end
+                -- Java 先注入占位符，Lua 再读取请求文件并填充 pending_cands；
+                -- 这里需要主动重放一次占位符更新，确保 Translator 在候选已就绪后重新运行。
+                ctx:clear()
+                ctx:push_input(expected_ph)
+                ctx.caret_pos = expected_len
+                return
+            elseif pending_cands then
+                is_predicting = true
+                set_prediction_visible(env, true)
+            end
+        end
 
-        -- 预测状态下输入为空且 need_push=false → 被外部清空，重置
-        if is_predicting and input ~= PH_CHAR and not env.need_push then
+        -- deploy 后首轮预测里，Rime 可能在内部刷新时短暂上报一个空 input；
+        -- 这不是用户真的打断预测，不能把刚生成的候选链直接清掉。
+        -- 这里只把“出现了非空且不是占位符的真实输入”视为外部打断。
+        if is_predicting and input ~= "" and input ~= PH_CHAR and not env.need_push then
             reset_memory_chain(env, "external input clear")
             ctx:clear()
         end
@@ -708,14 +824,8 @@ function P.init(env)
         -- push_input 会触发 Rime Context::Update()，重新运行翻译器
         -- Translator 看到输入为 ››› 时从 pending_cands 生成预测候选
         -- 这样候选栏在上屏后保持显示 isComposing=true
-        local expected_ph = PH_CHAR
-        local expected_len = utf8_len(PH_CHAR) or 1
-
         if env.need_push and input == "" then
-            env.need_push = false
-            ctx:push_input(expected_ph)
-            ctx.caret_pos = expected_len
-            return
+            if push_prediction_placeholder(ctx, env) then return end
         end
 
         -- ============ 占位符清理 ============
@@ -863,6 +973,13 @@ end
 function T.func(input, seg, env)
     -- 受总开关控制
     if not env.engine.context:get_option("prediction") then return end
+    -- 删后重预测有时会错过 update_cb 的消费时机；这里在 Translator 入口兜底再读一次请求文件。
+    if input == PH_CHAR and not pending_cands then
+        local external_anchor = read_external_prediction_request()
+        if external_anchor then
+            activate_external_prediction(env, external_anchor)
+        end
+    end
     -- 只有输入为精确占位符时才产出预测候选
     if input == PH_CHAR and pending_cands then
         is_predicting = true
@@ -979,6 +1096,11 @@ end
 function F.fini(env) end
 
 -- ======================== 模块导出 ========================
+-- 直接把组件挂到全局，避免某些加载顺序下仅靠 rime.lua 中转赋值时拿不到对应组件。
+user_predict_processor = P
+user_predict_translator = T
+user_predict_filter = F
+
 -- librime-lua 自动根据注册名加载对应组件
 --   lua_processor@user_predict_processor    → P (Processor)
 --   lua_translator@user_predict_translator  → T (Translator)

@@ -17,6 +17,7 @@ import android.inputmethodservice.InputMethodService;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.text.Html;
 import android.text.InputType;
 import android.text.TextUtils;
@@ -70,9 +71,12 @@ import org.luaj.lib.ResourceFinder;
 import org.luaj.lib.jse.JsePlatform;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -87,6 +91,14 @@ import java.util.regex.Pattern;
 public class TrimeService extends InputMethodService {
     private static final String PREDICTION_PLACEHOLDER = "tyl";
     private static final String RAW_INPUT_CANDIDATE_OPTION = "show_raw_input_candidate";
+    private static final String PREDICTION_REQUEST_FILE_NAME = "user_predict_request.txt";
+    private static final long PREDICTION_REFRESH_DELAY_MS = 48L;
+    private static final long PREDICTION_REFRESH_RETRY_DELAY_MS = 96L;
+    private static final int PREDICTION_REFRESH_MAX_RETRIES = 2;
+    private static final int PREDICTION_CONTEXT_LIMIT = 128;
+    // user_predict 的 1-Gram / P-Gram 主要围绕最近 1~4 个汉字建模，
+    // 删后重预测把整段长尾串喂进去会明显拉低命中率，这里对齐到 4 字窗口。
+    private static final int PREDICTION_ANCHOR_MAX_CHARS = 4;
     // ==================== 常量与静态变量 ====================
     // 日志标签，用于 Logcat 输出
     private static final String TAG = "TrimeService";
@@ -112,10 +124,21 @@ public class TrimeService extends InputMethodService {
     private boolean mShowExtractedCandidatesView = false;
     // 是否正在显示上屏后的预测候选（独立于占位符是否仍留在 Rime context）
     private boolean mPredictionCandidatesVisible = false;
+    // 删除正文后，等待宿主应用完成文本变更再读取最新上下文并重触发预测。
+    private boolean mPendingPredictionRefresh = false;
+    private int mPredictionRefreshRevision = 0;
+    private long mPredictionRequestRevision = System.currentTimeMillis();
+    private int mPredictionRefreshRetries = 0;
+    // 记录最近一次删除键触发的时间戳。
+    // 删后预测不会在每次 Backspace 后立刻无条件弹出，而是要结合主题里的
+    // repeat_click_time 判断当前是“正常点删”还是“长按/快速连删”。
+    // 连删过程中先隐藏候选栏，等用户停手后再恢复预测候选，避免删字时闪烁。
+    private long mLastDeleteKeyTime = 0L;
     // 是否需要发送键释放事件
     private boolean keyUpNeeded;
     // 点击 composition 后待在下一次按键前同步到 Rime 的光标位。
     private int mPendingCompositionCaret = -1;
+    private String mLastPredictionAnchorText = "";
     // Enter 键是否作为换行符
     private boolean enterAsLineBreak;
     // 回车键的动作标签（搜索/发送/下一个等）
@@ -154,6 +177,7 @@ public class TrimeService extends InputMethodService {
     private Speech mSpeech;
 
     // ==================== 静态访问器与生命周期 ====================
+
     /**
      * 获取 TrimeService 的单例实例。
      *
@@ -293,6 +317,7 @@ public class TrimeService extends InputMethodService {
     @Override
     public void onFinishInput() {
         Log.w(TAG, "onFinishInput: " + Rime.isComposing());
+        cancelPredictionRefresh();
         // 如果正在编码，则取消编码并清空
         if (Rime.isComposing()) {
             onKey(KeyEvent.KEYCODE_ESCAPE, 0);
@@ -310,6 +335,7 @@ public class TrimeService extends InputMethodService {
     @Override
     public void onWindowHidden() {
         Log.w(TAG, "onWindowHidden: " + Rime.isComposing());
+        cancelPredictionRefresh();
         // 如果正在编码，则取消编码并清空
         if (Rime.isComposing()) {
             onKey(KeyEvent.KEYCODE_ESCAPE, 0);
@@ -380,8 +406,8 @@ public class TrimeService extends InputMethodService {
         if (parent != null && parent instanceof ViewGroup) {
             ((ViewGroup) parent).removeView(view);
         }
-        //FrameLayout fr = new FrameLayout(this);
-        //fr.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.BOTTOM));
+        // FrameLayout fr = new FrameLayout(this);
+        // fr.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.BOTTOM));
         super.setInputView(view);
         FrameLayout mInputFrame = getWindow().findViewById(android.R.id.inputArea);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) view.getLayoutParams();
@@ -531,7 +557,7 @@ public class TrimeService extends InputMethodService {
      * 开始输入时根据输入框类型选择合适的键盘和模式。
      * 例如：密码框使用 ASCII 键盘，短信框 Enter 作为换行等。
      *
-     * @param attribute 编辑器信息，包含输入类型、动作等。
+     * @param attribute  编辑器信息，包含输入类型、动作等。
      * @param restarting 是否重新启动输入。
      */
     @Override
@@ -539,6 +565,7 @@ public class TrimeService extends InputMethodService {
         // Function.printStackTrace("onStartInput");
         if (BuildConfig.DEBUG)
             android.util.Log.i(TAG, "onStartInput: " + attribute + ":" + restarting);
+        cancelPredictionRefresh();
         super.onStartInput(attribute, restarting);
         // 获取 imeOptions 整数值，用于确定回车键的动作
         int imeOptions = attribute.imeOptions;
@@ -709,7 +736,8 @@ public class TrimeService extends InputMethodService {
         // 0. 处理候选词选择
         // 如果事件中包含了候选词选择索引（send为数值），则直接选择对应位置的候选词
         int selectCandidate = event.getSelectCandidate();
-        if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onEvent:selectCandidate " + selectCandidate);
+        if (BuildConfig.DEBUG)
+            android.util.Log.w(TAG, "onEvent:selectCandidate " + selectCandidate);
         if (selectCandidate > 0) {
             // 当预输入区含有字母时，数字键追加到预输入区而不是选择候选词
             if (shouldAppendDigitToComposition() && isDigitSelectionEvent(event)) {
@@ -814,8 +842,7 @@ public class TrimeService extends InputMethodService {
                     else if ("deploy".equals(command)) {
                         // 显示部署弹窗
                         showDeployDialog();
-                    }
-                    else {
+                    } else {
                         String resolvedOption = option;
                         if (!TextUtils.isEmpty(option)) {
                             try {
@@ -944,10 +971,11 @@ public class TrimeService extends InputMethodService {
      * 如果是符号键则直接提交，否则发送完整的按下-抬起事件序列。
      *
      * @param keyCode Android 键码。
-     * @param mask 修饰键状态掩码。
+     * @param mask    修饰键状态掩码。
      */
     public void onKey(int keyCode, int mask) {
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKey: " + keyCode);
+        boolean shouldRefreshPredictionAfterDelete = shouldRefreshPredictionAfterDelete(keyCode);
         boolean handled = handleKey(keyCode, mask);
         if (handled) {
             return;
@@ -959,6 +987,9 @@ public class TrimeService extends InputMethodService {
         }
         keyUpNeeded = false;
         sendDownUpKeyEvents(keyCode, mask);
+        if (shouldRefreshPredictionAfterDelete) {
+            schedulePredictionRefreshAfterDelete("delete");
+        }
     }
 
     /**
@@ -966,15 +997,18 @@ public class TrimeService extends InputMethodService {
      * 依次尝试：Rime 引擎处理 -> 快捷键处理 -> 菜单键处理 -> Enter 键处理 -> 返回键处理 -> 系统分类打开。
      *
      * @param keyCode 键码。
-     * @param mask 修饰键状态掩码。
+     * @param mask    修饰键状态掩码。
      * @return true 如果已处理，false 否则。
      */
     private boolean handleKey(int keyCode, int mask) {
         keyUpNeeded = false;
-        //if(keyCode==KeyEvent.KEYCODE_DPAD_LEFT&&mRootInputView.prevCandidate())
+        // if(keyCode==KeyEvent.KEYCODE_DPAD_LEFT&&mRootInputView.prevCandidate())
         //    return true;
-        //if(keyCode==KeyEvent.KEYCODE_DPAD_RIGHT&&mRootInputView.nextCandidate())
+        // if(keyCode==KeyEvent.KEYCODE_DPAD_RIGHT&&mRootInputView.nextCandidate())
         //    return true;
+        if (handleDeleteDuringPrediction(keyCode, mask)) {
+            return true;
+        }
         if (commitRawInputCompositionIfNeeded(keyCode)) {
             return true;
         }
@@ -1082,6 +1116,337 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
+     * 处理“预测候选已经显示时”的删除键。
+     *
+     * <p>此时 Backspace 的目标应是宿主输入框中的正文，而不是 Rime context 里的 `tyl`
+     * 预测占位符。因此这里先退出当前预测态，再把删除键真实发送给宿主应用，最后按删后的
+     * 光标前文本重新触发一轮预测。</p>
+     *
+     * @param keyCode Android 删除键码。
+     * @param mask    当前修饰键掩码。
+     * @return true 表示已接管本次删除；false 表示当前不是预测态删除，继续走普通按键处理。
+     */
+    private boolean handleDeleteDuringPrediction(int keyCode, int mask) {
+        if (!isPredicting() || !isDeleteKey(keyCode) || isRealComposing()) {
+            return false;
+        }
+        setPredictionCandidatesVisible(false);
+        cancelPredictionRefresh();
+        mRime.clearComposition();
+        clearDisplayedComposition();
+        sendDownUpKeyEvents(keyCode, mask);
+        schedulePredictionRefreshAfterDelete("prediction-delete");
+        return true;
+    }
+
+    /**
+     * 判断当前键码是否为删除键。
+     *
+     * @param keyCode Android 键码。
+     * @return true 表示是 Backspace；false 表示不是。
+     */
+    private boolean isDeleteKey(int keyCode) {
+        return keyCode == KeyEvent.KEYCODE_DEL;
+    }
+
+    /**
+     * 判断当前是否处于“真实编码输入”而不是预测占位符态。
+     *
+     * @return true 表示用户正在正常组词/编码；false 表示未编码或处于预测态。
+     */
+    private boolean isRealComposing() {
+        return isComposing() && !isPredicting();
+    }
+
+    /**
+     * 判断一次普通删除后是否应该安排“删后重预测”。
+     *
+     * <p>只有在中文可组合输入、预测开关开启、且当前不在真实编码态时，删除正文才需要按新的
+     * 光标前文本重建预测候选。ASCII 模式、临时 ASCII 模式和正常编码输入过程中都不进入这里。</p>
+     *
+     * @param keyCode Android 键码。
+     * @return true 表示删除后要重新预测；false 表示不需要。
+     */
+    private boolean shouldRefreshPredictionAfterDelete(int keyCode) {
+        return isDeleteKey(keyCode)
+                && canCompose
+                && !isRealComposing()
+                && !mTempAsciiMode
+                && !Rime.getRimeOption("ascii_mode")
+                && Rime.getRimeOption("prediction");
+    }
+
+    /**
+     * 获取“连续删除”判定所使用的节流时间。
+     *
+     * <p>这里直接复用主题中的 `repeat_click_time`，让删后预测与 KeyView 的长按重复删除使用同一套
+     * 节奏判定，避免按键层已经进入连删，而预测层仍把它当作多次独立点删。与此同时再用
+     * {@link #PREDICTION_REFRESH_DELAY_MS} 做下限保护，避免主题配置过小导致宿主文本尚未刷新就提前读上下文。</p>
+     *
+     * @return 连续删除判定与恢复预测所使用的延迟毫秒数。
+     */
+    private long getDeleteRepeatClickTime() {
+        try {
+            return Math.max(PREDICTION_REFRESH_DELAY_MS, ThemeManager.getStyle().getKeyStyle("key").getRepeatClickTime());
+        } catch (Exception e) {
+            return 200L;
+        }
+    }
+
+    /**
+     * 按删除速度安排删后预测刷新。
+     *
+     * <p>删除后的候选恢复分两条路径：</p>
+     * <p>1. 正常点删：按一帧延迟快速恢复预测，保证“删一个字看新的续写”尽量跟手。</p>
+     * <p>2. 长按/快速连删：立即收起候选栏，并把恢复预测延后到一个 `repeat_click_time` 之后；
+     * 只要连删还在继续，每次新删除都会覆盖上一次恢复任务，因此删的过程中候选栏不会反复弹出。</p>
+     *
+     * @param reason 调试日志中的调度来源标记。
+     */
+    private void schedulePredictionRefreshAfterDelete(String reason) {
+        long now = SystemClock.uptimeMillis();
+        long repeatClickTime = getDeleteRepeatClickTime();
+        boolean isRapidDelete = mLastDeleteKeyTime > 0 && now - mLastDeleteKeyTime <= repeatClickTime;
+        mLastDeleteKeyTime = now;
+        if (isRapidDelete) {
+            // 连删过程中候选栏不应反复出现，先立即收起，等停手后由延迟任务统一恢复。
+            clearPredictionCandidates();
+        }
+        schedulePredictionRefresh(reason, isRapidDelete ? repeatClickTime : PREDICTION_REFRESH_DELAY_MS);
+    }
+
+    /**
+     * 以默认短延迟安排一次删后预测刷新。
+     *
+     * <p>宿主应用通常会异步更新输入框文本，因此这里默认延迟一帧后再读取上下文，避免拿到删除前内容。</p>
+     *
+     * @param reason 调试日志中的调度来源标记。
+     */
+    private void schedulePredictionRefresh(String reason) {
+        schedulePredictionRefresh(reason, PREDICTION_REFRESH_DELAY_MS);
+    }
+
+    /**
+     * 用指定延迟调度删后预测刷新任务。
+     *
+     * <p>普通删除会传入较短延迟，尽快读取宿主最新文本；连续快删会传入 `repeat_click_time`，把预测恢复推迟到用户停手之后。
+     * 每次重新调度前都会先取消旧任务，保证消息队列里始终只保留“最后一次删除”对应的刷新请求。</p>
+     *
+     * @param reason  调试日志中的调度来源标记。
+     * @param delayMs 延迟执行的毫秒数。
+     */
+    private void schedulePredictionRefresh(String reason, long delayMs) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "schedulePredictionRefresh: " + reason);
+        }
+        cancelPredictionRefresh();
+        mPendingPredictionRefresh = true;
+        mPredictionRefreshRetries = 0;
+        mPredictionRefreshRevision++;
+        mHandler.postDelayed(mPredictionRefreshRunnable, Math.max(0L, delayMs));
+    }
+
+    /**
+     * 取消当前所有等待中的删后预测刷新任务与短重试任务。
+     *
+     * <p>在预测态被显式关闭、输入窗口隐藏或新的删除调度覆盖旧调度时调用，避免旧任务晚到后把候选栏重新弹出来。</p>
+     */
+    private void cancelPredictionRefresh() {
+        mPendingPredictionRefresh = false;
+        mPredictionRefreshRetries = 0;
+        mHandler.removeCallbacks(mPredictionRefreshRunnable);
+        mHandler.removeCallbacks(mPredictionRefreshVerifyRunnable);
+    }
+
+    /**
+     * 安排一次删后预测的短重试校验。
+     *
+     * <p>当宿主文本刷新或 Lua 占位符注入慢一拍时，首轮预测可能暂时没有成功显示；这里延后一次短时间校验，必要时再补拉一轮。</p>
+     */
+    private void schedulePredictionRefreshVerify() {
+        mHandler.removeCallbacks(mPredictionRefreshVerifyRunnable);
+        mHandler.postDelayed(mPredictionRefreshVerifyRunnable, PREDICTION_REFRESH_RETRY_DELAY_MS);
+    }
+
+    /**
+     * 校验上一轮删后预测是否真的成功显示。
+     *
+     * <p>连续删除时，宿主文本刷新、Java 写请求文件和 Lua 占位符注入都可能慢一拍。
+     * 如果当前既不在真实编码态，也还没有显示预测候选，就允许做有限次短重试，降低删后丢预测概率。</p>
+     */
+    private void verifyPredictionRefresh() {
+        if (mPendingPredictionRefresh
+                || mPredictionRefreshRetries >= PREDICTION_REFRESH_MAX_RETRIES
+                || !Rime.getRimeOption("prediction")
+                || mTempAsciiMode
+                || Rime.getRimeOption("ascii_mode")
+                || isPredicting()
+                || mPredictionCandidatesVisible
+                || isRealComposing()) {
+            return;
+        }
+        mPredictionRefreshRetries++;
+        refreshPredictionFromInputConnection();
+    }
+
+    /**
+     * 从宿主输入框读取“删除后的最新上下文”，并触发一轮新的预测候选生成。
+     *
+     * <p>Java 与 Lua 不共享运行时，因此这里先把最新 anchor 写入共享请求文件，再清理旧预测态，最后通过注入 `tyl`
+     * 占位符复用现有的 user_predict.lua 预测链路。若当前已经没有可用 anchor，则直接关闭预测候选栏。</p>
+     */
+    private void refreshPredictionFromInputConnection() {
+        if (!Rime.getRimeOption("prediction") || mTempAsciiMode || Rime.getRimeOption("ascii_mode")) {
+            return;
+        }
+        CursorContext context = readCursorContext();
+        String anchor = buildPredictionAnchor(context);
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                    TAG,
+                    "refreshPredictionFromInputConnection: before='"
+                            + context.beforeText
+                            + "', selected='"
+                            + context.selectedText
+                            + "', after='"
+                            + context.afterText
+                            + "', anchor='"
+                            + anchor
+                            + "'");
+        }
+        if (TextUtils.isEmpty(anchor)) {
+            mLastPredictionAnchorText = "";
+            clearPredictionCandidates();
+            return;
+        }
+        if (TextUtils.equals(anchor, mLastPredictionAnchorText) && isPredicting()) {
+            return;
+        }
+        if (!writePredictionRequest(anchor)) {
+            return;
+        }
+        mLastPredictionAnchorText = anchor;
+        setPredictionCandidatesVisible(false);
+        mRime.clearComposition();
+        clearDisplayedComposition();
+        mRime.simulateKeySequence(PREDICTION_PLACEHOLDER);
+        schedulePredictionRefreshVerify();
+    }
+
+    // 只读取光标附近的宿主文本，不直接依赖 Rime context，避免占位符干扰正文判断。
+    private CursorContext readCursorContext() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return new CursorContext("", "", "");
+        }
+        CharSequence before = ic.getTextBeforeCursor(PREDICTION_CONTEXT_LIMIT, 0);
+        CharSequence selected = ic.getSelectedText(0);
+        CharSequence after = ic.getTextAfterCursor(PREDICTION_CONTEXT_LIMIT, 0);
+        return new CursorContext(
+                before != null ? before.toString() : "",
+                selected != null ? selected.toString() : "",
+                after != null ? after.toString() : "");
+    }
+
+    // 删后重预测只取光标前末尾连续汉字段中的最近 4 字，尽量贴近 user_predict
+    // 训练时常见的单次上屏粒度，避免把整句尾串直接塞给预测器导致命中率过低。
+    private String buildPredictionAnchor(CursorContext context) {
+        if (context == null) {
+            return "";
+        }
+        String before = stripPredictionPlaceholder(context.beforeText);
+        if (TextUtils.isEmpty(before)) {
+            return "";
+        }
+        int end = before.length();
+        while (end > 0 && Character.isWhitespace(before.charAt(end - 1))) {
+            end--;
+        }
+        if (end <= 0 || !isHan(before.charAt(end - 1))) {
+            return "";
+        }
+        int start = end;
+        int count = 0;
+        while (start > 0) {
+            char ch = before.charAt(start - 1);
+            if (!isHan(ch)) {
+                break;
+            }
+            start--;
+            count++;
+            if (count >= PREDICTION_ANCHOR_MAX_CHARS) {
+                break;
+            }
+        }
+        return before.substring(start, end);
+    }
+
+    /**
+     * 判断一个字符是否属于汉字相关 Unicode 区块。
+     *
+     * <p>这里不用 {@code Character.UnicodeScript.of()}，因为该 API 需要 24+。
+     * 删后预测这里只是为了判断“光标前最后一段是否仍是汉字段”，因此使用 minSdk 21
+     * 可用且编译稳定的 BMP 区块判断即可。当前链路逐个读取 {@code char}，本身也无法完整覆盖
+     * 代理对表示的增补平面汉字，所以这里不再引用 Extension B/C/D/E 之类常量，避免 lint
+     * 与编译环境差异带来的报错。</p>
+     *
+     * @param ch 待判断字符。
+     * @return true 表示可视为汉字；false 表示不是。
+     */
+    private boolean isHan(char ch) {
+        Character.UnicodeBlock block = Character.UnicodeBlock.of(ch);
+        return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+                || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS;
+    }
+
+    // Java 与 Rime Lua 不共享运行时，这里用共享文件把删后重预测请求桥接给 user_predict.lua。
+    private boolean writePredictionRequest(String anchor) {
+        mPredictionRequestRevision = Math.max(mPredictionRequestRevision + 1, System.currentTimeMillis());
+        String payload = mPredictionRequestRevision + "\n" + anchor;
+        boolean written = false;
+        File[] targets = new File[]{
+                new File(DataManager.getSharedDataDir(), PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getSharedDataDir(), "lua/" + PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getSharedDataDir(), "schemas/default/lua/" + PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getStagingDir(), PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getStagingDir(), "lua/" + PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getStagingDir(), "schemas/default/lua/" + PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getUserDataDir(), PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getUserDataDir(), "lua/" + PREDICTION_REQUEST_FILE_NAME),
+                new File(DataManager.getUserDataDir(), "schemas/default/lua/" + PREDICTION_REQUEST_FILE_NAME)
+        };
+        for (File file : targets) {
+            boolean targetWritten = writePredictionRequestFile(file, payload);
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "writePredictionRequest: " + file.getAbsolutePath() + " -> " + targetWritten);
+            }
+            if (targetWritten) {
+                written = true;
+            }
+        }
+        return written;
+    }
+
+    /** 尝试写入预测请求文件。
+     *  返回写入成功与否。
+     **/
+    private boolean writePredictionRequestFile(File file, String payload) {
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            return false;
+        }
+        try (FileOutputStream outputStream = new FileOutputStream(file, false)) {
+            outputStream.write(payload.getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+            return true;
+        } catch (IOException e) {
+            Log.w(TAG, "writePredictionRequestFile: " + file + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * 当前方案是否要求把 mixed rawInput 从候选区隐藏。
      * 这不仅拦截 Java 侧补出来的 raw 候选，也用于过滤 Rime 直接返回的同文候选。
      */
@@ -1109,13 +1474,13 @@ public class TrimeService extends InputMethodService {
 
     /**
      * 解析编码区应显示的可见文本。
-     *
+     * <p>
      * 当原始输入（rawInput）同时包含英文字母和数字（即"混合输入"）时，
      * 优先返回原始输入作为显示文本，以便用户直接看到混合编码内容。
      * 否则返回预编辑文本（preedit），若预编辑为空则退回原始输入。
      * 两个参数均会先去除预测占位符（{@link #PREDICTION_PLACEHOLDER}）。
      *
-     * @param preedit Rime 引擎返回的预编辑/组合文本。
+     * @param preedit  Rime 引擎返回的预编辑/组合文本。
      * @param rawInput 用户实际按键的原始输入字符串。
      * @return 编码区应展示的可见文本。
      */
@@ -1130,12 +1495,12 @@ public class TrimeService extends InputMethodService {
 
     /**
      * 判断预编辑文本是否仅包含预测占位符而无可显示内容。
-     *
+     * <p>
      * 当 preedit 或 rawInput 中存在占位符（如"tyl"），但经过
      * {@link #resolveVisibleCompositionText} 解析后没有可显示的文本时返回 true。
      * 用于在 UI 层面决定是否隐藏编码区——仅含占位符的编码区不应向用户展示。
      *
-     * @param preedit Rime 引擎返回的预编辑文本。
+     * @param preedit  Rime 引擎返回的预编辑文本。
      * @param rawInput 用户实际按键的原始输入。
      * @return true 如果仅含占位符且无可显示内容，false 否则。
      */
@@ -1234,6 +1599,7 @@ public class TrimeService extends InputMethodService {
     }
 
     // 6. 文本提交与 Rime 消息处理 (Text Commitment & Rime Logic)
+
     /**
      * 提交文本到输入框。
      *
@@ -1248,13 +1614,17 @@ public class TrimeService extends InputMethodService {
         if (ic != null) ic.commitText(text, 1);
     }
 
-    /** 去除预测占位符（{@link #PREDICTION_PLACEHOLDER}），避免其原样上屏或显示在编码区。 */
+    /**
+     * 去除预测占位符（{@link #PREDICTION_PLACEHOLDER}），避免其原样上屏或显示在编码区。
+     */
     private static String stripPredictionPlaceholder(String s) {
         if (s == null || !s.contains(PREDICTION_PLACEHOLDER)) return s;
         return s.replace(PREDICTION_PLACEHOLDER, "");
     }
 
-    /** 判断字符串是否包含预测占位符。 */
+    /**
+     * 判断字符串是否包含预测占位符。
+     */
     private static boolean hasPredictionPlaceholder(String s) {
         return !TextUtils.isEmpty(s) && s.contains(PREDICTION_PLACEHOLDER);
     }
@@ -1311,7 +1681,7 @@ public class TrimeService extends InputMethodService {
             return false;
         boolean ret = mRime.processKey(event[0], event[1]);
         Log.w(TAG, "onRimeKey: " + ret);
-        //commitText();
+        // commitText();
         return ret;
     }
 
@@ -1325,14 +1695,14 @@ public class TrimeService extends InputMethodService {
      */
     private boolean composeEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
-        if (keyCode == KeyEvent.KEYCODE_MENU) return false; //不处理Menu键
-        if (keyCode >= Key.getSymbolStart()) return false; //只处理安卓标准按键
+        if (keyCode == KeyEvent.KEYCODE_MENU) return false; // 不处理Menu键
+        if (keyCode >= Key.getSymbolStart()) return false; // 只处理安卓标准按键
         if (event.getRepeatCount() == 0 && KeyEvent.isModifierKey(keyCode)) {
             boolean ret =
                     onRimeKey(
                             Event.getRimeEvent(
                                     keyCode, event.getAction() == KeyEvent.ACTION_DOWN ? 0 : Rime.META_RELEASE_ON));
-            if (isComposing()) setCandidatesViewShown(canCompose); //蓝牙键盘打字时显示候选栏
+            if (isComposing()) setCandidatesViewShown(canCompose); // 蓝牙键盘打字时显示候选栏
             return ret;
         }
         if (!canCompose || Rime.isVoidKeycode(keyCode)) return false;
@@ -1358,12 +1728,12 @@ public class TrimeService extends InputMethodService {
      * 支持方向键选择候选词、修饰键组合等。
      *
      * @param keyCode Android 键码。
-     * @param event 键盘事件对象。
+     * @param event   键盘事件对象。
      * @return true 如果已处理，false 交给系统处理。
      */
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        //Log.info("onKeyDown=" + event);
+        // Log.info("onKeyDown=" + event);
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKeyDown: " + keyCode);
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
             try {
@@ -1388,12 +1758,12 @@ public class TrimeService extends InputMethodService {
      * 处理实体键盘的按键抬起事件。
      *
      * @param keyCode Android 键码。
-     * @param event 键盘事件对象。
+     * @param event   键盘事件对象。
      * @return true 如果已处理，false 交给系统处理。
      */
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        //Log.info("onKeyUp=" + event);
+        // Log.info("onKeyUp=" + event);
         if (composeEvent(event) && keyUpNeeded) {
             onRelease(keyCode);
             return true;
@@ -1409,7 +1779,7 @@ public class TrimeService extends InputMethodService {
      * @return true 如果已处理，false 否则。
      */
     private boolean onKeyEvent(KeyEvent event) {
-        //Log.info("onKeyEvent=" + event);
+        // Log.info("onKeyEvent=" + event);
         int keyCode = event.getKeyCode();
 
         boolean ret = true;
@@ -1442,12 +1812,12 @@ public class TrimeService extends InputMethodService {
         int i = Event.getClickCode(s);
         if (i > 0) {
             keyCode = i;
-        } else { //空格、回車等
+        } else { // 空格、回車等
             mask = event.getMetaState();
         }
         ret = handleKey(keyCode, mask);
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onKeyDown:3 " + keyCode + ret);
-        if (isComposing()) setCandidatesViewShown(canCompose); //蓝牙键盘打字时显示候选栏
+        if (isComposing()) setCandidatesViewShown(canCompose); // 蓝牙键盘打字时显示候选栏
         return ret;
     }
 
@@ -1471,7 +1841,8 @@ public class TrimeService extends InputMethodService {
         // 当 Rime 引擎确定需要上屏一段文本时（如用户选择候选词或确认输入），触发此分支
         if (message instanceof RimeMessage.CommitTextMessage) {
             // 获取消息中的文本数据并直接提交到输入框
-            commitText(((RimeMessage.CommitTextMessage) message).data.getText());
+            CharSequence committedText = ((RimeMessage.CommitTextMessage) message).data.getText();
+            commitText(committedText);
         }
         // 2. 处理输入方案切换消息
         // 当用户切换输入法方案（如从拼音切换到五笔）时触发
@@ -1522,7 +1893,13 @@ public class TrimeService extends InputMethodService {
             String rawInput = Rime.getRimeRawInput();
             String preedit = composition != null ? composition.getPreedit() : null;
             boolean predictionVisible = hasPredictionPlaceholder(rawInput) || hasPredictionPlaceholder(preedit);
+            boolean predictionVisibilityChanged = mPredictionCandidatesVisible != predictionVisible;
             setPredictionCandidatesVisible(predictionVisible);
+            // deploy 后首轮预测有时只出现 composition=tyl=>候选，而 CandidateListMessage
+            // 没及时送到 Java；进入预测态时主动拉一次候选，避免 UI 错过这一拍。
+            if (predictionVisible && predictionVisibilityChanged) {
+                updateCandidate();
+            }
         }
         // 5. 处理候选词列表更新消息
         // 当候选词列表发生变化（如翻页、新候选词出现）时触发
@@ -1570,6 +1947,35 @@ public class TrimeService extends InputMethodService {
     private boolean mComposing;
     // 仅在 composition 摘要变化时输出一次调试日志，避免刷屏。
     private String mLastCompositionLog = "";
+    // 复用同一个刷新任务，避免连按删除时堆积多个读取宿主文本的回调。
+    private final Runnable mPredictionRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mPendingPredictionRefresh = false;
+            refreshPredictionFromInputConnection();
+        }
+    };
+
+    private final Runnable mPredictionRefreshVerifyRunnable = new Runnable() {
+        @Override
+        public void run() {
+            verifyPredictionRefresh();
+        }
+    };
+
+    // 仅保留删后重预测需要的最小光标邻域信息。
+    private static final class CursorContext {
+        final String beforeText;
+        final String selectedText;
+        final String afterText;
+
+        CursorContext(String beforeText, String selectedText, String afterText) {
+            this.beforeText = beforeText != null ? beforeText : "";
+            this.selectedText = selectedText != null ? selectedText : "";
+            this.afterText = afterText != null ? afterText : "";
+        }
+    }
+
     // 1. 复用 Runnable，避免 GC 压力
     private final Runnable mStatusRunnable = new Runnable() {
         @Override
@@ -1733,8 +2139,8 @@ public class TrimeService extends InputMethodService {
         }
         ThemeManager.setTheme(theme);
         mRootInputView.setTheme(theme);
-        //setInputView(onCreateInputView());
-        //showToolbarView(true);
+        // setInputView(onCreateInputView());
+        // showToolbarView(true);
     }
 
     /**
@@ -1750,7 +2156,7 @@ public class TrimeService extends InputMethodService {
         }
         ThemeManager.setStyle(theme);
         mRootInputView.setStyle(theme);
-        //setInputView(onCreateInputView());
+        // setInputView(onCreateInputView());
     }
 
     /**
@@ -1761,7 +2167,7 @@ public class TrimeService extends InputMethodService {
     public void showExtractedCandidatesView(boolean b) {
         mRootInputView.showExtractedCandidatesView(b);
         mShowExtractedCandidatesView = b;
-        //updateCandidate();
+        // updateCandidate();
     }
 
     /**
@@ -1837,6 +2243,7 @@ public class TrimeService extends InputMethodService {
     }
 
     // 8. 输入法操作辅助 (Input Helpers)
+
     /**
      * 选择指定索引的候选词。
      *
@@ -1958,6 +2365,7 @@ public class TrimeService extends InputMethodService {
      */
     public void clearPredictionCandidates() {
         if (!isPredicting() && !mPredictionCandidatesVisible) return;
+        cancelPredictionRefresh();
         setPredictionCandidatesVisible(false);
         mRime.clearComposition();
         clearDisplayedComposition();
@@ -2005,6 +2413,7 @@ public class TrimeService extends InputMethodService {
     }
 
     // 9. 按键与编辑操作辅助 (Key & Edit Helpers)
+
     /**
      * 处理 Ctrl 快捷键。
      * 支持：全选、复制、剪切、粘贴、撤销、重做、分享、纯文本粘贴等。
@@ -2034,6 +2443,7 @@ public class TrimeService extends InputMethodService {
             }
             if (code == KeyEvent.KEYCODE_DEL && Event.hasModifier(mask, KeyEvent.META_SHIFT_ON)) {
                 backToSentence();
+                schedulePredictionRefresh("back-to-sentence");
                 return true;
             }
             if (code == KeyEvent.KEYCODE_A)
@@ -2070,7 +2480,7 @@ public class TrimeService extends InputMethodService {
      * 包括修饰键（Shift、Ctrl、Alt）的按下和释放。
      *
      * @param keyCode 键码。
-     * @param mask 修饰键状态掩码。
+     * @param mask    修饰键状态掩码。
      */
     private void sendDownUpKeyEvents(int keyCode, int mask) {
         InputConnection ic = getCurrentInputConnection();
@@ -2103,8 +2513,8 @@ public class TrimeService extends InputMethodService {
     /**
      * 发送按键按下事件。
      *
-     * @param ic 输入连接对象。
-     * @param key 键码。
+     * @param ic   输入连接对象。
+     * @param key  键码。
      * @param meta 修饰键状态。
      */
     private void sendKeyDown(InputConnection ic, int key, int meta) {
@@ -2114,8 +2524,8 @@ public class TrimeService extends InputMethodService {
     /**
      * 发送按键抬起事件。
      *
-     * @param ic 输入连接对象。
-     * @param key 键码。
+     * @param ic   输入连接对象。
+     * @param key  键码。
      * @param meta 修饰键状态。
      */
     private void sendKeyUp(InputConnection ic, int key, int meta) {
@@ -2125,9 +2535,9 @@ public class TrimeService extends InputMethodService {
     /**
      * 发送单个键事件（按下或抬起）。
      *
-     * @param ic 输入连接对象。
-     * @param key 键码。
-     * @param meta 修饰键状态。
+     * @param ic     输入连接对象。
+     * @param key    键码。
+     * @param meta   修饰键状态。
      * @param action 事件动作（ACTION_DOWN 或 ACTION_UP）。
      */
     private void sendKey(InputConnection ic, int key, int meta, int action) {
@@ -2190,6 +2600,7 @@ public class TrimeService extends InputMethodService {
     }
 
     // 10. 对话框与测量辅助 (Dialog & Dimension Helpers)
+
     /**
      * 显示对话框，设置窗口类型为输入法附加对话框。
      * 宽度设置为屏幕宽度的 50%。
@@ -2345,7 +2756,7 @@ public class TrimeService extends InputMethodService {
      */
     public int getWidth() {
         if (Config.isSmallMode() || Config.isFloatMode())
-            //if (Rime.getRimeOption("small_mode"))
+            // if (Rime.getRimeOption("small_mode"))
             return Math.max(Math.min(Config.getSmallModeWidth(), (getMaxWidth())), (int) (getMaxWidth() * 0.2));
         return getMaxWidth();
     }
@@ -2363,6 +2774,7 @@ public class TrimeService extends InputMethodService {
     }
 
     // 11. 文本获取辅助 (Text Extraction)
+
     /**
      * 获取活动文本，用于 Lua 脚本或命令处理。
      * 根据 type 参数返回不同的文本：
@@ -2456,7 +2868,7 @@ public class TrimeService extends InputMethodService {
      * 执行 Lua 脚本文件（单参数版本）。
      * 支持从多个路径查找脚本文件：绝对路径、主题目录、脚本目录。
      *
-     * @param path 脚本文件路径。
+     * @param path   脚本文件路径。
      * @param option 传递给脚本的参数。
      * @return 脚本执行结果，失败返回 null。
      */
@@ -2521,7 +2933,7 @@ public class TrimeService extends InputMethodService {
      * 执行 Lua 脚本文件（多参数版本）。
      * 支持从多个路径查找脚本文件：绝对路径、脚本目录。
      *
-     * @param path 脚本文件路径。
+     * @param path   脚本文件路径。
      * @param option 可变参数列表。
      * @return 脚本执行结果，失败返回 null。
      */
@@ -2723,6 +3135,7 @@ public class TrimeService extends InputMethodService {
      * 重启 Rime 引擎。
      */
     public void restart() {
+        cancelPredictionRefresh();
         mRime.restart();
         mHandler.post(new Runnable() {
             @Override
@@ -2745,10 +3158,10 @@ public class TrimeService extends InputMethodService {
      * @param text 要显示的消息文本。
      */
     public void sendMsg(final String text) {
-        //Function.printStackTrace("sendMsg " + text);
+        // Function.printStackTrace("sendMsg " + text);
         LuaActivity.logs.add(text);
         Log.w(TAG, "sendMsg: " + text);
-        //sendMsgAux(text);
+        // sendMsgAux(text);
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -2769,9 +3182,9 @@ public class TrimeService extends InputMethodService {
      */
     public void sendMsgAux(final String text) {
         Log.w(TAG, "sendMsgAux: " + text);
-        //if(!isInputViewShown()&&PrefLauncher.getToken()==null){
+        // if(!isInputViewShown()&&PrefLauncher.getToken()==null){
         CustomToast.show(this, text, Toast.LENGTH_SHORT, true);
-        //return;
+        // return;
         //}
        /*if (mDlg == null) {
             mDlg=showListDialog(new AlertDialog.Builder(this)
@@ -2863,7 +3276,7 @@ public class TrimeService extends InputMethodService {
     /**
      * 添加云输入结果及注释（未实现）。
      *
-     * @param index 索引。
+     * @param index   索引。
      * @param comment 注释。
      */
     public void addCloud(String index, String comment) {
