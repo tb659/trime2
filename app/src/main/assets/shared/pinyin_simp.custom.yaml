@@ -1,6 +1,11 @@
 # 下面的 #号 是注释符，注释了就无效了，删掉即可生效
 patch:
 
+  style/inline_preedit: false # 嵌入编码模式，默认是true开启，若想关闭，取消注释即可（删除前面的#号）
+  style/preedit_type: input # 嵌入首选项内容(字词)。有4个选项可设：input 嵌入输入码 | composition 嵌入编码 | preview 嵌入首选项 | preview_all 嵌入全部内容
+  style/horizontal: true # 默认是false竖排显示，删掉行首的#号，可横排显示（横排建议把上面这行注释掉）
+  style/vertical_auto_reverse: false # 竖排候选框超长时，自动倒序 默认启用，若想关闭，将该行行首的#删掉
+
   engine/processors/@before 0: lua_processor@user_predict_processor    # 监听上屏事件，维护记忆链并写入预测库
   engine/translators/@before 0: lua_translator@user_predict_translator  # 上屏后注入占位符，生成预测候选
   engine/filters/@before 0: lua_filter@user_predict_filter              # 输入过程中按上下文提升候选排序
