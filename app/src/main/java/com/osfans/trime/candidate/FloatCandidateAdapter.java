@@ -157,6 +157,15 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
                 TrimeService.getInstance().selectCandidateItem(mData.get(position));
             }
         });
+        holder.itemView.setOnLongClickListener(v -> {
+            int position = holder.getBindingAdapterPosition();
+            if (position == RecyclerView.NO_POSITION || mData == null) {
+                return false;
+            }
+            return TrimeService.getInstance().showDeleteSelfCreatedWordDialog(
+                    Rime.getRimeRawInput(),
+                    mData.get(position));
+        });
         return holder;
     }
 
@@ -192,9 +201,6 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
             holder.tvComment.setMaxWidth(sWidth);
             holder.tvText.setMaxWidth(sWidth);
         }
-        Log.w("TAG", "onBindViewHolder:1 "+tvCommentWidth );
-        Log.w("TAG", "onBindViewHolder:2 "+tvTextWidth );
-        Log.w("TAG", "onBindViewHolder:3 "+mMaxWidth );
         holder.itemView.setContentDescription(data.getText());
         holder.itemView.setSelected(mIdx == position);
         holder.itemView.setBackground(mIdx == position ? mCandidatePressedBackground : null);

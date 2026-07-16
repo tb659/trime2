@@ -625,6 +625,21 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
     /**
+     * 按指定编码和文本从当前方案 user_dict 删除一条显式自造词。
+     *
+     * <p>该接口服务于候选栏长按删除：用户确认删除后，直接按保存时的完整编码和词语
+     * 精确移除对应用户词条，避免误删同文不同码的其他记录。</p>
+     *
+     * @param code 当前词条对应的完整编码。
+     * @param text 需要从 user_dict 移除的词语文本。
+     * @return true 表示删除成功。
+     */
+    public boolean removeUserPhrase(String code, String text) {
+        if (TextUtils.isEmpty(code) || TextUtils.isEmpty(text)) return false;
+        return Boolean.TRUE.equals(withRimeContext(() -> removeRimeUserPhrase(code, text)));
+    }
+
+    /**
      * 按当前方案的 user_dict 前缀查询 mixed rawInput 补全项。
      *
      * <p>该接口主要服务于 `a1显`：像输入 `tb` 时，把此前学习过的 `tb659` 这类字母+数字词
@@ -1178,10 +1193,24 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
      */
     public static native String getRimeRawInput();
 
+    /**
+     * 将 mixed 原始输入按“文本=编码”的形式写回当前方案 user_dict。
+     */
     public static native boolean learnRimeRawInput(String text);
 
+    /**
+     * 按完整编码和词语向当前方案 user_dict 写入一条显式自造词。
+     */
     public static native boolean addRimeUserPhrase(String code, String text);
 
+    /**
+     * 按完整编码和词语从当前方案 user_dict 删除一条显式自造词。
+     */
+    public static native boolean removeRimeUserPhrase(String code, String text);
+
+    /**
+     * 按输入前缀查询当前方案 user_dict 中的 mixed 补全项。
+     */
     public static native String[] queryRimeRawInputCompletions(String prefix, int limit);
 
     /**

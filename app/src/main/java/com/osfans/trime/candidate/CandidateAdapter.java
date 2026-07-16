@@ -165,6 +165,15 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
                 TrimeService.getInstance().selectCandidateItem(mData.get(position));
             }
         });
+        holder.itemView.setOnLongClickListener(v -> {
+            int position = holder.getBindingAdapterPosition();
+            if (position == RecyclerView.NO_POSITION || mData == null) {
+                return false;
+            }
+            return TrimeService.getInstance().showDeleteSelfCreatedWordDialog(
+                    Rime.getRimeRawInput(),
+                    mData.get(position));
+        });
 
         return holder;
     }

@@ -22,6 +22,7 @@ import com.google.android.flexbox.FlexboxLayoutManager;
 import com.osfans.trime.Config;
 import com.osfans.trime.TrimeService;
 import com.osfans.trime.core.CandidateItem;
+import com.osfans.trime.core.Rime;
 import com.osfans.trime.theme.KeyStyle;
 import com.osfans.trime.theme.ThemeManager;
 
@@ -119,6 +120,15 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
             if (position != RecyclerView.NO_POSITION && mData != null) {
                 TrimeService.getInstance().selectCandidateItem(mData.get(position));
             }
+        });
+        holder.itemView.setOnLongClickListener(v -> {
+            int position = holder.getBindingAdapterPosition();
+            if (position == RecyclerView.NO_POSITION || mData == null) {
+                return false;
+            }
+            return TrimeService.getInstance().showDeleteSelfCreatedWordDialog(
+                    Rime.getRimeRawInput(),
+                    mData.get(position));
         });
 
         return holder;

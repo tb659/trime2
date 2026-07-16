@@ -2504,6 +2504,12 @@ public class TrimeService extends InputMethodService {
         mRime.selectCandidate(index);
     }
 
+    /**
+     * 处理候选栏点击真实 Rime 候选时的统一入口。
+     *
+     * <p>若当前首位存在 Java 侧补出的 mixed 临时候选，空格/点击应优先提交该文本；
+     * 否则继续走 Rime 原生候选选择链。</p>
+     */
     public void selectCandidateFromUi(int index) {
         if (shouldCommitRawInputComposition()) {
             commitRawInputComposition();
@@ -2521,6 +2527,9 @@ public class TrimeService extends InputMethodService {
         mRime.selectPagedCandidate(index);
     }
 
+    /**
+     * 处理分页候选栏点击，保持与首屏候选相同的 mixed 优先提交语义。
+     */
     public void selectPagedCandidateFromUi(int index) {
         if (shouldCommitRawInputComposition()) {
             commitRawInputComposition();
@@ -2529,6 +2538,9 @@ public class TrimeService extends InputMethodService {
         mRime.selectPagedCandidate(index);
     }
 
+    /**
+     * 统一处理候选栏中的真实候选、mixed 临时候选和“添加自造词”动作项。
+     */
     public void selectCandidateItem(CandidateItem item) {
         if (item == null) {
             return;
@@ -2547,6 +2559,46 @@ public class TrimeService extends InputMethodService {
             return;
         }
         selectCandidateFromUi(item.getIndex());
+    }
+
+    /**
+     * 长按候选栏中的自造词时，弹出确认对话框，允许用户删除误添加或误学习的词条。
+     *
+     * <p>删除优先按“手动造词登记表”中的完整编码精确处理；若当前候选并非手动造词，
+     * 但仍属于带小太极的自动学习候选，则退回到 Rime 原生 forget/user_dict 删除链。</p>
+     *
+     * @param rawInput 当前候选栏对应的输入前缀。
+     * @param item     被长按的候选项。
+     * @return true 表示本次长按已被消费。
+     */
+    public boolean showDeleteSelfCreatedWordDialog(String rawInput, CandidateItem item) {
+        ArrayList<String[]> matchedEntries = resolveManualCreatedWordEntries(rawInput, item);
+        boolean canDeleteLearnedWord = item != null
+                && item.isSelfCreated()
+                && (item.getIndex() >= 0 || shouldPreferRawInputForComposition(item.getText()));
+        if (matchedEntries.isEmpty() && !canDeleteLearnedWord) {
+            return false;
+        }
+        String message = buildDeleteManualCreatedWordMessage(rawInput, item, matchedEntries, canDeleteLearnedWord);
+        AlertDialog dialog = new AlertDialog.Builder(this, Config.getDialogTheme())
+                .setTitle("删除自造词")
+                .setMessage(message)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok, (unusedDialog, which) -> {
+                    if (deleteSelfCreatedWord(rawInput, item, matchedEntries, canDeleteLearnedWord)) {
+                        CustomToast.show(this, "已删除自造词", Toast.LENGTH_SHORT, true);
+                        updateCandidate();
+                    } else {
+                        CustomToast.show(this, "删除自造词失败", Toast.LENGTH_SHORT, true);
+                    }
+                })
+                .create();
+        if (getToken() != null) {
+            showPassiveDialog(dialog);
+        } else {
+            dialog.show();
+        }
+        return true;
     }
 
     /**
@@ -3033,7 +3085,9 @@ public class TrimeService extends InputMethodService {
         if (item == null || item.isCreateWordAction()) {
             return item;
         }
-        boolean shouldMarkSelfCreated = isRememberedManualCreatedWord(rawInput, item);
+        // 保留 native 已识别出的 user_phrase/user_table 自造词标记，
+        // 同时为“手动造词登记表”命中的前缀候选额外补上小太极。
+        boolean shouldMarkSelfCreated = item.isSelfCreated() || isRememberedManualCreatedWord(rawInput, item);
         if (item.isSelfCreated() == shouldMarkSelfCreated) {
             return item;
         }
@@ -3054,21 +3108,26 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
-     * 判断当前候选是否命中了“手动造词登记表”。
+     * 解析当前候选对应的手动造词登记项。
+     *
+     * <p>前缀补全阶段候选栏里的 rawInput 往往只是完整编码前缀，因此这里按
+     * “同方案 + 同词语 + 登记编码以前缀命中当前输入”来回查完整记录，供补小太极
+     * 和长按删除共用。</p>
      */
-    private boolean isRememberedManualCreatedWord(String rawInput, CandidateItem item) {
+    private ArrayList<String[]> resolveManualCreatedWordEntries(String rawInput, CandidateItem item) {
+        ArrayList<String[]> matchedEntries = new ArrayList<>();
         if (item == null) {
-            return false;
+            return matchedEntries;
         }
         String code = stripPredictionPlaceholder(rawInput).trim();
         String text = stripPredictionPlaceholder(item.getText()).trim();
         if (TextUtils.isEmpty(code) || TextUtils.isEmpty(text)) {
-            return false;
+            return matchedEntries;
         }
+        String currentSchemaId = getCurrentSchemaIdSafe();
         Set<String> storedEntries = Function.getPref(this).getStringSet(
                 MANUAL_CREATED_WORDS_PREF_KEY,
                 Collections.emptySet());
-        String currentSchemaId = getCurrentSchemaIdSafe();
         for (String entry : storedEntries) {
             String[] parts = splitManualCreatedWordKey(entry);
             if (parts == null || parts.length != 3) {
@@ -3079,10 +3138,109 @@ public class TrimeService extends InputMethodService {
                 continue;
             }
             if (parts[1].startsWith(code)) {
-                return true;
+                matchedEntries.add(parts);
             }
         }
-        return false;
+        return matchedEntries;
+    }
+
+    /**
+     * 判断当前候选是否命中了“手动造词登记表”。
+     */
+    private boolean isRememberedManualCreatedWord(String rawInput, CandidateItem item) {
+        return !resolveManualCreatedWordEntries(rawInput, item).isEmpty();
+    }
+
+    /**
+     * 生成删除确认文案；手动造词会展开列出具体编码，自动学习候选则提示按当前词条删除。
+     */
+    private String buildDeleteManualCreatedWordMessage(
+            String rawInput,
+            CandidateItem item,
+            ArrayList<String[]> matchedEntries,
+            boolean canDeleteLearnedWord) {
+        String text = item != null ? item.getText() : "";
+        StringBuilder builder = new StringBuilder();
+        builder.append("是否删除自造词「").append(text).append("」？");
+        if (!matchedEntries.isEmpty()) {
+            builder.append("\n手动造词：");
+            for (int i = 0; i < matchedEntries.size(); i++) {
+                builder.append("\n")
+                        .append(i + 1)
+                        .append(". ")
+                        .append(matchedEntries.get(i)[1]);
+            }
+        }
+        if (canDeleteLearnedWord) {
+            String learnedCode = resolveLearnedWordDeleteCode(rawInput, item);
+            builder.append("\n自动养词：\n")
+                    .append("1. ")
+                    .append(TextUtils.isEmpty(learnedCode) ? "当前候选" : learnedCode);
+        }
+        return builder.toString();
+    }
+
+    /**
+     * 删除当前候选对应的自造词。
+     *
+     * <p>优先按手动造词登记表中的完整编码逐条精确删除；若没有匹配到手动造词记录，
+     * 再按自动学习候选的来源类型回退到 forgetCandidate 或 mixed user_dict 删除。</p>
+     */
+    private boolean deleteSelfCreatedWord(
+            String rawInput,
+            CandidateItem item,
+            ArrayList<String[]> matchedEntries,
+            boolean canDeleteLearnedWord) {
+        boolean deletedAny = false;
+        if (matchedEntries != null && !matchedEntries.isEmpty()) {
+            deletedAny = deleteManualCreatedWordEntries(matchedEntries);
+        }
+        if (!canDeleteLearnedWord || item == null || !item.isSelfCreated()) {
+            return deletedAny;
+        }
+        if (item.getIndex() >= 0) {
+            return mRime.forgetCandidate(item.getIndex()) || deletedAny;
+        }
+        String learnedCode = resolveLearnedWordDeleteCode(rawInput, item);
+        if (!TextUtils.isEmpty(learnedCode) && shouldPreferRawInputForComposition(learnedCode)) {
+            return mRime.removeUserPhrase(learnedCode, learnedCode) || deletedAny;
+        }
+        return deletedAny;
+    }
+
+    /**
+     * 推断当前自动养词候选对应的删除编码，用于删除确认展示与 mixed 学习词条移除。
+     */
+    private String resolveLearnedWordDeleteCode(String rawInput, CandidateItem item) {
+        String normalizedRawInput = stripPredictionPlaceholder(rawInput).trim();
+        if (!TextUtils.isEmpty(normalizedRawInput)) {
+            return normalizedRawInput;
+        }
+        return item != null ? stripPredictionPlaceholder(item.getText()).trim() : "";
+    }
+
+    /**
+     * 删除一组手动造词登记项，并同步从 user_dict 与小太极登记表中移除。
+     */
+    private boolean deleteManualCreatedWordEntries(ArrayList<String[]> matchedEntries) {
+        SharedPreferences preferences = Function.getPref(this);
+        Set<String> storedEntries = preferences.getStringSet(MANUAL_CREATED_WORDS_PREF_KEY, Collections.emptySet());
+        LinkedHashSet<String> mutableEntries = new LinkedHashSet<>(storedEntries);
+        boolean deletedAny = false;
+        for (String[] entry : matchedEntries) {
+            if (entry == null || entry.length != 3) {
+                continue;
+            }
+            if (!mRime.removeUserPhrase(entry[1], entry[2])) {
+                continue;
+            }
+            mutableEntries.remove(buildManualCreatedWordKey(entry[0], entry[1], entry[2]));
+            deletedAny = true;
+        }
+        if (deletedAny) {
+            preferences.edit().putStringSet(MANUAL_CREATED_WORDS_PREF_KEY, mutableEntries).apply();
+        }
+        return deletedAny;
     }
 
     /**
