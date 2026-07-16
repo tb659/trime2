@@ -212,6 +212,10 @@ public class FlexboxCandidateAdapter extends RecyclerView.Adapter<FlexboxCandida
         TrimeService.getInstance().setPreferredRawInputCandidate(
                 preferredMixedCandidate != null ? preferredMixedCandidate.getText() : "");
         mData.addAll(visibleItems); // 添加过滤后的候选数据
+        CandidateItem createWordAction = TrimeService.getCreateWordActionCandidate(rawInput, mData);
+        if (createWordAction != null) {
+            mData.add(createWordAction);
+        }
         notifyDataSetChanged(); // 通知数据更新
     }
 

@@ -10,6 +10,7 @@ import static com.osfans.trime.core.RimeKeyMap.RimeKey_VoidSymbol;
 import android.app.AlertDialog;
 import android.content.ClipboardManager;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -20,11 +21,14 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.text.Html;
 import android.text.InputType;
+import android.text.Layout;
+import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -36,6 +40,8 @@ import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -78,8 +84,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -92,6 +100,9 @@ import java.util.regex.Pattern;
 public class TrimeService extends InputMethodService {
     private static final String PREDICTION_PLACEHOLDER = "tyl";
     private static final String RAW_INPUT_CANDIDATE_OPTION = "show_raw_input_candidate";
+    private static final String CREATE_WORD_CANDIDATE_LABEL = "添加自造词";
+    private static final String CREATE_WORD_MODE_OPTION = "_create_word_mode";
+    private static final String MANUAL_CREATED_WORDS_PREF_KEY = "manual_created_words";
     private static final String PREDICTION_REQUEST_FILE_NAME = "user_predict_request.txt";
     private static final long PREDICTION_REFRESH_DELAY_MS = 48L;
     private static final long PREDICTION_REFRESH_RETRY_DELAY_MS = 96L;
@@ -135,6 +146,21 @@ public class TrimeService extends InputMethodService {
     private boolean mSchemaAcceptsDigitInSpeller = false;
     // 当候选栏首位是 Java 补出来的 mixed 临时候选时，记录其文本，供空格/回车优先上屏。
     private String mPreferredRawInputCandidate = "";
+    private enum CreateWordFocusField {
+        CODE,
+        TEXT,
+    }
+    // “添加自造词”弹窗打开后，使用输入法自身键盘把字符写入这里，避免 IME 给自己的 EditText 输入导致窗口被系统收起。
+    @Nullable private AlertDialog mCreateWordDialog;
+    @Nullable private TextView mCreateWordCodeLabelView;
+    @Nullable private TextView mCreateWordCodeView;
+    @Nullable private TextView mCreateWordTextLabelView;
+    @Nullable private TextView mCreateWordTextView;
+    private final StringBuilder mCreateWordTextBuffer = new StringBuilder();
+    private String mCreateWordCode = "";
+    private int mCreateWordCodeCursor = 0;
+    private int mCreateWordTextCursor = 0;
+    private CreateWordFocusField mCreateWordFocusField = CreateWordFocusField.TEXT;
     // 记录最近一次删除键触发的时间戳。
     // 删后预测不会在每次 Backspace 后立刻无条件弹出，而是要结合主题里的
     // repeat_click_time 判断当前是“正常点删”还是“长按/快速连删”。
@@ -350,6 +376,7 @@ public class TrimeService extends InputMethodService {
         super.onWindowHidden();
         // 调用 Lua 脚本的 onWindowHidden 钩子
         ThemeManager.callFunction("onWindowHidden");
+        clearCreateWordDialogState();
         // 销毁语音模块
         if (mSpeech != null)
             mSpeech.destroy();
@@ -738,7 +765,9 @@ public class TrimeService extends InputMethodService {
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onEvent:1 " + event.getCode());
         // 调试日志：打印事件修饰键掩码
         if (BuildConfig.DEBUG) android.util.Log.w(TAG, "onEvent:2 " + event.getMask());
-
+        if (handleCreateWordCodeEvent(event)) {
+            return;
+        }
         // 0. 处理候选词选择
         // 如果事件中包含了候选词选择索引（send为数值），则直接选择对应位置的候选词
         int selectCandidate = event.getSelectCandidate();
@@ -1008,6 +1037,9 @@ public class TrimeService extends InputMethodService {
      */
     private boolean handleKey(int keyCode, int mask) {
         keyUpNeeded = false;
+        if (handleCreateWordDialogKey(keyCode)) {
+            return true;
+        }
         // if(keyCode==KeyEvent.KEYCODE_DPAD_LEFT&&mRootInputView.prevCandidate())
         //    return true;
         // if(keyCode==KeyEvent.KEYCODE_DPAD_RIGHT&&mRootInputView.nextCandidate())
@@ -1126,9 +1158,26 @@ public class TrimeService extends InputMethodService {
             return;
         }
         commitTextAndClearComposition(rawInput);
-        if (shouldPreferRawInputForComposition(rawInput)) {
+        if (!isCreateWordDialogShowing()
+                && shouldPreferRawInputForComposition(rawInput)
+                && shouldLearnRawInputComposition()) {
             mRime.learnRawInput(rawInput);
         }
+    }
+
+    /**
+     * 判断当前 mixed 上屏是否应继续写回 user_dict 做学习。
+     * 虎码在“养词关”时停掉这条学习链，其他方案保持原行为。
+     */
+    private boolean shouldLearnRawInputComposition() {
+        if (mRime == null) {
+            return false;
+        }
+        String schemaId = mRime.selectedSchemaId();
+        if (TextUtils.isEmpty(schemaId) || !schemaId.startsWith("tigress")) {
+            return true;
+        }
+        return Rime.getRimeOption("aggressive_auto_phrase");
     }
 
     /**
@@ -1146,15 +1195,20 @@ public class TrimeService extends InputMethodService {
      */
     public static ArrayList<CandidateItem> filterVisibleCandidateItems(
             String rawInput, ArrayList<CandidateItem> candidateItems) {
-        if (candidateItems == null || candidateItems.isEmpty()
-                || !shouldHideRawInputCandidate(rawInput)) {
+        if (candidateItems == null || candidateItems.isEmpty()) {
             return candidateItems;
         }
         ArrayList<CandidateItem> visibleItems = new ArrayList<>();
+        TrimeService instance = getInstance();
         for (CandidateItem item : candidateItems) {
-            if (item == null || !shouldHideMixedWordCandidate(item.getText(), rawInput)) {
-                visibleItems.add(item);
+            if (item == null) {
+                visibleItems.add(null);
+                continue;
             }
+            if (shouldHideRawInputCandidate(rawInput) && shouldHideMixedWordCandidate(item.getText(), rawInput)) {
+                continue;
+            }
+            visibleItems.add(instance != null ? instance.decorateVisibleCandidateItem(rawInput, item) : item);
         }
         return visibleItems;
     }
@@ -1240,6 +1294,41 @@ public class TrimeService extends InputMethodService {
             result.add(new CandidateItem(text, "", true));
         }
         return result;
+    }
+
+    /**
+     * 在当前编码没有任何候选时，生成“添加自造词”动作项。
+     *
+     * <p>这里只在候选区真的空白时显示入口，避免与正常候选竞争位置；
+     * 点击后会弹窗，让用户把当前编码和目标词语明确写入 user_dict。</p>
+     */
+    public static CandidateItem getCreateWordActionCandidate(
+            String rawInput, ArrayList<CandidateItem> visibleItems) {
+        rawInput = stripPredictionPlaceholder(rawInput);
+        if (!Rime.isComposing()
+                || TextUtils.isEmpty(rawInput)
+                || isPredictingStatic()
+                || isCreateWordDialogShowingStatic()
+                || (visibleItems != null && !visibleItems.isEmpty())) {
+            return null;
+        }
+        return CandidateItem.createWordAction(rawInput, "编码：" + rawInput);
+    }
+
+    /**
+     * 静态环境下判断当前是否处于上屏后预测态。
+     */
+    private static boolean isPredictingStatic() {
+        TrimeService instance = getInstance();
+        return instance != null && instance.isPredicting();
+    }
+
+    /**
+     * 静态环境下判断当前是否正在显示造词面板。
+     */
+    private static boolean isCreateWordDialogShowingStatic() {
+        TrimeService instance = getInstance();
+        return instance != null && instance.isCreateWordDialogShowing();
     }
 
     /**
@@ -1748,6 +1837,11 @@ public class TrimeService extends InputMethodService {
         if (TextUtils.isEmpty(text)) return;
         text = stripPredictionPlaceholder(text.toString());
         if (TextUtils.isEmpty(text)) return;
+        if (isCreateWordDialogShowing()) {
+            setCreateWordFocus(CreateWordFocusField.TEXT);
+            appendCommittedCreateWordText(text);
+            return;
+        }
         lastCommittedText = text;
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) ic.commitText(text, 1);
@@ -2439,6 +2533,10 @@ public class TrimeService extends InputMethodService {
         if (item == null) {
             return;
         }
+        if (item.isCreateWordAction()) {
+            showCreateWordDialog(item.getCreateWordCode());
+            return;
+        }
         if (item.getIndex() == -1) {
             String rawInput = stripPredictionPlaceholder(item.getText());
             if (shouldPreferRawInputForComposition(rawInput)) {
@@ -2449,6 +2547,608 @@ public class TrimeService extends InputMethodService {
             return;
         }
         selectCandidateFromUi(item.getIndex());
+    }
+
+    /**
+     * 弹出“添加自造词”窗口。
+     *
+     * <p>默认带入当前候选区对应的编码；用户确认后，直接写入当前方案正式 user_dict，
+     * 这样后续 `sync` 时也会沿用现有用户词同步链路。</p>
+     */
+    public void showCreateWordDialog(String initialCode) {
+        dismissCreateWordDialog();
+        String rawCode = stripPredictionPlaceholder(initialCode).trim();
+        mCreateWordCode = rawCode;
+        mCreateWordCodeCursor = rawCode.length();
+        mCreateWordTextBuffer.setLength(0);
+        mCreateWordTextCursor = 0;
+        mCreateWordFocusField = CreateWordFocusField.TEXT;
+        // 保存完原编码后立刻释放当前候选/编码区，后续输入应回到正常打字选字流程，
+        // 由用户继续输入 `lhf -> 芙`、`... -> 宁/娜` 这类编码并把选字结果累积到造词缓冲区。
+        mPreferredRawInputCandidate = "";
+        setCreateWordModeEnabled(true);
+        mRime.clearComposition();
+        clearDisplayedComposition();
+        updateCandidate();
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int padding = ThemeManager.dp2px(16);
+        container.setPadding(padding, padding, padding, 0);
+
+        LinearLayout codeRow = new LinearLayout(this);
+        codeRow.setOrientation(LinearLayout.HORIZONTAL);
+        codeRow.setGravity(Gravity.CENTER_VERTICAL);
+        container.addView(codeRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView codeLabel = new TextView(this);
+        codeLabel.setText("编码");
+        codeRow.addView(codeLabel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView codeValue = new TextView(this);
+        codeValue.setText(rawCode);
+        codeValue.setMinHeight(ThemeManager.dp2px(40));
+        codeValue.setPadding(ThemeManager.dp2px(12), ThemeManager.dp2px(4), 0, ThemeManager.dp2px(12));
+        codeRow.addView(codeValue, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        ((LinearLayout.LayoutParams) codeValue.getLayoutParams()).weight = 1f;
+
+        LinearLayout textRow = new LinearLayout(this);
+        textRow.setOrientation(LinearLayout.HORIZONTAL);
+        textRow.setGravity(Gravity.CENTER_VERTICAL);
+        container.addView(textRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView textLabel = new TextView(this);
+        textLabel.setText("词语");
+        textRow.addView(textLabel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView textValue = new TextView(this);
+        textValue.setHint("请输入词语");
+        textValue.setMinHeight(ThemeManager.dp2px(40));
+        textValue.setPadding(ThemeManager.dp2px(12), ThemeManager.dp2px(8), 0, ThemeManager.dp2px(8));
+        textRow.addView(textValue, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        ((LinearLayout.LayoutParams) textValue.getLayoutParams()).weight = 1f;
+        bindCreateWordFocusListener(codeLabel, CreateWordFocusField.CODE);
+        bindCreateWordFieldTouchListener(codeValue, CreateWordFocusField.CODE);
+        bindCreateWordFocusListener(textLabel, CreateWordFocusField.TEXT);
+        bindCreateWordFieldTouchListener(textValue, CreateWordFocusField.TEXT);
+        mCreateWordCodeLabelView = codeLabel;
+        mCreateWordCodeView = codeValue;
+        mCreateWordTextLabelView = textLabel;
+        mCreateWordTextView = textValue;
+        refreshCreateWordDialogViews();
+
+        AlertDialog dialog = new AlertDialog.Builder(this, Config.getDialogTheme())
+                .setTitle(CREATE_WORD_CANDIDATE_LABEL)
+                .setView(container)
+                .setNegativeButton(getString(android.R.string.cancel), null)
+                .setPositiveButton(getString(android.R.string.ok), null)
+                .create();
+        dialog.setOnDismissListener(unused -> clearCreateWordDialogState());
+        dialog.setOnShowListener(unused -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String code = stripPredictionPlaceholder(mCreateWordCode).trim();
+                    String text = mCreateWordTextBuffer.toString().trim();
+                    if (TextUtils.isEmpty(code)) {
+                        CustomToast.show(this, "编码不能为空", Toast.LENGTH_SHORT, true);
+                        return;
+                    }
+                    if (TextUtils.isEmpty(text)) {
+                        CustomToast.show(this, "词语不能为空", Toast.LENGTH_SHORT, true);
+                        return;
+                    }
+                    if (!mRime.addUserPhrase(code, text)) {
+                        CustomToast.show(this, "添加自造词失败", Toast.LENGTH_SHORT, true);
+                        return;
+                    }
+                    rememberManualCreatedWord(code, text);
+                    CustomToast.show(this, "已添加用户词", Toast.LENGTH_SHORT, true);
+                    dialog.dismiss();
+                    updateCandidate();
+                }));
+        mCreateWordDialog = dialog;
+        if (getToken() != null) {
+            showPassiveDialog(dialog);
+        } else {
+            dialog.show();
+        }
+    }
+
+    /**
+     * 将一次真正上屏的候选文本追加到造词缓冲区。
+     */
+    private void appendCommittedCreateWordText(CharSequence text) {
+        if (!isCreateWordDialogShowing() || TextUtils.isEmpty(text)) {
+            return;
+        }
+        insertCreateWordText(text);
+        refreshCreateWordDialogViews();
+    }
+
+    /**
+     * 在编码字段聚焦时，直接把 ASCII 按键写入造词编码缓冲区。
+     */
+    private boolean handleCreateWordCodeEvent(Event event) {
+        if (!isCreateWordDialogShowing() || mCreateWordFocusField != CreateWordFocusField.CODE || event == null) {
+            return false;
+        }
+        String directInput = resolveCreateWordCodeInput(event);
+        if (TextUtils.isEmpty(directInput)) {
+            return false;
+        }
+        insertCreateWordCode(directInput);
+        refreshCreateWordDialogViews();
+        return true;
+    }
+
+    /**
+     * 解析编码字段可接受的直接输入字符，避免把候选提交误当成编码编辑。
+     */
+    private String resolveCreateWordCodeInput(Event event) {
+        if (event == null || event.isFunctional()) {
+            return "";
+        }
+        if (event.getSelectCandidate() > 0 && isDigitSelectionEvent(event)) {
+            return String.valueOf(event.getSelectCandidate() % 10);
+        }
+        String label = event.getLabel();
+        if (!TextUtils.isEmpty(label) && label.length() == 1 && isAsciiPrintable(label.charAt(0))) {
+            return String.valueOf(Character.toLowerCase(label.charAt(0)));
+        }
+        String raw = event.getRawText();
+        if (!TextUtils.isEmpty(raw) && raw.length() == 1 && isAsciiPrintable(raw.charAt(0))) {
+            return String.valueOf(Character.toLowerCase(raw.charAt(0)));
+        }
+        int keyCode = event.getCode();
+        if (keyCode >= KeyEvent.KEYCODE_A && keyCode <= KeyEvent.KEYCODE_Z) {
+            return String.valueOf((char) ('a' + (keyCode - KeyEvent.KEYCODE_A)));
+        }
+        if (keyCode >= KeyEvent.KEYCODE_0 && keyCode <= KeyEvent.KEYCODE_9) {
+            return String.valueOf((char) ('0' + (keyCode - KeyEvent.KEYCODE_0)));
+        }
+        return "";
+    }
+
+    /**
+     * 造词面板显示时处理退格、方向、确认与关闭。
+     */
+    private boolean handleCreateWordDialogKey(int keyCode) {
+        if (!isCreateWordDialogShowing() || Rime.isComposing()) {
+            return false;
+        }
+        if (keyCode == KeyEvent.KEYCODE_DEL) {
+            deleteCreateWordCharBeforeCursor();
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
+            deleteCreateWordCharAfterCursor();
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+            moveCreateWordCursor(-1);
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            moveCreateWordCursor(1);
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_MOVE_HOME) {
+            moveCreateWordCursorToBoundary(false);
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_MOVE_END) {
+            moveCreateWordCursorToBoundary(true);
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (mCreateWordDialog != null) {
+                mCreateWordDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            }
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            dismissCreateWordDialog();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 在指定字段中插入文本，并把光标推进到新内容末尾。
+     */
+    private void insertCreateWordCode(String text) {
+        String normalized = normalizeCreateWordCode(text);
+        if (TextUtils.isEmpty(normalized)) {
+            return;
+        }
+        int cursor = clampCreateWordCursor(mCreateWordCodeCursor, mCreateWordCode.length());
+        mCreateWordCode = mCreateWordCode.substring(0, cursor)
+                + normalized
+                + mCreateWordCode.substring(cursor);
+        mCreateWordCodeCursor = cursor + normalized.length();
+    }
+
+    /**
+     * 在词语字段当前光标位置插入文本。
+     */
+    private void insertCreateWordText(CharSequence text) {
+        if (TextUtils.isEmpty(text)) {
+            return;
+        }
+        int cursor = clampCreateWordCursor(mCreateWordTextCursor, mCreateWordTextBuffer.length());
+        mCreateWordTextBuffer.insert(cursor, text);
+        mCreateWordTextCursor = cursor + text.length();
+    }
+
+    /**
+     * 删除当前编辑字段中光标前的一个 Unicode 字符。
+     */
+    private void deleteCreateWordCharBeforeCursor() {
+        if (mCreateWordFocusField == CreateWordFocusField.CODE) {
+            if (TextUtils.isEmpty(mCreateWordCode) || mCreateWordCodeCursor <= 0) {
+                return;
+            }
+            int deleteStart = Character.offsetByCodePoints(mCreateWordCode, mCreateWordCodeCursor, -1);
+            mCreateWordCode = mCreateWordCode.substring(0, deleteStart) + mCreateWordCode.substring(mCreateWordCodeCursor);
+            mCreateWordCodeCursor = deleteStart;
+        } else {
+            if (mCreateWordTextBuffer.length() <= 0 || mCreateWordTextCursor <= 0) {
+                return;
+            }
+            int deleteStart = Character.offsetByCodePoints(
+                    mCreateWordTextBuffer,
+                    mCreateWordTextCursor,
+                    -1);
+            mCreateWordTextBuffer.delete(deleteStart, mCreateWordTextCursor);
+            mCreateWordTextCursor = deleteStart;
+        }
+        refreshCreateWordDialogViews();
+    }
+
+    /**
+     * 删除当前编辑字段中光标后的一个 Unicode 字符。
+     */
+    private void deleteCreateWordCharAfterCursor() {
+        if (mCreateWordFocusField == CreateWordFocusField.CODE) {
+            if (TextUtils.isEmpty(mCreateWordCode) || mCreateWordCodeCursor >= mCreateWordCode.length()) {
+                return;
+            }
+            int deleteEnd = Character.offsetByCodePoints(mCreateWordCode, mCreateWordCodeCursor, 1);
+            mCreateWordCode = mCreateWordCode.substring(0, mCreateWordCodeCursor) + mCreateWordCode.substring(deleteEnd);
+        } else {
+            if (mCreateWordTextBuffer.length() <= 0 || mCreateWordTextCursor >= mCreateWordTextBuffer.length()) {
+                return;
+            }
+            int deleteEnd = Character.offsetByCodePoints(
+                    mCreateWordTextBuffer,
+                    mCreateWordTextCursor,
+                    1);
+            mCreateWordTextBuffer.delete(mCreateWordTextCursor, deleteEnd);
+        }
+        refreshCreateWordDialogViews();
+    }
+
+    /**
+     * 切换当前造词弹窗内的编辑字段。
+     */
+    private void setCreateWordFocus(CreateWordFocusField focusField) {
+        mCreateWordFocusField = focusField;
+        refreshCreateWordDialogViews();
+    }
+
+    /**
+     * 按相对位移移动当前编辑字段的光标。
+     */
+    private void moveCreateWordCursor(int deltaCodePoints) {
+        if (mCreateWordFocusField == CreateWordFocusField.CODE) {
+            mCreateWordCodeCursor = moveCreateWordCursor(mCreateWordCode, mCreateWordCodeCursor, deltaCodePoints);
+        } else {
+            mCreateWordTextCursor = moveCreateWordCursor(mCreateWordTextBuffer, mCreateWordTextCursor, deltaCodePoints);
+        }
+        refreshCreateWordDialogViews();
+    }
+
+    /**
+     * 把当前编辑字段的光标直接移动到首位或末位。
+     */
+    private void moveCreateWordCursorToBoundary(boolean moveToEnd) {
+        if (mCreateWordFocusField == CreateWordFocusField.CODE) {
+            mCreateWordCodeCursor = moveToEnd ? mCreateWordCode.length() : 0;
+        } else {
+            mCreateWordTextCursor = moveToEnd ? mCreateWordTextBuffer.length() : 0;
+        }
+        refreshCreateWordDialogViews();
+    }
+
+    /**
+     * 在 TextView 上绑定点击定位逻辑，让被动弹窗也能切换字段和内部光标。
+     */
+    private void bindCreateWordFieldTouchListener(TextView view, CreateWordFocusField focusField) {
+        view.setClickable(true);
+        view.setOnTouchListener((unusedView, event) -> {
+            if (event.getAction() != MotionEvent.ACTION_DOWN && event.getAction() != MotionEvent.ACTION_UP) {
+                return false;
+            }
+            setCreateWordFocus(focusField);
+            if (focusField == CreateWordFocusField.CODE) {
+                mCreateWordCodeCursor = resolveCreateWordCursorFromTouch(view, focusField, event.getX(), event.getY());
+            } else {
+                mCreateWordTextCursor = resolveCreateWordCursorFromTouch(view, focusField, event.getX(), event.getY());
+            }
+            refreshCreateWordDialogViews();
+            return true;
+        });
+    }
+
+    /**
+     * 给造词字段标题绑定焦点切换，点击标题时直接把光标放到该字段末尾。
+     */
+    private void bindCreateWordFocusListener(View view, CreateWordFocusField focusField) {
+        view.setOnClickListener(unusedView -> {
+            setCreateWordFocus(focusField);
+            if (focusField == CreateWordFocusField.CODE) {
+                mCreateWordCodeCursor = mCreateWordCode.length();
+            } else {
+                mCreateWordTextCursor = mCreateWordTextBuffer.length();
+            }
+            refreshCreateWordDialogViews();
+        });
+    }
+
+    /**
+     * 根据点击位置换算造词字段内部光标，支持在只读 TextView 上做近似定位编辑。
+     */
+    private int resolveCreateWordCursorFromTouch(TextView view, CreateWordFocusField focusField, float x, float y) {
+        CharSequence rawText = focusField == CreateWordFocusField.CODE ? mCreateWordCode : mCreateWordTextBuffer;
+        int rawLength = rawText.length();
+        Layout layout = view.getLayout();
+        if (layout == null) {
+            return rawLength;
+        }
+        int line = layout.getLineForVertical((int) y - view.getTotalPaddingTop() + view.getScrollY());
+        float horizontal = x - view.getTotalPaddingLeft() + view.getScrollX();
+        int offset = layout.getOffsetForHorizontal(line, horizontal);
+        int displayCursor = focusField == CreateWordFocusField.CODE ? mCreateWordCodeCursor : mCreateWordTextCursor;
+        if (mCreateWordFocusField == focusField && offset > displayCursor) {
+            offset -= 1;
+        }
+        return clampCreateWordCursor(offset, rawLength);
+    }
+
+    /**
+     * 规范化编码编辑输入，只保留可见 ASCII 并统一为小写。
+     */
+    private String normalizeCreateWordCode(String text) {
+        if (TextUtils.isEmpty(text)) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (isAsciiPrintable(ch)) {
+                builder.append(Character.toLowerCase(ch));
+            }
+        }
+        return builder.toString();
+    }
+
+    /**
+     * 计算 Unicode 感知的光标移动结果，避免落在代理对中间。
+     */
+    private int moveCreateWordCursor(CharSequence text, int cursor, int deltaCodePoints) {
+        int clampedCursor = clampCreateWordCursor(cursor, text.length());
+        if (deltaCodePoints == 0) {
+            return clampedCursor;
+        }
+        if (deltaCodePoints > 0) {
+            int steps = deltaCodePoints;
+            while (steps-- > 0 && clampedCursor < text.length()) {
+                clampedCursor = Character.offsetByCodePoints(text, clampedCursor, 1);
+            }
+            return clampedCursor;
+        }
+        int steps = -deltaCodePoints;
+        while (steps-- > 0 && clampedCursor > 0) {
+            clampedCursor = Character.offsetByCodePoints(text, clampedCursor, -1);
+        }
+        return clampedCursor;
+    }
+
+    /**
+     * 把造词字段光标限制到合法边界。
+     */
+    private int clampCreateWordCursor(int cursor, int length) {
+        return Math.max(0, Math.min(cursor, length));
+    }
+
+    /**
+     * 生成带内部光标标记的显示文本，便于在被动弹窗里直观看到当前插入位置。
+     */
+    private CharSequence buildCreateWordFieldDisplayText(CharSequence rawText, int cursor, boolean activeField) {
+        if (!activeField) {
+            return rawText;
+        }
+        int safeCursor = clampCreateWordCursor(cursor, rawText.length());
+        SpannableStringBuilder display = new SpannableStringBuilder(rawText);
+        display.insert(safeCursor, "|");
+        return display;
+    }
+
+    /**
+     * 刷新造词弹窗里的编码/词语显示，并同步当前编辑字段提示。
+     */
+    private void refreshCreateWordDialogViews() {
+        if (mCreateWordCodeLabelView != null) {
+            mCreateWordCodeLabelView.setText("编码");
+            mCreateWordCodeLabelView.setAlpha(mCreateWordFocusField == CreateWordFocusField.CODE ? 1f : 0.72f);
+        }
+        if (mCreateWordCodeView != null) {
+            mCreateWordCodeView.setText(buildCreateWordFieldDisplayText(
+                    mCreateWordCode,
+                    mCreateWordCodeCursor,
+                    mCreateWordFocusField == CreateWordFocusField.CODE));
+            mCreateWordCodeView.setAlpha(mCreateWordFocusField == CreateWordFocusField.CODE ? 1f : 0.72f);
+        }
+        if (mCreateWordTextLabelView != null) {
+            mCreateWordTextLabelView.setText("词语");
+            mCreateWordTextLabelView.setAlpha(mCreateWordFocusField == CreateWordFocusField.TEXT ? 1f : 0.72f);
+        }
+        if (mCreateWordTextView != null) {
+            mCreateWordTextView.setText(buildCreateWordFieldDisplayText(
+                    mCreateWordTextBuffer,
+                    mCreateWordTextCursor,
+                    mCreateWordFocusField == CreateWordFocusField.TEXT));
+            mCreateWordTextView.setAlpha(mCreateWordFocusField == CreateWordFocusField.TEXT ? 1f : 0.72f);
+        }
+    }
+
+    /**
+     * 当前是否仍在显示造词弹窗。
+     */
+    private boolean isCreateWordDialogShowing() {
+        return mCreateWordDialog != null && mCreateWordDialog.isShowing();
+    }
+
+    /**
+     * 切换造词模式运行时选项，用于在手动造词期间暂停自动学习链路。
+     */
+    private void setCreateWordModeEnabled(boolean enabled) {
+        mRime.setRuntimeOption(CREATE_WORD_MODE_OPTION, enabled);
+    }
+
+    /**
+     * 只给“手动造词登记表”中的候选补小太极，避免把普通自动学习词一并标成自造词。
+     */
+    private CandidateItem decorateVisibleCandidateItem(String rawInput, CandidateItem item) {
+        if (item == null || item.isCreateWordAction()) {
+            return item;
+        }
+        boolean shouldMarkSelfCreated = isRememberedManualCreatedWord(rawInput, item);
+        if (item.isSelfCreated() == shouldMarkSelfCreated) {
+            return item;
+        }
+        CandidateItem decorated = new CandidateItem(item.getText(), item.getRawComment(), shouldMarkSelfCreated);
+        decorated.setIndex(item.getIndex());
+        return decorated;
+    }
+
+    /**
+     * 记录一条用户通过造词弹窗显式保存的词条，供候选区后续精确补小太极标识。
+     */
+    private void rememberManualCreatedWord(String code, String text) {
+        SharedPreferences preferences = Function.getPref(this);
+        Set<String> storedEntries = preferences.getStringSet(MANUAL_CREATED_WORDS_PREF_KEY, Collections.emptySet());
+        LinkedHashSet<String> mutableEntries = new LinkedHashSet<>(storedEntries);
+        mutableEntries.add(buildManualCreatedWordKey(getCurrentSchemaIdSafe(), code, text));
+        preferences.edit().putStringSet(MANUAL_CREATED_WORDS_PREF_KEY, mutableEntries).apply();
+    }
+
+    /**
+     * 判断当前候选是否命中了“手动造词登记表”。
+     */
+    private boolean isRememberedManualCreatedWord(String rawInput, CandidateItem item) {
+        if (item == null) {
+            return false;
+        }
+        String code = stripPredictionPlaceholder(rawInput).trim();
+        String text = stripPredictionPlaceholder(item.getText()).trim();
+        if (TextUtils.isEmpty(code) || TextUtils.isEmpty(text)) {
+            return false;
+        }
+        Set<String> storedEntries = Function.getPref(this).getStringSet(
+                MANUAL_CREATED_WORDS_PREF_KEY,
+                Collections.emptySet());
+        String currentSchemaId = getCurrentSchemaIdSafe();
+        for (String entry : storedEntries) {
+            String[] parts = splitManualCreatedWordKey(entry);
+            if (parts == null || parts.length != 3) {
+                continue;
+            }
+            if (!TextUtils.equals(currentSchemaId, parts[0])
+                    || !TextUtils.equals(text, parts[2])) {
+                continue;
+            }
+            if (parts[1].startsWith(code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 生成“方案 + 编码 + 词语”三元组键，避免不同方案或同词不同码相互串标。
+     */
+    private String buildManualCreatedWordKey(String schemaId, String code, String text) {
+        return sanitizeManualCreatedWordPart(schemaId)
+                + "\t"
+                + sanitizeManualCreatedWordPart(code)
+                + "\t"
+                + sanitizeManualCreatedWordPart(text);
+    }
+
+    /**
+     * 解析“方案 + 编码 + 词语”三元组键，供前缀命中手动造词记录时复用。
+     */
+    @Nullable
+    private String[] splitManualCreatedWordKey(String key) {
+        if (TextUtils.isEmpty(key)) {
+            return null;
+        }
+        String[] parts = key.split("\\t", 3);
+        return parts.length == 3 ? parts : null;
+    }
+
+    /**
+     * 获取当前方案 ID，缺省时回退到空字符串，避免 SharedPreferences 键生成空指针。
+     */
+    private String getCurrentSchemaIdSafe() {
+        String schemaId = mRime != null ? mRime.selectedSchemaId() : "";
+        return schemaId != null ? schemaId : "";
+    }
+
+    /**
+     * 清理登记键中的分隔符，避免编码、词语或方案名污染三元组键格式。
+     */
+    private String sanitizeManualCreatedWordPart(String value) {
+        return value == null ? "" : value.replace('\t', ' ').trim();
+    }
+
+    /**
+     * 主动关闭造词弹窗。
+     */
+    private void dismissCreateWordDialog() {
+        if (mCreateWordDialog != null && mCreateWordDialog.isShowing()) {
+            mCreateWordDialog.dismiss();
+        } else {
+            clearCreateWordDialogState();
+        }
+    }
+
+    /**
+     * 清理造词弹窗相关状态。
+     */
+    private void clearCreateWordDialogState() {
+        setCreateWordModeEnabled(false);
+        mCreateWordDialog = null;
+        mCreateWordCodeLabelView = null;
+        mCreateWordCodeView = null;
+        mCreateWordTextLabelView = null;
+        mCreateWordTextView = null;
+        mCreateWordCode = "";
+        mCreateWordCodeCursor = 0;
+        mCreateWordTextBuffer.setLength(0);
+        mCreateWordTextCursor = 0;
+        mCreateWordFocusField = CreateWordFocusField.TEXT;
     }
 
     /**
@@ -2805,6 +3505,33 @@ public class TrimeService extends InputMethodService {
             lp = window.getAttributes();
             // 设置为屏幕宽度的 80%，避免撑满全屏
             DisplayMetrics dm = getResources().getDisplayMetrics();
+            window.setAttributes(lp);
+        }
+        return dialog;
+    }
+
+    /**
+     * 显示一个不参与输入焦点竞争的附着对话框。
+     *
+     * <p>该方法用于造词面板这类“仅展示状态并接收点击”的浮层。窗口保持不可聚焦，
+     * 这样当前输入法窗口不会因为附着对话框抢焦点而触发隐藏/重启。</p>
+     *
+     * @param dialog 要显示的对话框。
+     * @return 显示后的对话框对象。
+     */
+    public AlertDialog showPassiveDialog(AlertDialog dialog) {
+        Window window = dialog.getWindow();
+        WindowManager.LayoutParams lp = window.getAttributes();
+        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+        lp.token = getToken();
+        window.setAttributes(lp);
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+
+        dialog.show();
+        window = dialog.getWindow();
+        if (window != null) {
+            lp = window.getAttributes();
             window.setAttributes(lp);
         }
         return dialog;

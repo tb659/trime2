@@ -180,6 +180,51 @@ class Rime {
     return user_dict->UpdateEntry(entry, 1);
   }
 
+  bool addUserPhrase(std::string_view code, std::string_view text) {
+    if (code.empty() || text.empty()) {
+      return false;
+    }
+    std::string schema_id = currentSchemaId();
+    if (schema_id.empty() || schema_id == ".default") {
+      return false;
+    }
+
+    rime::Schema schema(schema_id);
+    if (!schema.config()) {
+      return false;
+    }
+    rime::Ticket ticket(&schema, "translator");
+
+    auto user_dictionary = rime::UserDictionary::Require("user_dictionary");
+    if (!user_dictionary) {
+      return false;
+    }
+    std::unique_ptr<rime::UserDictionary> user_dict(user_dictionary->Create(ticket));
+    if (!user_dict || !user_dict->Load() || user_dict->readonly()) {
+      return false;
+    }
+
+    if (auto dictionary = rime::Dictionary::Require("dictionary")) {
+      std::unique_ptr<rime::Dictionary> dict(dictionary->Create(ticket));
+      if (dict && dict->Load()) {
+        user_dict->Attach(dict->primary_table(), dict->prism());
+      }
+    }
+
+    rime::DictEntry entry;
+    entry.text = std::string(text);
+    entry.custom_code = std::string(code);
+    if (!user_dict->UpdateEntry(entry, 1)) {
+      return false;
+    }
+
+    auto current_session = rime::Service::instance().GetSession(session(false));
+    if (current_session && current_session->context()) {
+      current_session->context()->RefreshNonConfirmedComposition();
+    }
+    return true;
+  }
+
   std::vector<std::string> queryRawInputCompletions(std::string_view prefix,
                                                     size_t limit) {
     std::vector<std::string> result;
@@ -500,6 +545,16 @@ Java_com_osfans_trime_core_Rime_learnRimeRawInput(JNIEnv *env,
                                                   jstring text) {
   std::string raw_text = CString(env, text);
   return Rime::Instance().learnRawInput(raw_text);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_osfans_trime_core_Rime_addRimeUserPhrase(JNIEnv *env,
+                                                  jclass /* thiz */,
+                                                  jstring code,
+                                                  jstring text) {
+  std::string raw_code = CString(env, code);
+  std::string raw_text = CString(env, text);
+  return Rime::Instance().addUserPhrase(raw_code, raw_text);
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL

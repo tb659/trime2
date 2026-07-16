@@ -34,6 +34,9 @@ switches: # 0 默认关，1 默认开
   - name: simplification #简转繁滤镜
     reset: 0
     states: [简中, 繁中]
+  - name: aggressive_auto_phrase
+    reset: 0
+    states: [养词关, 养词开]
   - name: show_raw_input_candidate
     reset: 0
     states: [a1隐, a1显]

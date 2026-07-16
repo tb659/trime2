@@ -259,6 +259,10 @@ public class FloatCandidateAdapter extends RecyclerView.Adapter<FloatCandidateAd
         TrimeService.getInstance().setPreferredRawInputCandidate(
                 preferredMixedCandidate != null ? preferredMixedCandidate.getText() : "");
         mData.addAll(visibleItems); // 添加过滤后的候选数据
+        CandidateItem createWordAction = TrimeService.getCreateWordActionCandidate(rawInput, mData);
+        if (createWordAction != null) {
+            mData.add(createWordAction);
+        }
         if (!mData.isEmpty() && mData.get(0).getIndex() >= 0)
             Rime.highlightRimeCandidate(mData.get(0).getIndex()); // 高亮第一个候选词
         notifyDataSetChanged(); // 通知数据更新

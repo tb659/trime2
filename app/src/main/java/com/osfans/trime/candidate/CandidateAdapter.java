@@ -310,6 +310,10 @@ public class CandidateAdapter extends RecyclerView.Adapter<CandidateAdapter.Cand
         TrimeService.getInstance().setPreferredRawInputCandidate(
                 preferredMixedCandidate != null ? preferredMixedCandidate.getText() : "");
         mData.addAll(visibleItems); // 添加过滤后的候选数据
+        CandidateItem createWordAction = TrimeService.getCreateWordActionCandidate(rawInput, mData);
+        if (createWordAction != null) {
+            mData.add(createWordAction);
+        }
         if (!mData.isEmpty() && mData.get(0).getIndex() >= 0) {
             Rime.highlightRimeCandidate(mData.get(0).getIndex()); // 仅高亮真实的 Rime 候选
         }

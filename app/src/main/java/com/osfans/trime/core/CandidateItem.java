@@ -14,6 +14,8 @@ import java.util.Objects;
 public class CandidateItem {
     /** 自造词标识文本。 */
     private static final String SELF_CREATED_MARKER = "☯";
+    /** 造词入口候选显示文本。 */
+    private static final String CREATE_WORD_ACTION_TEXT = "添加自造词";
     // ==================== 成员变量 ====================
     /** 候选词文本 */
     private final String text;
@@ -21,6 +23,10 @@ public class CandidateItem {
     private final String comment;
     /** 候选词是否来自用户词典/自造词链路。 */
     private final boolean selfCreated;
+    /** 候选是否是“打开造词弹窗”的动作项。 */
+    private final boolean createWordAction;
+    /** 造词动作项对应的默认编码。 */
+    private final String createWordCode;
     /** 候选词索引位置 */
     private int mIndex=-1;
 
@@ -51,9 +57,40 @@ public class CandidateItem {
      * @param selfCreated true 表示该候选来自用户词典/自造词链路。
      */
     public CandidateItem(String text, String comment, boolean selfCreated) {
+        this(text, comment, selfCreated, false, "");
+    }
+
+    /**
+     * 构造函数(完整参数)。
+     *
+     * @param text 候选词文本。
+     * @param comment 候选词注释。
+     * @param selfCreated true 表示该候选来自用户词典/自造词链路。
+     * @param createWordAction true 表示该候选点击后打开造词弹窗。
+     * @param createWordCode 造词弹窗默认带入的编码。
+     */
+    private CandidateItem(
+            String text,
+            String comment,
+            boolean selfCreated,
+            boolean createWordAction,
+            String createWordCode) {
         this.text = text;
         this.comment = (comment != null) ? comment : "";
         this.selfCreated = selfCreated;
+        this.createWordAction = createWordAction;
+        this.createWordCode = createWordCode != null ? createWordCode : "";
+    }
+
+    /**
+     * 创建“添加自造词”动作候选。
+     *
+     * @param code 当前预输入编码。
+     * @param comment 需要展示给用户的辅助说明。
+     * @return 动作候选项。
+     */
+    public static CandidateItem createWordAction(String code, String comment) {
+        return new CandidateItem(CREATE_WORD_ACTION_TEXT, comment, false, true, code);
     }
 
     /**
@@ -90,6 +127,20 @@ public class CandidateItem {
      */
     public boolean isSelfCreated() {
         return selfCreated;
+    }
+
+    /**
+     * 当前候选是否为“添加自造词”动作项。
+     */
+    public boolean isCreateWordAction() {
+        return createWordAction;
+    }
+
+    /**
+     * 获取造词动作项默认带入的编码。
+     */
+    public String getCreateWordCode() {
+        return createWordCode;
     }
 
     /**
@@ -132,8 +183,10 @@ public class CandidateItem {
         if (o == null || getClass() != o.getClass()) return false;
         CandidateItem that = (CandidateItem) o;
         return selfCreated == that.selfCreated
+                && createWordAction == that.createWordAction
                 && Objects.equals(text, that.text)
-                && Objects.equals(comment, that.comment);
+                && Objects.equals(comment, that.comment)
+                && Objects.equals(createWordCode, that.createWordCode);
     }
 
     /**
@@ -144,7 +197,7 @@ public class CandidateItem {
      */
     @Override
     public int hashCode() {
-        return Objects.hash(text, comment, selfCreated);
+        return Objects.hash(text, comment, selfCreated, createWordAction, createWordCode);
     }
 
     /**

@@ -12,6 +12,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
@@ -88,7 +89,9 @@ public class CustomToast {
             // 加载自定义 Toast 布局文件
             View toastView = LayoutInflater.from(context).inflate(R.layout.toast_custom, null);
             // 查找文本视图并设置显示内容
+            ImageView iconView = toastView.findViewById(R.id.toast_icon);
             TextView textView = toastView.findViewById(R.id.toast_text);
+            iconView.setImageResource(R.drawable.ic_trime_status);
             textView.setText(text);
 
             // 创建 PopupWindow 实例
@@ -109,11 +112,11 @@ public class CustomToast {
                 popupWindow.setElevation(0);
             }
 
-            // 在输入法窗口中优先贴近顶部显示，避免被键盘本体遮挡。
+            // 在输入法窗口中贴近底部显示，但仍附着在键盘窗口上层，避免真机上被键盘遮挡。
             int gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
             int yOffset = dpToPx(context, 96);
             if (aboveKeyboard && context instanceof android.inputmethodservice.InputMethodService) {
-                gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+                gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
                 yOffset = dpToPx(context, 16);
             }
             popupWindow.showAtLocation(getContentView(context), gravity, 0, yOffset);

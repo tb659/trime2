@@ -6,16 +6,16 @@ patch:
   style/horizontal: true # 默认是false竖排显示，删掉行首的#号，可横排显示（横排建议把上面这行注释掉）
   style/vertical_auto_reverse: false # 竖排候选框超长时，自动倒序 默认启用，若想关闭，将该行行首的#删掉
 
+  translator/enable_encoder: true            # 开启自动造词，保留 mixed 输入后续学习能力
+  translator/enable_user_dict: true          # 开启用户词典，让 mixed 输入与普通上屏都能写入当前方案词典
+  translator/max_phrase_length: 10           # 自动造词最大词长
+  translator/encode_commit_history: true     # 对已上屏内容自动成词，便于后续预测与词频积累
+  translator/enable_completion: true         # 允许按编码前缀取回 user_dict 候选，例如输入 tb 召回已学习的 tb659
+  translator/user_dict: shared_trime         # 与虎码共用同一个 user_dict 文件，先统一用户词与词频存储
+
   engine/processors/@before 0: lua_processor@user_predict_processor    # 监听上屏事件，维护记忆链并写入预测库
   engine/translators/@before 0: lua_translator@user_predict_translator  # 上屏后注入占位符，生成预测候选
   engine/filters/@before 0: lua_filter@user_predict_filter              # 输入过程中按上下文提升候选排序
-
-  translator/enable_encoder: true            # 开启自动造词，保留 mixed 输入后续学习能力
-  translator/encode_commit_history: true     # 对已上屏内容自动成词，便于后续预测与词频积累
-  translator/enable_user_dict: true          # 开启用户词典，让 mixed 输入与普通上屏都能写入当前方案词典
-  translator/user_dict: shared_trime         # 与虎码共用同一个 user_dict 文件，先统一用户词与词频存储
-  translator/enable_completion: true         # 允许按编码前缀取回 user_dict 候选，例如输入 tb 召回已学习的 tb659
-  translator/max_phrase_length: 10           # 自动造词最大词长
 
   user_predict:
     db_name: predict                      # 与现有方案共用同一个预测库，保留已学习上下文
