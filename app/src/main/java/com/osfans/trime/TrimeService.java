@@ -2245,6 +2245,10 @@ public class TrimeService extends InputMethodService {
     private void updateStatus(RimeProto.Status status) {
         boolean isComposing = status.isComposing();
 
+        if (isComposing) {
+            updateComposing(mRime.getCompositionCached());
+        }
+
         // 2. 状态预判：如果状态没变，直接拦截，不往主线程 post 消息
         if (mComposing == isComposing) {
             return;
@@ -2737,11 +2741,11 @@ public class TrimeService extends InputMethodService {
                     return;
                 }
                 if (!mRime.addUserPhrase(code, text)) {
-                    CustomToast.show(this, "添加自造词失败", Toast.LENGTH_SHORT, true);
+                    CustomToast.show(this, "造词失败：" + text, Toast.LENGTH_SHORT, true);
                     return;
                 }
                 rememberManualCreatedWord(code, text);
-                CustomToast.show(this, "已添加用户词", Toast.LENGTH_SHORT, true);
+                CustomToast.show(this, "已造词：" + text, Toast.LENGTH_SHORT, true);
                 dialog.dismiss();
                 updateCandidate();
             });
@@ -3131,13 +3135,7 @@ public class TrimeService extends InputMethodService {
      * 生成带内部光标标记的显示文本，便于在被动弹窗里直观看到当前插入位置。
      */
     private CharSequence buildCreateWordFieldDisplayText(CharSequence rawText, int cursor, boolean activeField) {
-        if (!activeField) {
-            return rawText;
-        }
-        int safeCursor = clampCreateWordCursor(cursor, rawText.length());
-        SpannableStringBuilder display = new SpannableStringBuilder(rawText);
-        display.insert(safeCursor, "|");
-        return display;
+        return rawText;
     }
 
     private GradientDrawable buildCreateWordFieldBackground(boolean active, int baseColor) {
@@ -3604,7 +3602,7 @@ public class TrimeService extends InputMethodService {
     }
 
     public boolean shouldHideCompositionDuringPrediction() {
-        return mPredictionCandidatesVisible || isPredicting();
+        return !isRealComposing() && (mPredictionCandidatesVisible || isPredicting());
     }
 
     /**
