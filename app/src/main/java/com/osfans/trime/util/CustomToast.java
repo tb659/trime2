@@ -91,7 +91,7 @@ public class CustomToast {
             // 查找文本视图并设置显示内容
             ImageView iconView = toastView.findViewById(R.id.toast_icon);
             TextView textView = toastView.findViewById(R.id.toast_text);
-            iconView.setImageResource(R.drawable.ic_trime_status);
+            iconView.setImageResource(R.drawable.kele);
             textView.setText(text);
 
             // 创建 PopupWindow 实例
@@ -112,12 +112,12 @@ public class CustomToast {
                 popupWindow.setElevation(0);
             }
 
-            // 在输入法窗口中贴近底部显示，但仍附着在键盘窗口上层，避免真机上被键盘遮挡。
-            int gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
-            int yOffset = dpToPx(context, 96);
-            if (aboveKeyboard && context instanceof android.inputmethodservice.InputMethodService) {
+            // 对输入法内提示统一显示在屏幕中间，附着在输入法窗口上层，避免被键盘盖住。
+            int gravity = Gravity.CENTER;
+            int yOffset = 0;
+            if (!aboveKeyboard) {
                 gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
-                yOffset = dpToPx(context, 16);
+                yOffset = dpToPx(context, 96);
             }
             popupWindow.showAtLocation(getContentView(context), gravity, 0, yOffset);
 

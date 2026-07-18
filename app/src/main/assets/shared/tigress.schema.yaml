@@ -28,21 +28,21 @@ switches: # 0 默认关，1 默认开
   - name: chaifen
     reset: 0
     states: [拆隐, 拆显]
-  - name: emoji_cn #emoji滤镜
-    reset: 0
-    states: [🈚, 🈶]
-  - name: simplification #简转繁滤镜
-    reset: 0
-    states: [简中, 繁中]
   - name: aggressive_auto_phrase
     reset: 0
-    states: [养词关, 养词开]
+    states: [造词关, 造词开]
   - name: show_raw_input_candidate
     reset: 0
     states: [a1隐, a1显]
   - name: prediction
     reset: 1
     states: [联想隐, 联想显]
+  - name: emoji_cn #emoji滤镜
+    reset: 0
+    states: [🈚, 🈶]
+  - name: simplification #简转繁滤镜
+    reset: 0
+    states: [简中, 繁中]
   - name: full_shape
     reset: 0
     states: [半角, 全角]

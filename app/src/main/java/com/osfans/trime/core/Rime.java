@@ -625,6 +625,21 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
     /**
+     * 按当前虎码编码规则把整段词语一次性编码进 user_dict。
+     *
+     * <p>该接口服务于“造词开/关”会话模式：开启时仅记录上屏文本，关闭时再把本轮
+     * 累积的目标词整体交给 UnityTableEncoder 编码，并顺带清理同词链上遗留的更短自动
+     * 编码子串，避免即时学习历史留下单字或前缀垃圾词。</p>
+     *
+     * @param text 需要按虎码编码规则写入 user_dict 的目标词语。
+     * @return true 表示编码写入成功。
+     */
+    public boolean encodeUserPhrase(String text) {
+        if (TextUtils.isEmpty(text)) return false;
+        return Boolean.TRUE.equals(withRimeContext(() -> encodeRimeUserPhrase(text)));
+    }
+
+    /**
      * 按指定编码和文本从当前方案 user_dict 删除一条显式自造词。
      *
      * <p>该接口服务于候选栏长按删除：用户确认删除后，直接按保存时的完整编码和词语
@@ -653,6 +668,14 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
         if (TextUtils.isEmpty(prefix) || limit <= 0) return new String[0];
         String[] result = queryRimeRawInputCompletions(prefix, limit);
         return result != null ? result : new String[0];
+    }
+
+    /**
+     * 判断当前方案的 user_dict 中，是否存在“编码以前缀命中当前输入”的指定词条。
+     */
+    public boolean hasUserPhraseWithPrefix(String prefix, String text) {
+        if (TextUtils.isEmpty(prefix) || TextUtils.isEmpty(text)) return false;
+        return Boolean.TRUE.equals(withRimeContext(() -> hasRimeUserPhraseWithPrefix(prefix, text)));
     }
 
     /**
@@ -1203,6 +1226,8 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
      */
     public static native boolean addRimeUserPhrase(String code, String text);
 
+    public static native boolean encodeRimeUserPhrase(String text);
+
     /**
      * 按完整编码和词语从当前方案 user_dict 删除一条显式自造词。
      */
@@ -1212,6 +1237,11 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
      * 按输入前缀查询当前方案 user_dict 中的 mixed 补全项。
      */
     public static native String[] queryRimeRawInputCompletions(String prefix, int limit);
+
+    /**
+     * 判断当前方案 user_dict 中是否存在以前缀命中的指定词条。
+     */
+    public static native boolean hasRimeUserPhraseWithPrefix(String prefix, String text);
 
     /**
      * 获取光标位置(原生方法)。

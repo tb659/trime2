@@ -5,8 +5,11 @@
 #include <rime_api.h>
 
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
+
+#include <utf8.h>
 
 #include <rime/dict/dictionary.h>
 #include <rime/dict/user_dictionary.h>
@@ -16,6 +19,7 @@
 #include <rime/service.h>
 #include <rime/schema.h>
 #include <rime/ticket.h>
+#include <rime/gear/unity_table_encoder.h>
 
 #include "jni-utils.h"
 #include "objconv.h"
@@ -43,6 +47,91 @@ bool isSelfCreatedCandidate(const rime::an<rime::Candidate>& candidate) {
   }
   const auto& type = genuine->type();
   return type == "user_phrase" || type == "user_table";
+}
+
+class SinglePhraseEncoder : public rime::UnityTableEncoder {
+ public:
+  using rime::UnityTableEncoder::UnityTableEncoder;
+
+  void CreateEntry(const std::string& word,
+                   const std::string& code_str,
+                   const std::string& weight_str) override {
+    if (captured_code_.empty() && !word.empty() && !code_str.empty()) {
+      captured_code_ = code_str;
+    }
+  }
+
+  const std::string& captured_code() const { return captured_code_; }
+
+ private:
+  std::string captured_code_;
+};
+
+std::vector<std::string> splitUtf8Chars(const std::string& text) {
+  std::vector<std::string> chars;
+  auto it = text.begin();
+  while (it != text.end()) {
+    auto start = it;
+    utf8::next(it, text.end());
+    chars.emplace_back(start, it);
+  }
+  return chars;
+}
+
+bool deleteEncodedPhraseChain(rime::UserDictionary* user_dict,
+                              const rime::Ticket& ticket,
+                              const std::string& phrase) {
+  if (!user_dict || phrase.empty()) {
+    return false;
+  }
+  rime::UnityTableEncoder encoder(user_dict);
+  if (!encoder.Load(ticket) || !encoder.loaded()) {
+    return false;
+  }
+  auto chars = splitUtf8Chars(phrase);
+  if (chars.empty()) {
+    return false;
+  }
+  std::set<std::string> phrases_to_delete;
+  for (size_t length = 1; length <= chars.size(); ++length) {
+    for (size_t start = 0; start + length <= chars.size(); ++start) {
+      std::string subphrase;
+      for (size_t i = start; i < start + length; ++i) {
+        subphrase += chars[i];
+      }
+      phrases_to_delete.insert(std::move(subphrase));
+    }
+  }
+  bool deleted_any = false;
+  for (const auto& subphrase : phrases_to_delete) {
+    deleted_any = encoder.DeletePhrase(subphrase) || deleted_any;
+  }
+  return deleted_any;
+}
+
+bool addExplicitEncodedPhrase(rime::UserDictionary* user_dict,
+                              const rime::Ticket& ticket,
+                              const std::string& phrase) {
+  if (!user_dict || phrase.empty()) {
+    return false;
+  }
+  SinglePhraseEncoder encoder(user_dict);
+  if (!encoder.Load(ticket) || !encoder.loaded()) {
+    return false;
+  }
+  if (!encoder.EncodePhrase(phrase, "1") || encoder.captured_code().empty()) {
+    return false;
+  }
+
+  rime::DictEntry entry;
+  entry.text = phrase;
+  entry.custom_code = encoder.captured_code();
+  bool inserted = user_dict->UpdateEntry(entry, 1);
+  if (!inserted) {
+    return false;
+  }
+  deleteEncodedPhraseChain(user_dict, ticket, phrase);
+  return true;
 }
 
 }  // namespace
@@ -225,6 +314,42 @@ class Rime {
     return true;
   }
 
+  bool encodeUserPhrase(std::string_view text) {
+    if (text.empty()) {
+      return false;
+    }
+    std::string schema_id = currentSchemaId();
+    if (schema_id.empty() || schema_id == ".default") {
+      return false;
+    }
+
+    rime::Schema schema(schema_id);
+    if (!schema.config()) {
+      return false;
+    }
+    rime::Ticket ticket(&schema, "translator");
+
+    auto user_dictionary = rime::UserDictionary::Require("user_dictionary");
+    if (!user_dictionary) {
+      return false;
+    }
+    std::unique_ptr<rime::UserDictionary> user_dict(user_dictionary->Create(ticket));
+    if (!user_dict || !user_dict->Load() || user_dict->readonly()) {
+      return false;
+    }
+
+    std::string phrase(text);
+    if (!addExplicitEncodedPhrase(user_dict.get(), ticket, phrase)) {
+      return false;
+    }
+
+    auto current_session = rime::Service::instance().GetSession(session(false));
+    if (current_session && current_session->context()) {
+      current_session->context()->RefreshNonConfirmedComposition();
+    }
+    return true;
+  }
+
   bool removeUserPhrase(std::string_view code, std::string_view text) {
     if (code.empty() || text.empty()) {
       return false;
@@ -262,6 +387,7 @@ class Rime {
     if (!user_dict->UpdateEntry(entry, -1)) {
       return false;
     }
+    deleteEncodedPhraseChain(user_dict.get(), ticket, entry.text);
 
     auto current_session = rime::Service::instance().GetSession(session(false));
     if (current_session && current_session->context()) {
@@ -336,6 +462,51 @@ class Rime {
       result.emplace_back(item.text);
     }
     return result;
+  }
+
+  bool hasUserPhraseWithPrefix(std::string_view prefix, std::string_view text) {
+    if (prefix.empty() || text.empty()) {
+      return false;
+    }
+
+    std::string schema_id = currentSchemaId();
+    if (schema_id.empty() || schema_id == ".default") {
+      return false;
+    }
+
+    rime::Schema schema(schema_id);
+    if (!schema.config()) {
+      return false;
+    }
+    rime::Ticket ticket(&schema, "translator");
+
+    auto user_dictionary = rime::UserDictionary::Require("user_dictionary");
+    if (!user_dictionary) {
+      return false;
+    }
+    std::unique_ptr<rime::UserDictionary> user_dict(user_dictionary->Create(ticket));
+    if (!user_dict || !user_dict->Load()) {
+      return false;
+    }
+
+    if (auto dictionary = rime::Dictionary::Require("dictionary")) {
+      std::unique_ptr<rime::Dictionary> dict(dictionary->Create(ticket));
+      if (dict && dict->Load()) {
+        user_dict->Attach(dict->primary_table(), dict->prism());
+      }
+    }
+
+    rime::UserDictEntryIterator iter;
+    user_dict->LookupWords(&iter, std::string(prefix), true, 64, nullptr);
+    for (auto entry = iter.Peek(); entry; entry = iter.Next() ? iter.Peek() : nullptr) {
+      if (!entry || entry->text.empty()) {
+        continue;
+      }
+      if (entry->text == text) {
+        return true;
+      }
+    }
+    return false;
   }
 
   size_t caretPosition() { return rime->get_caret_pos(session()); }
@@ -603,6 +774,14 @@ Java_com_osfans_trime_core_Rime_addRimeUserPhrase(JNIEnv *env,
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
+Java_com_osfans_trime_core_Rime_encodeRimeUserPhrase(JNIEnv *env,
+                                                     jclass /* thiz */,
+                                                     jstring text) {
+  std::string raw_text = CString(env, text);
+  return Rime::Instance().encodeUserPhrase(raw_text);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
 Java_com_osfans_trime_core_Rime_removeRimeUserPhrase(JNIEnv *env,
                                                      jclass /* thiz */,
                                                      jstring code,
@@ -625,6 +804,14 @@ Java_com_osfans_trime_core_Rime_queryRimeRawInputCompletions(
     env->SetObjectArrayElement(array, i, JString(env, result[i]));
   }
   return array;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_osfans_trime_core_Rime_hasRimeUserPhraseWithPrefix(
+    JNIEnv *env, jclass /* thiz */, jstring prefix, jstring text) {
+  std::string raw_prefix = CString(env, prefix);
+  std::string raw_text = CString(env, text);
+  return Rime::Instance().hasUserPhraseWithPrefix(raw_prefix, raw_text);
 }
 
 extern "C" JNIEXPORT jint JNICALL

@@ -12,8 +12,11 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.inputmethodservice.InputMethodService;
 import android.os.Build;
 import android.os.Handler;
@@ -103,6 +106,7 @@ public class TrimeService extends InputMethodService {
     private static final String CREATE_WORD_CANDIDATE_LABEL = "添加自造词";
     private static final String CREATE_WORD_MODE_OPTION = "_create_word_mode";
     private static final String MANUAL_CREATED_WORDS_PREF_KEY = "manual_created_words";
+    private static final String AGGRESSIVE_AUTO_PHRASE_OPTION = "aggressive_auto_phrase";
     private static final String PREDICTION_REQUEST_FILE_NAME = "user_predict_request.txt";
     private static final long PREDICTION_REFRESH_DELAY_MS = 48L;
     private static final long PREDICTION_REFRESH_RETRY_DELAY_MS = 96L;
@@ -156,11 +160,21 @@ public class TrimeService extends InputMethodService {
     @Nullable private TextView mCreateWordCodeView;
     @Nullable private TextView mCreateWordTextLabelView;
     @Nullable private TextView mCreateWordTextView;
+    private final Runnable mCreateWordDialogRefreshRunnable = () -> {
+        if (isCreateWordDialogShowing()) {
+            refreshCreateWordDialogViews();
+        }
+    };
+    private String mPendingCreateWordUiCommitText = "";
+    private int mPendingCreateWordUiCommitCount = 0;
     private final StringBuilder mCreateWordTextBuffer = new StringBuilder();
     private String mCreateWordCode = "";
     private int mCreateWordCodeCursor = 0;
     private int mCreateWordTextCursor = 0;
     private CreateWordFocusField mCreateWordFocusField = CreateWordFocusField.TEXT;
+    // 虎码“造词开”会话期间先缓存连续上屏文本，关闭时再一次性编码入 user_dict。
+    private final StringBuilder mAggressiveAutoPhraseBuffer = new StringBuilder();
+    private boolean mIsAggressiveAutoPhraseRecording = false;
     // 记录最近一次删除键触发的时间戳。
     // 删后预测不会在每次 Backspace 后立刻无条件弹出，而是要结合主题里的
     // repeat_click_time 判断当前是“正常点删”还是“长按/快速连删”。
@@ -1167,7 +1181,7 @@ public class TrimeService extends InputMethodService {
 
     /**
      * 判断当前 mixed 上屏是否应继续写回 user_dict 做学习。
-     * 虎码在“养词关”时停掉这条学习链，其他方案保持原行为。
+     * 虎码在“造词关”时停掉这条学习链，其他方案保持原行为。
      */
     private boolean shouldLearnRawInputComposition() {
         if (mRime == null) {
@@ -1837,11 +1851,12 @@ public class TrimeService extends InputMethodService {
         if (TextUtils.isEmpty(text)) return;
         text = stripPredictionPlaceholder(text.toString());
         if (TextUtils.isEmpty(text)) return;
-        if (isCreateWordDialogShowing()) {
-            setCreateWordFocus(CreateWordFocusField.TEXT);
-            appendCommittedCreateWordText(text);
+        if (isCreateWordDialogActive()) {
+            CharSequence committedText = text;
+            mHandler.post(() -> handleCreateWordCommittedText(committedText));
             return;
         }
+        appendAggressiveAutoPhraseCommit(text);
         lastCommittedText = text;
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) ic.commitText(text, 1);
@@ -2123,6 +2138,9 @@ public class TrimeService extends InputMethodService {
             // 更新编码区显示的文本
             RimeProto.Context.Composition composition = ((RimeMessage.CompositionMessage) message).getData();
             updateComposing(composition);
+            if (isCreateWordDialogActive()) {
+                syncCreateWordCodeFromComposition();
+            }
             String rawInput = Rime.getRimeRawInput();
             String preedit = composition != null ? composition.getPreedit() : null;
             boolean predictionVisible = hasPredictionPlaceholder(rawInput) || hasPredictionPlaceholder(preedit);
@@ -2166,6 +2184,9 @@ public class TrimeService extends InputMethodService {
                 // 对于其他选项，包括 ascii_punct 等开关选项，也需要更新UI
                 // 这些选项会影响工具栏开关的状态显示
                 updateRimeOption();
+            }
+            if (AGGRESSIVE_AUTO_PHRASE_OPTION.equals(optionName)) {
+                handleAggressiveAutoPhraseOptionChanged(optionValue);
             }
         }
         // 7. 处理状态栏状态消息
@@ -2549,6 +2570,9 @@ public class TrimeService extends InputMethodService {
             showCreateWordDialog(item.getCreateWordCode());
             return;
         }
+        if (isCreateWordDialogActive() && mCreateWordFocusField == CreateWordFocusField.TEXT) {
+            stageCreateWordUiCommit(item.getText());
+        }
         if (item.getIndex() == -1) {
             String rawInput = stripPredictionPlaceholder(item.getText());
             if (shouldPreferRawInputForComposition(rawInput)) {
@@ -2594,7 +2618,7 @@ public class TrimeService extends InputMethodService {
                 })
                 .create();
         if (getToken() != null) {
-            showPassiveDialog(dialog);
+            showUpperCenterDialog(dialog);
         } else {
             dialog.show();
         }
@@ -2625,7 +2649,7 @@ public class TrimeService extends InputMethodService {
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         int padding = ThemeManager.dp2px(16);
-        container.setPadding(padding, padding, padding, 0);
+        container.setPadding(padding, padding, padding, ThemeManager.dp2px(4));
 
         LinearLayout codeRow = new LinearLayout(this);
         codeRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -2633,17 +2657,24 @@ public class TrimeService extends InputMethodService {
         container.addView(codeRow, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
+        ((LinearLayout.LayoutParams) codeRow.getLayoutParams()).bottomMargin = ThemeManager.dp2px(8);
 
         TextView codeLabel = new TextView(this);
         codeLabel.setText("编码");
+        codeLabel.setTextSize(12f);
+        codeLabel.setTypeface(Typeface.DEFAULT_BOLD);
         codeRow.addView(codeLabel, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
+        ((LinearLayout.LayoutParams) codeLabel.getLayoutParams()).rightMargin = ThemeManager.dp2px(10);
 
         TextView codeValue = new TextView(this);
         codeValue.setText(rawCode);
-        codeValue.setMinHeight(ThemeManager.dp2px(40));
-        codeValue.setPadding(ThemeManager.dp2px(12), ThemeManager.dp2px(4), 0, ThemeManager.dp2px(12));
+        codeValue.setTextSize(15f);
+        codeValue.setTypeface(Typeface.MONOSPACE);
+        codeValue.setGravity(Gravity.CENTER_VERTICAL);
+        codeValue.setMinHeight(ThemeManager.dp2px(38));
+        codeValue.setPadding(ThemeManager.dp2px(12), ThemeManager.dp2px(8), ThemeManager.dp2px(12), ThemeManager.dp2px(8));
         codeRow.addView(codeValue, new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -2658,14 +2689,19 @@ public class TrimeService extends InputMethodService {
 
         TextView textLabel = new TextView(this);
         textLabel.setText("词语");
+        textLabel.setTextSize(12f);
+        textLabel.setTypeface(Typeface.DEFAULT_BOLD);
         textRow.addView(textLabel, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
+        ((LinearLayout.LayoutParams) textLabel.getLayoutParams()).rightMargin = ThemeManager.dp2px(10);
 
         TextView textValue = new TextView(this);
         textValue.setHint("请输入词语");
-        textValue.setMinHeight(ThemeManager.dp2px(40));
-        textValue.setPadding(ThemeManager.dp2px(12), ThemeManager.dp2px(8), 0, ThemeManager.dp2px(8));
+        textValue.setTextSize(16f);
+        textValue.setGravity(Gravity.CENTER_VERTICAL);
+        textValue.setMinHeight(ThemeManager.dp2px(42));
+        textValue.setPadding(ThemeManager.dp2px(12), ThemeManager.dp2px(8), ThemeManager.dp2px(12), ThemeManager.dp2px(8));
         textRow.addView(textValue, new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -2687,27 +2723,29 @@ public class TrimeService extends InputMethodService {
                 .setPositiveButton(getString(android.R.string.ok), null)
                 .create();
         dialog.setOnDismissListener(unused -> clearCreateWordDialogState());
-        dialog.setOnShowListener(unused -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(v -> {
-                    String code = stripPredictionPlaceholder(mCreateWordCode).trim();
-                    String text = mCreateWordTextBuffer.toString().trim();
-                    if (TextUtils.isEmpty(code)) {
-                        CustomToast.show(this, "编码不能为空", Toast.LENGTH_SHORT, true);
-                        return;
-                    }
-                    if (TextUtils.isEmpty(text)) {
-                        CustomToast.show(this, "词语不能为空", Toast.LENGTH_SHORT, true);
-                        return;
-                    }
-                    if (!mRime.addUserPhrase(code, text)) {
-                        CustomToast.show(this, "添加自造词失败", Toast.LENGTH_SHORT, true);
-                        return;
-                    }
-                    rememberManualCreatedWord(code, text);
-                    CustomToast.show(this, "已添加用户词", Toast.LENGTH_SHORT, true);
-                    dialog.dismiss();
-                    updateCandidate();
-                }));
+        dialog.setOnShowListener(unused -> {
+            scheduleCreateWordDialogRefresh();
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String code = stripPredictionPlaceholder(mCreateWordCode).trim();
+                String text = mCreateWordTextBuffer.toString().trim();
+                if (TextUtils.isEmpty(code)) {
+                    CustomToast.show(this, "编码不能为空", Toast.LENGTH_SHORT, true);
+                    return;
+                }
+                if (TextUtils.isEmpty(text)) {
+                    CustomToast.show(this, "词语不能为空", Toast.LENGTH_SHORT, true);
+                    return;
+                }
+                if (!mRime.addUserPhrase(code, text)) {
+                    CustomToast.show(this, "添加自造词失败", Toast.LENGTH_SHORT, true);
+                    return;
+                }
+                rememberManualCreatedWord(code, text);
+                CustomToast.show(this, "已添加用户词", Toast.LENGTH_SHORT, true);
+                dialog.dismiss();
+                updateCandidate();
+            });
+        });
         mCreateWordDialog = dialog;
         if (getToken() != null) {
             showPassiveDialog(dialog);
@@ -2720,27 +2758,86 @@ public class TrimeService extends InputMethodService {
      * 将一次真正上屏的候选文本追加到造词缓冲区。
      */
     private void appendCommittedCreateWordText(CharSequence text) {
-        if (!isCreateWordDialogShowing() || TextUtils.isEmpty(text)) {
+        if (!isCreateWordDialogActive() || TextUtils.isEmpty(text)) {
             return;
         }
         insertCreateWordText(text);
-        refreshCreateWordDialogViews();
+        scheduleCreateWordDialogRefresh();
+    }
+
+    /**
+     * 候选栏点击时先把文本写入造词弹窗，等 Rime 真正回送 commit 时再做去重。
+     */
+    private void stageCreateWordUiCommit(CharSequence text) {
+        String committedText = stripPredictionPlaceholder(text != null ? text.toString() : "");
+        if (TextUtils.isEmpty(committedText)) {
+            return;
+        }
+        mPendingCreateWordUiCommitText = committedText;
+        mPendingCreateWordUiCommitCount++;
+        setCreateWordFocus(CreateWordFocusField.TEXT);
+        appendCommittedCreateWordText(committedText);
+    }
+
+    /**
+     * 造词弹窗打开期间，把候选上屏改为写入词语缓冲区，而不是提交到宿主输入框。
+     */
+    private void handleCreateWordCommittedText(CharSequence text) {
+        if (!isCreateWordDialogActive() || TextUtils.isEmpty(text)) {
+            return;
+        }
+        String committedText = stripPredictionPlaceholder(text.toString());
+        if (TextUtils.isEmpty(committedText)) {
+            return;
+        }
+        if (mCreateWordFocusField != CreateWordFocusField.TEXT) {
+            syncCreateWordCodeFromComposition();
+            return;
+        }
+        if (mPendingCreateWordUiCommitCount > 0 && TextUtils.equals(mPendingCreateWordUiCommitText, committedText)) {
+            mPendingCreateWordUiCommitCount--;
+            if (mPendingCreateWordUiCommitCount <= 0) {
+                mPendingCreateWordUiCommitCount = 0;
+                mPendingCreateWordUiCommitText = "";
+            }
+            syncCreateWordCodeFromComposition();
+            return;
+        }
+        setCreateWordFocus(CreateWordFocusField.TEXT);
+        appendCommittedCreateWordText(committedText);
+        syncCreateWordCodeFromComposition();
+    }
+
+    /**
+     * 把造词弹窗的视图刷新切回主线程，兼容首轮候选上屏与被动对话框 show 的时序竞争。
+     */
+    private void scheduleCreateWordDialogRefresh() {
+        mHandler.removeCallbacks(mCreateWordDialogRefreshRunnable);
+        mHandler.post(mCreateWordDialogRefreshRunnable);
+    }
+
+    /**
+     * 把当前 Rime composition/rawInput 同步到造词弹窗的编码栏。
+     */
+    private void syncCreateWordCodeFromComposition() {
+        if (!isCreateWordDialogActive() || mCreateWordFocusField != CreateWordFocusField.CODE) {
+            return;
+        }
+        String rawInput = stripPredictionPlaceholder(Rime.getRimeRawInput()).trim();
+        mCreateWordCode = rawInput;
+        mCreateWordCodeCursor = rawInput.length();
+        scheduleCreateWordDialogRefresh();
+    }
+
+    private boolean hasCreateWordCompositionInput() {
+        return isCreateWordDialogActive() && !TextUtils.isEmpty(stripPredictionPlaceholder(Rime.getRimeRawInput()).trim());
     }
 
     /**
      * 在编码字段聚焦时，直接把 ASCII 按键写入造词编码缓冲区。
      */
     private boolean handleCreateWordCodeEvent(Event event) {
-        if (!isCreateWordDialogShowing() || mCreateWordFocusField != CreateWordFocusField.CODE || event == null) {
-            return false;
-        }
-        String directInput = resolveCreateWordCodeInput(event);
-        if (TextUtils.isEmpty(directInput)) {
-            return false;
-        }
-        insertCreateWordCode(directInput);
-        refreshCreateWordDialogViews();
-        return true;
+        return false;
     }
 
     /**
@@ -2775,14 +2872,24 @@ public class TrimeService extends InputMethodService {
      * 造词面板显示时处理退格、方向、确认与关闭。
      */
     private boolean handleCreateWordDialogKey(int keyCode) {
-        if (!isCreateWordDialogShowing() || Rime.isComposing()) {
+        if (!isCreateWordDialogActive()) {
             return false;
         }
         if (keyCode == KeyEvent.KEYCODE_DEL) {
+            if (hasCreateWordCompositionInput()) {
+                onRimeKey(Event.getRimeEvent(KeyEvent.KEYCODE_DEL, 0));
+                syncCreateWordCodeFromComposition();
+                return true;
+            }
             deleteCreateWordCharBeforeCursor();
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
+            if (hasCreateWordCompositionInput()) {
+                onRimeKey(Event.getRimeEvent(KeyEvent.KEYCODE_DEL, 0));
+                syncCreateWordCodeFromComposition();
+                return true;
+            }
             deleteCreateWordCharAfterCursor();
             return true;
         }
@@ -2803,9 +2910,6 @@ public class TrimeService extends InputMethodService {
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_ENTER) {
-            if (mCreateWordDialog != null) {
-                mCreateWordDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
-            }
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
@@ -3036,10 +3140,25 @@ public class TrimeService extends InputMethodService {
         return display;
     }
 
+    private GradientDrawable buildCreateWordFieldBackground(boolean active, int baseColor) {
+        GradientDrawable background = new GradientDrawable();
+        background.setCornerRadius(ThemeManager.dp2px(12));
+        background.setColor(withAlpha(baseColor, active ? 24 : 12));
+        background.setStroke(ThemeManager.dp2px(1), withAlpha(baseColor, active ? 96 : 40));
+        return background;
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color));
+    }
+
     /**
      * 刷新造词弹窗里的编码/词语显示，并同步当前编辑字段提示。
      */
     private void refreshCreateWordDialogViews() {
+        int labelColor = mCreateWordCodeLabelView != null
+                ? mCreateWordCodeLabelView.getCurrentTextColor()
+                : Color.BLACK;
         if (mCreateWordCodeLabelView != null) {
             mCreateWordCodeLabelView.setText("编码");
             mCreateWordCodeLabelView.setAlpha(mCreateWordFocusField == CreateWordFocusField.CODE ? 1f : 0.72f);
@@ -3050,6 +3169,9 @@ public class TrimeService extends InputMethodService {
                     mCreateWordCodeCursor,
                     mCreateWordFocusField == CreateWordFocusField.CODE));
             mCreateWordCodeView.setAlpha(mCreateWordFocusField == CreateWordFocusField.CODE ? 1f : 0.72f);
+            mCreateWordCodeView.setBackground(buildCreateWordFieldBackground(
+                    mCreateWordFocusField == CreateWordFocusField.CODE,
+                    labelColor));
         }
         if (mCreateWordTextLabelView != null) {
             mCreateWordTextLabelView.setText("词语");
@@ -3061,6 +3183,9 @@ public class TrimeService extends InputMethodService {
                     mCreateWordTextCursor,
                     mCreateWordFocusField == CreateWordFocusField.TEXT));
             mCreateWordTextView.setAlpha(mCreateWordFocusField == CreateWordFocusField.TEXT ? 1f : 0.72f);
+            mCreateWordTextView.setBackground(buildCreateWordFieldBackground(
+                    mCreateWordFocusField == CreateWordFocusField.TEXT,
+                    labelColor));
         }
     }
 
@@ -3069,6 +3194,16 @@ public class TrimeService extends InputMethodService {
      */
     private boolean isCreateWordDialogShowing() {
         return mCreateWordDialog != null && mCreateWordDialog.isShowing();
+    }
+
+    /**
+     * 造词弹窗是否仍处于活动态。
+     *
+     * <p>被动对话框的显示状态与 Rime commit/delete 消息存在一拍时序差，这里只要对象
+     * 还未 dismiss 就继续把输入、上屏和退格路由给造词弹窗，避免首轮事件漏回宿主输入框。</p>
+     */
+    private boolean isCreateWordDialogActive() {
+        return mCreateWordDialog != null;
     }
 
     /**
@@ -3085,9 +3220,11 @@ public class TrimeService extends InputMethodService {
         if (item == null || item.isCreateWordAction()) {
             return item;
         }
-        // 保留 native 已识别出的 user_phrase/user_table 自造词标记，
-        // 同时为“手动造词登记表”命中的前缀候选额外补上小太极。
-        boolean shouldMarkSelfCreated = item.isSelfCreated() || isRememberedManualCreatedWord(rawInput, item);
+        // 保留 native 已识别出的 user_phrase/user_table 自造词标记；
+        // 同时为“手动造词登记表”命中的前缀候选，以及造词开关写入 user_dict 的前缀候选补小太极。
+        boolean shouldMarkSelfCreated = item.isSelfCreated()
+                || isRememberedManualCreatedWord(rawInput, item)
+                || isAutoCreatedWordPrefix(rawInput, item);
         if (item.isSelfCreated() == shouldMarkSelfCreated) {
             return item;
         }
@@ -3152,6 +3289,21 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
+     * 判断当前候选是否命中了 user_dict 中的自动造词前缀记录。
+     */
+    private boolean isAutoCreatedWordPrefix(String rawInput, CandidateItem item) {
+        if (mRime == null || item == null || item.isSelfCreated()) {
+            return false;
+        }
+        String code = stripPredictionPlaceholder(rawInput).trim();
+        String text = stripPredictionPlaceholder(item.getText()).trim();
+        if (TextUtils.isEmpty(code) || TextUtils.isEmpty(text)) {
+            return false;
+        }
+        return mRime.hasUserPhraseWithPrefix(code, text);
+    }
+
+    /**
      * 生成删除确认文案；手动造词会展开列出具体编码，自动学习候选则提示按当前词条删除。
      */
     private String buildDeleteManualCreatedWordMessage(
@@ -3173,7 +3325,7 @@ public class TrimeService extends InputMethodService {
         }
         if (canDeleteLearnedWord) {
             String learnedCode = resolveLearnedWordDeleteCode(rawInput, item);
-            builder.append("\n自动养词：\n")
+            builder.append("\n自动造词：\n")
                     .append("1. ")
                     .append(TextUtils.isEmpty(learnedCode) ? "当前候选" : learnedCode);
         }
@@ -3209,7 +3361,7 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
-     * 推断当前自动养词候选对应的删除编码，用于删除确认展示与 mixed 学习词条移除。
+     * 推断当前自动造词候选对应的删除编码，用于删除确认展示与 mixed 学习词条移除。
      */
     private String resolveLearnedWordDeleteCode(String rawInput, CandidateItem item) {
         String normalizedRawInput = stripPredictionPlaceholder(rawInput).trim();
@@ -3282,6 +3434,85 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
+     * 当前是否处于虎码方案。
+     */
+    private boolean isTigressSchema() {
+        if (mRime == null) {
+            return false;
+        }
+        String schemaId = mRime.selectedSchemaId();
+        return !TextUtils.isEmpty(schemaId) && schemaId.startsWith("tigress");
+    }
+
+    /**
+     * 处理“造词开关”状态切换。
+     *
+     * <p>开启时开始记录本轮上屏文本；关闭时结束记录，并把累计的目标词一次性按虎码
+     * 编码规则写入 user_dict，避免在记录过程中即时产生单字和前缀垃圾词。</p>
+     */
+    private void handleAggressiveAutoPhraseOptionChanged(boolean enabled) {
+        if (!isTigressSchema()) {
+            mIsAggressiveAutoPhraseRecording = false;
+            mAggressiveAutoPhraseBuffer.setLength(0);
+            return;
+        }
+        if (enabled) {
+            mIsAggressiveAutoPhraseRecording = true;
+            mAggressiveAutoPhraseBuffer.setLength(0);
+            return;
+        }
+        flushAggressiveAutoPhraseRecording();
+    }
+
+    /**
+     * 在“造词开”会话期间累计真正上屏的汉字文本。
+     */
+    private void appendAggressiveAutoPhraseCommit(CharSequence text) {
+        if (!mIsAggressiveAutoPhraseRecording || isCreateWordDialogShowing()) {
+            return;
+        }
+        String recordableText = extractAggressiveAutoPhraseText(text);
+        if (TextUtils.isEmpty(recordableText)) {
+            return;
+        }
+        mAggressiveAutoPhraseBuffer.append(recordableText);
+    }
+
+    /**
+     * 从一次上屏文本中提取适合进入虎码造词会话的连续汉字内容。
+     */
+    private String extractAggressiveAutoPhraseText(CharSequence text) {
+        if (TextUtils.isEmpty(text)) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (isHan(ch)) {
+                builder.append(ch);
+            }
+        }
+        return builder.toString();
+    }
+
+    /**
+     * 结束“造词开”会话，并把本轮累计的词语一次性编码进 user_dict。
+     */
+    private void flushAggressiveAutoPhraseRecording() {
+        String phrase = mAggressiveAutoPhraseBuffer.toString();
+        mIsAggressiveAutoPhraseRecording = false;
+        mAggressiveAutoPhraseBuffer.setLength(0);
+        if (!isTigressSchema() || phrase.length() <= 1) {
+            return;
+        }
+        if (mRime.encodeUserPhrase(phrase)) {
+            CustomToast.show(this, "已造词：" + phrase, Toast.LENGTH_SHORT, true);
+        } else {
+            CustomToast.show(this, "造词失败：" + phrase, Toast.LENGTH_SHORT, true);
+        }
+    }
+
+    /**
      * 主动关闭造词弹窗。
      */
     private void dismissCreateWordDialog() {
@@ -3304,9 +3535,11 @@ public class TrimeService extends InputMethodService {
         mCreateWordTextView = null;
         mCreateWordCode = "";
         mCreateWordCodeCursor = 0;
+        mPendingCreateWordUiCommitText = "";
+        mPendingCreateWordUiCommitCount = 0;
         mCreateWordTextBuffer.setLength(0);
         mCreateWordTextCursor = 0;
-        mCreateWordFocusField = CreateWordFocusField.TEXT;
+        mCreateWordFocusField = CreateWordFocusField.CODE;
     }
 
     /**
@@ -3690,6 +3923,54 @@ public class TrimeService extends InputMethodService {
         window = dialog.getWindow();
         if (window != null) {
             lp = window.getAttributes();
+            window.setAttributes(lp);
+        }
+        return dialog;
+    }
+
+    /**
+     * 显示造词弹窗，保持不抢输入焦点，并尽量贴在键盘上方，避免遮挡按键区。
+     */
+    public AlertDialog showCreateWordPassiveDialog(AlertDialog dialog) {
+        Window window = dialog.getWindow();
+        WindowManager.LayoutParams lp = window.getAttributes();
+        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+        lp.token = getToken();
+        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        window.setAttributes(lp);
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+
+        dialog.show();
+        window = dialog.getWindow();
+        if (window != null) {
+            lp = window.getAttributes();
+            DisplayMetrics dm = getResources().getDisplayMetrics();
+            lp.width = Math.min((int) (dm.widthPixels * 0.92f), ThemeManager.dp2px(560));
+            lp.y = ThemeManager.dp2px(8);
+            window.setAttributes(lp);
+        }
+        return dialog;
+    }
+
+    /**
+     * 显示中间偏上的确认对话框，避免贴顶，也避免压住键盘区域。
+     */
+    public AlertDialog showUpperCenterDialog(AlertDialog dialog) {
+        Window window = dialog.getWindow();
+        WindowManager.LayoutParams lp = window.getAttributes();
+        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+        lp.token = getToken();
+        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        window.setAttributes(lp);
+        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        dialog.show();
+        window = dialog.getWindow();
+        if (window != null) {
+            lp = window.getAttributes();
+            DisplayMetrics dm = getResources().getDisplayMetrics();
+            lp.width = Math.min((int) (dm.widthPixels * 0.84f), ThemeManager.dp2px(520));
+            lp.y = Math.max(ThemeManager.dp2px(96), dm.heightPixels / 5);
             window.setAttributes(lp);
         }
         return dialog;
