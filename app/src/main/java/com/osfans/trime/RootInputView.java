@@ -765,10 +765,14 @@ public class RootInputView extends FrameLayout {
                  }*/
             }
             mStartIdx = 0;
-            if (mHasComposition)
+            if (mHasComposition) {
                 mStartIdx = mPreedit.setWindow(mCompositionMinLength);
-            else
+                if (TextUtils.isEmpty(mPreedit.getText()) && !TextUtils.isEmpty(s)) {
+                    mPreedit.setText(s);
+                }
+            } else {
                 mPreedit.setText(s);
+            }
         }
     };
 

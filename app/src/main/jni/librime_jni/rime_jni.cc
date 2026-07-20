@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/algorithm/string.hpp>
 #include <utf8.h>
 
 #include <rime/dict/dictionary.h>
@@ -509,6 +510,60 @@ class Rime {
     return false;
   }
 
+  /**
+   * 按输入前缀和词语回查当前方案 user_dict 中保存的完整编码。
+   *
+   * <p>辅助造词候选在候选栏里看到的 rawInput 往往只是当前前缀，删除确认和精确删除
+   * 需要以 user_dict 里保存的完整 custom_code 为准。</p>
+   */
+  std::string getUserPhraseCodeWithPrefix(std::string_view prefix,
+                                          std::string_view text) {
+    if (prefix.empty() || text.empty()) {
+      return "";
+    }
+
+    std::string schema_id = currentSchemaId();
+    if (schema_id.empty() || schema_id == ".default") {
+      return "";
+    }
+
+    rime::Schema schema(schema_id);
+    if (!schema.config()) {
+      return "";
+    }
+    rime::Ticket ticket(&schema, "translator");
+
+    auto user_dictionary = rime::UserDictionary::Require("user_dictionary");
+    if (!user_dictionary) {
+      return "";
+    }
+    std::unique_ptr<rime::UserDictionary> user_dict(user_dictionary->Create(ticket));
+    if (!user_dict || !user_dict->Load()) {
+      return "";
+    }
+
+    if (auto dictionary = rime::Dictionary::Require("dictionary")) {
+      std::unique_ptr<rime::Dictionary> dict(dictionary->Create(ticket));
+      if (dict && dict->Load()) {
+        user_dict->Attach(dict->primary_table(), dict->prism());
+      }
+    }
+
+    rime::UserDictEntryIterator iter;
+    user_dict->LookupWords(&iter, std::string(prefix), true, 64, nullptr);
+    for (auto entry = iter.Peek(); entry; entry = iter.Next() ? iter.Peek() : nullptr) {
+      if (!entry || entry->text.empty()) {
+        continue;
+      }
+      if (entry->text == text) {
+        std::string full_code = entry->custom_code;
+        boost::trim(full_code);
+        return full_code;
+      }
+    }
+    return "";
+  }
+
   size_t caretPosition() { return rime->get_caret_pos(session()); }
 
   void setCaretPosition(size_t caretPos) {
@@ -812,6 +867,16 @@ Java_com_osfans_trime_core_Rime_hasRimeUserPhraseWithPrefix(
   std::string raw_prefix = CString(env, prefix);
   std::string raw_text = CString(env, text);
   return Rime::Instance().hasUserPhraseWithPrefix(raw_prefix, raw_text);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_osfans_trime_core_Rime_getRimeUserPhraseCodeWithPrefix(
+    JNIEnv *env, jclass /* thiz */, jstring prefix, jstring text) {
+  std::string raw_prefix = CString(env, prefix);
+  std::string raw_text = CString(env, text);
+  std::string full_code =
+      Rime::Instance().getUserPhraseCodeWithPrefix(raw_prefix, raw_text);
+  return env->NewStringUTF(full_code.c_str());
 }
 
 extern "C" JNIEXPORT jint JNICALL

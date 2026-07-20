@@ -1506,8 +1506,18 @@ public class TrimeService extends InputMethodService {
      * <p>当宿主文本刷新或 Lua 占位符注入慢一拍时，首轮预测可能暂时没有成功显示；这里延后一次短时间校验，必要时再补拉一轮。</p>
      */
     private void schedulePredictionRefreshVerify() {
+        schedulePredictionRefreshVerify(PREDICTION_REFRESH_RETRY_DELAY_MS);
+    }
+
+    private void schedulePredictionRefreshVerify(long delayMs) {
         mHandler.removeCallbacks(mPredictionRefreshVerifyRunnable);
-        mHandler.postDelayed(mPredictionRefreshVerifyRunnable, PREDICTION_REFRESH_RETRY_DELAY_MS);
+        mHandler.postDelayed(mPredictionRefreshVerifyRunnable, Math.max(0L, delayMs));
+    }
+
+    private boolean isWithinDeleteRepeatWindow() {
+        long lastDeleteKeyTime = mLastDeleteKeyTime;
+        return lastDeleteKeyTime > 0
+                && SystemClock.uptimeMillis() - lastDeleteKeyTime <= getDeleteRepeatClickTime();
     }
 
     /**
@@ -1525,6 +1535,10 @@ public class TrimeService extends InputMethodService {
                 || isPredicting()
                 || mPredictionCandidatesVisible
                 || isRealComposing()) {
+            return;
+        }
+        if (isWithinDeleteRepeatWindow()) {
+            schedulePredictionRefreshVerify(getDeleteRepeatClickTime());
             return;
         }
         mPredictionRefreshRetries++;
@@ -2155,6 +2169,7 @@ public class TrimeService extends InputMethodService {
         // 5. 处理候选词列表更新消息
         // 当候选词列表发生变化（如翻页、新候选词出现）时触发
         else if (message instanceof RimeMessage.CandidateMenuMessage || message instanceof RimeMessage.CandidateListMessage) {
+            recoverCompositionFromCurrentContext();
             // 刷新候选词视图
             updateCandidate();
         }
@@ -2263,6 +2278,23 @@ public class TrimeService extends InputMethodService {
         // 5. 延迟/异步执行
         // 如果对实时性要求极高，用 post；如果怕连续抖动，用 postDelayed(mStatusRunnable, 10)
         mHandler.post(mStatusRunnable);
+    }
+
+    /**
+     * 候选消息到达时，按当前缓存的 composition/rawInput 再补一次编码区恢复。
+     */
+    private void recoverCompositionFromCurrentContext() {
+        RimeProto.Context.Composition composition = mRime.getCompositionCached();
+        String preedit = composition != null ? composition.getPreedit() : "";
+        String rawInput = Rime.getRimeRawInput();
+        boolean predictionVisible = hasPredictionPlaceholder(rawInput) || hasPredictionPlaceholder(preedit);
+        if (!predictionVisible && mPredictionCandidatesVisible) {
+            setPredictionCandidatesVisible(false);
+        }
+        String visibleText = resolveVisibleCompositionText(preedit, rawInput);
+        if (!TextUtils.isEmpty(visibleText)) {
+            updateComposing(composition);
+        }
     }
 
     private void updateComposing(RimeProto.Context.Composition data) {
@@ -2601,7 +2633,8 @@ public class TrimeService extends InputMethodService {
      */
     public boolean showDeleteSelfCreatedWordDialog(String rawInput, CandidateItem item) {
         ArrayList<String[]> matchedEntries = resolveManualCreatedWordEntries(rawInput, item);
-        boolean canDeleteLearnedWord = item != null
+        boolean canDeleteLearnedWord = matchedEntries.isEmpty()
+                && item != null
                 && item.isSelfCreated()
                 && (item.getIndex() >= 0 || shouldPreferRawInputForComposition(item.getText()));
         if (matchedEntries.isEmpty() && !canDeleteLearnedWord) {
@@ -3302,7 +3335,7 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
-     * 生成删除确认文案；手动造词会展开列出具体编码，自动学习候选则提示按当前词条删除。
+     * 生成删除确认文案；手动造词与辅助造词互斥展示，避免同一候选同时出现两种删除方式。
      */
     private String buildDeleteManualCreatedWordMessage(
             String rawInput,
@@ -3323,7 +3356,7 @@ public class TrimeService extends InputMethodService {
         }
         if (canDeleteLearnedWord) {
             String learnedCode = resolveLearnedWordDeleteCode(rawInput, item);
-            builder.append("\n自动造词：\n")
+            builder.append("\n辅助造词：\n")
                     .append("1. ")
                     .append(TextUtils.isEmpty(learnedCode) ? "当前候选" : learnedCode);
         }
@@ -3359,14 +3392,19 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
-     * 推断当前自动造词候选对应的删除编码，用于删除确认展示与 mixed 学习词条移除。
+     * 推断当前辅助造词候选对应的完整删除编码，用于删除确认展示与 user_dict 词条移除。
      */
     private String resolveLearnedWordDeleteCode(String rawInput, CandidateItem item) {
-        String normalizedRawInput = stripPredictionPlaceholder(rawInput).trim();
-        if (!TextUtils.isEmpty(normalizedRawInput)) {
-            return normalizedRawInput;
+        if (mRime == null || item == null) {
+            return "";
         }
-        return item != null ? stripPredictionPlaceholder(item.getText()).trim() : "";
+        String normalizedRawInput = stripPredictionPlaceholder(rawInput).trim();
+        String normalizedText = stripPredictionPlaceholder(item.getText()).trim();
+        String fullCode = mRime.getUserPhraseCodeWithPrefix(normalizedRawInput, normalizedText);
+        if (!TextUtils.isEmpty(fullCode)) {
+            return fullCode;
+        }
+        return normalizedRawInput;
     }
 
     /**

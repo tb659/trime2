@@ -679,6 +679,19 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
     /**
+     * 按输入前缀和词语回查当前方案 user_dict 中保存的完整编码。
+     *
+     * @param prefix 当前输入前缀。
+     * @param text 候选词文本。
+     * @return 命中的完整编码；未命中时返回空字符串。
+     */
+    public String getUserPhraseCodeWithPrefix(String prefix, String text) {
+        if (TextUtils.isEmpty(prefix) || TextUtils.isEmpty(text)) return "";
+        String code = withRimeContext(() -> getRimeUserPhraseCodeWithPrefix(prefix, text));
+        return code != null ? code : "";
+    }
+
+    /**
      * 清除当前组字内容(取消输入)。
      */
     @Override
@@ -938,7 +951,8 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
 
         } else if (message instanceof RimeMessage.CompositionMessage) {
             RimeProto.Context.Composition data = ((RimeMessage.CompositionMessage) message).getData();
-            isComposing=statusCached.isComposing();
+            // CompositionMessage 先于 StatusMessage 到达时，不能继续依赖上一拍的 statusCached。
+            isComposing = inferComposingFromComposition(data);
             this.compositionCached = data;
          } else if (message instanceof RimeMessage.CandidateMenuMessage) {
             RimeProto.Context.Menu menu = ((RimeMessage.CandidateMenuMessage) message).getData();
@@ -956,6 +970,24 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
             isAsciiMode =statusCached.isAsciiMode();
             updateSchemaCached(status);
         }
+    }
+
+    /**
+     * 根据当前 composition 快照推断是否仍处于组字态。
+     */
+    private boolean inferComposingFromComposition(RimeProto.Context.Composition data) {
+        if (data != null) {
+            if (data.getLength() > 0) {
+                return true;
+            }
+            if (!TextUtils.isEmpty(data.getPreedit())) {
+                return true;
+            }
+            if (!TextUtils.isEmpty(data.getCommitTextPreview())) {
+                return true;
+            }
+        }
+        return !TextUtils.isEmpty(getRimeRawInput());
     }
 
     /**
@@ -1242,6 +1274,11 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
      * 判断当前方案 user_dict 中是否存在以前缀命中的指定词条。
      */
     public static native boolean hasRimeUserPhraseWithPrefix(String prefix, String text);
+
+    /**
+     * 按输入前缀和词语回查当前方案 user_dict 中保存的完整编码。
+     */
+    public static native String getRimeUserPhraseCodeWithPrefix(String prefix, String text);
 
     /**
      * 获取光标位置(原生方法)。
