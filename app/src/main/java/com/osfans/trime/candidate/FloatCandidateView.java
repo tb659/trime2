@@ -204,6 +204,12 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         refreshHideButton(); // 刷新展开/关闭按钮状态
         CandidatesManager.reset();
         mAdapter.setData(CandidatesManager.next(5));
+        if (hideCandidateBarIfEmpty()) {
+            return;
+        }
+        if (mTrime != null) {
+            mTrime.showCandidateAreaForMenu();
+        }
         mListView.scrollToPosition(0);
         //mListView.invalidateItemDecorations();
         announceCandidate(0);
@@ -240,6 +246,12 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         CandidatesManager.reset();
         CandidatesManager.resetFilter();
         mAdapter.setData(CandidatesManager.next(5));
+        if (hideCandidateBarIfEmpty()) {
+            return;
+        }
+        if (mTrime != null) {
+            mTrime.showCandidateAreaForMenu();
+        }
         // 第一种方式：直接调用 RecyclerView 的方法
         mListView.scrollToPosition(0);
         //mListView.invalidateItemDecorations();
@@ -257,6 +269,24 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
                 mListView.setLayoutParams(lp);
             }
         });
+    }
+
+    /**
+     * 当刷新后的候选列表为空时，直接收起候选栏。
+     *
+     * <p>悬浮候选栏和普通候选栏都需要遵守同一条行为：删除后如果已经没有候选，
+     * 就不再保留空白面板。</p>
+     *
+     * @return true 表示已经收起候选栏；false 表示当前仍有候选可显示。
+     */
+    private boolean hideCandidateBarIfEmpty() {
+        if (mAdapter.getItemCount() > 0) {
+            return false;
+        }
+        if (mTrime != null) {
+            mTrime.hideCandidateAreaForEmptyMenu();
+        }
+        return true;
     }
 
     /**
@@ -428,4 +458,3 @@ public class FloatCandidateView extends LinearLayout implements View.OnClickList
         mPreedit.setTextSize(complexUnitDip,textSize);
     }
 }
-

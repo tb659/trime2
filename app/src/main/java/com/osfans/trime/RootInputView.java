@@ -89,6 +89,8 @@ public class RootInputView extends FrameLayout {
     private int mStartIdx = 0;
     // 编码区最小长度过滤条件
     private int mCompositionMinLength;
+    // 当前是否展示候选区高度占位。
+    private boolean mCandidateAreaVisible = true;
 
     /**
      * 构造函数，创建根输入视图并初始化所有子组件。
@@ -546,11 +548,8 @@ public class RootInputView extends FrameLayout {
             });
         }
 
-        // 根据 Rime 选项决定是否隐藏候选词栏
-        if(Rime.getRimeOption("_hide_candidate"))
-            mCandidateView.setVisibility(GONE);
-        else
-            mCandidateView.setVisibility(VISIBLE);
+        // 根据 Rime 选项决定是否隐藏候选词栏，并同步收缩整体布局高度。
+        applyCandidateAreaVisibility(!Rime.getRimeOption("_hide_candidate"));
         // 根据 Rime 选项决定是否隐藏按键提示和候选词注释
         Config.set_hide_comment(Rime.getRimeOption("_hide_comment"));
         Config.set_hide_key_hint(Rime.getRimeOption("_hide_key_hint"));
@@ -881,17 +880,7 @@ public class RootInputView extends FrameLayout {
                     showSymbolsView(false);
                     mInputView.setKeyboard(id);
                     // 更新 mCenterLayout 高度以匹配新键盘的动态高度
-                    ViewGroup.LayoutParams lp = mCenterLayout.getLayoutParams();
-                    if (lp != null) {
-                        lp.height = ThemeManager.getContentHeight();
-                        mCenterLayout.setLayoutParams(lp);
-                    }
-                    // 更新 mRoot 高度以匹配新键盘的动态高度，并触发窗口插入区重算
-                    ViewGroup.LayoutParams rlp = mRoot.getLayoutParams();
-                    if (rlp != null) {
-                        rlp.height = ThemeManager.getHeight();
-                        mRoot.setLayoutParams(rlp);
-                    }
+                    applyCandidateAreaVisibility(mCandidateAreaVisible && !Rime.getRimeOption("_hide_candidate"));
                     mRoot.requestApplyInsets();
             }
         });
@@ -926,31 +915,12 @@ public class RootInputView extends FrameLayout {
         Config.set_hide_key_sound(Rime.getRimeOption("_hide_key_sound"));
         if (mInputView != null) mInputView.invalidateAllKeys();
         if (mCandidateView != null){
-            if(Rime.getRimeOption("_hide_candidate"))
-                mCandidateView.setVisibility(GONE);
-            else
-                mCandidateView.setVisibility(VISIBLE);
+            applyCandidateAreaVisibility(mCandidateAreaVisible && !Rime.getRimeOption("_hide_candidate"));
             mCandidateView.invalidateAllKeys();
-        }
-        // 更新容器高度以匹配候选栏和键盘的最新动态高度
-        ViewGroup.LayoutParams clp = mCenterLayout.getLayoutParams();
-        if (clp != null) {
-            clp.height = ThemeManager.getContentHeight();
-            mCenterLayout.setLayoutParams(clp);
-        }
-        ViewGroup.LayoutParams rlp = mRoot.getLayoutParams();
-        if (rlp != null) {
-            rlp.height = ThemeManager.getHeight();
-            mRoot.setLayoutParams(rlp);
         }
         mRoot.requestApplyInsets();
         if (hideCommentChanged) {
-            int candidateAreaHeight = ThemeManager.getCandidateHeight();
-            ViewGroup.LayoutParams cvlp = mCandidateView.getLayoutParams();
-            if (cvlp != null) {
-                cvlp.height = candidateAreaHeight;
-                mCandidateView.setLayoutParams(cvlp);
-            }
+            applyCandidateAreaVisibility(mCandidateAreaVisible && !Rime.getRimeOption("_hide_candidate"));
         }
     }
 
@@ -983,6 +953,75 @@ public class RootInputView extends FrameLayout {
      */
     public void showToolbarView(boolean b) {
         mCandidateView.showToolbarView(b);
+    }
+
+    /**
+     * 显示或隐藏候选栏容器本身。
+     *
+     * <p>某些场景（如删除最后一个候选）需要把整个候选区域直接收起，
+     * 仅切换候选列表与工具栏子视图并不能移除外层占位。</p>
+     *
+     * @param visible true 显示候选栏容器，false 隐藏候选栏容器。
+     */
+    public void setCandidateViewVisible(boolean visible) {
+        if (!visible && mShowExtractedCandidatesView) {
+            showExtractedCandidatesView(false);
+        }
+        applyCandidateAreaVisibility(visible && !Rime.getRimeOption("_hide_candidate"));
+    }
+
+    /**
+     * 同步候选区显隐与整块内容高度。
+     *
+     * <p>本项目的输入区域总高度默认包含“候选栏 + 键盘”。如果只把候选视图设为 GONE，
+     * 父布局仍会保留这段高度，视觉上就会留下空白条。这里统一同步候选视图、内容区和
+     * 根布局的高度，确保候选区隐藏时整块区域真正收缩。</p>
+     *
+     * @param visible true 保留候选区高度；false 收起候选区高度。
+     */
+    private void applyCandidateAreaVisibility(boolean visible) {
+        mCandidateAreaVisible = visible;
+        int candidateHeight = visible ? ThemeManager.getCandidateHeight() : 0;
+        int contentHeight = ThemeManager.getKeyboardHeight() + candidateHeight;
+        int rootExtraHeight = ThemeManager.getHeight() - ThemeManager.getContentHeight();
+        int rootHeight = rootExtraHeight + contentHeight;
+
+        if (mCandidateView != null) {
+            ViewGroup.LayoutParams candidateLp = mCandidateView.getLayoutParams();
+            if (candidateLp != null) {
+                candidateLp.height = candidateHeight;
+                mCandidateView.setLayoutParams(candidateLp);
+            }
+            mCandidateView.setVisibility(visible ? VISIBLE : GONE);
+        }
+        if (mCenterLayout != null) {
+            ViewGroup.LayoutParams centerLp = mCenterLayout.getLayoutParams();
+            if (centerLp != null) {
+                centerLp.height = contentHeight;
+                mCenterLayout.setLayoutParams(centerLp);
+            }
+        }
+        if (mLeftLayout != null) {
+            ViewGroup.LayoutParams leftLp = mLeftLayout.getLayoutParams();
+            if (leftLp != null) {
+                leftLp.height = contentHeight;
+                mLeftLayout.setLayoutParams(leftLp);
+            }
+        }
+        if (mRightLayout != null) {
+            ViewGroup.LayoutParams rightLp = mRightLayout.getLayoutParams();
+            if (rightLp != null) {
+                rightLp.height = contentHeight;
+                mRightLayout.setLayoutParams(rightLp);
+            }
+        }
+        if (mRoot != null) {
+            ViewGroup.LayoutParams rootLp = mRoot.getLayoutParams();
+            if (rootLp != null) {
+                rootLp.height = rootHeight;
+                mRoot.setLayoutParams(rootLp);
+            }
+        }
     }
 
     /**
@@ -1044,6 +1083,23 @@ public class RootInputView extends FrameLayout {
             public void run() {
                 mCandidateView.setData(items);
                 showToolbarView(items.isEmpty());
+            }
+        });
+    }
+
+    /**
+     * 为删后重预测清空当前候选内容，但保留候选区位置。
+     *
+     * <p>这个场景下旧候选已经过期，不应继续显示；但如果立刻切到工具栏，等新的联想候选回来时
+     * 又会整栏跳回候选区，视觉上会有明显割裂感。这里仅清空当前候选数据，并保持候选区仍在，
+     * 让后续新候选可以直接顶上来。</p>
+     */
+    public void clearCandidatesForPredictionRefresh() {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                mCandidateView.setData(new ArrayList<>());
+                showToolbarView(false);
             }
         });
     }

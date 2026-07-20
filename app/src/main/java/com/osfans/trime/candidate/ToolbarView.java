@@ -225,8 +225,7 @@ public class ToolbarView extends LinearLayout implements View.OnClickListener {
                     mTopKeys.add(topKey);
                     mBottomKeys.add(bottomKey);
 
-                    // 同步 Rime 选项的初始重置状态
-                    Rime.setRimeOption(aSwitch.getName(), aSwitch.getReset() != 0);
+                    // 不在工具栏重建时回写 reset 默认值，避免覆盖当前运行时开关状态。
                 }
             }
         } catch (Exception e) {

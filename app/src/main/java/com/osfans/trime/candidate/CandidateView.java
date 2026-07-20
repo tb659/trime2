@@ -221,6 +221,12 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
         refreshHideButton(); // 刷新展开/关闭按钮状态
         CandidatesManager.reset(); // 重置管理器
         mAdapter.setData(CandidatesManager.next()); // 加载第一页数据
+        if (hideCandidateBarIfEmpty()) {
+            return;
+        }
+        if (mTrime != null) {
+            mTrime.showCandidateAreaForMenu();
+        }
         mListView.scrollToPosition(0); // 滚动到顶部
         //mListView.invalidateItemDecorations();
         announceCandidate(0); // 无障碍播报第一个候选词
@@ -246,6 +252,12 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
         CandidatesManager.reset(); // 重置管理器
         CandidatesManager.resetFilter(); // 重置过滤器
         mAdapter.setData(CandidatesManager.next()); // 加载第一页数据
+        if (hideCandidateBarIfEmpty()) {
+            return;
+        }
+        if (mTrime != null) {
+            mTrime.showCandidateAreaForMenu();
+        }
         // 第一种方式:直接调用 RecyclerView 的方法
         mListView.scrollToPosition(0); // 滚动到顶部
         //mListView.invalidateItemDecorations();
@@ -275,11 +287,35 @@ public class CandidateView extends LinearLayout implements View.OnClickListener 
         CandidatesManager.resetFilter(); // 重置过滤器
         //CandidatesManager.setStart(idx);
         mAdapter.setData(CandidatesManager.next()); // 加载第一页数据
+        if (hideCandidateBarIfEmpty()) {
+            return;
+        }
+        if (mTrime != null) {
+            mTrime.showCandidateAreaForMenu();
+        }
         // 第一种方式:直接调用 RecyclerView 的方法
         //mListView.invalidateItemDecorations();
         mListView.requestLayout(); // 请求重新布局
         announceCandidate(0); // 无障碍播报第一个候选词
         setIdx(idx); // 设置选中索引
+    }
+
+    /**
+     * 当刷新后的候选列表为空时，直接收起候选栏。
+     *
+     * <p>删除用户词后，Rime 可能已经没有任何候选返回；此时继续保留空候选栏只会留下
+     * 一块无内容区域。这里统一在候选视图层检测空结果，并通知输入法服务隐藏候选栏。</p>
+     *
+     * @return true 表示已经收起候选栏；false 表示当前仍有候选可显示。
+     */
+    private boolean hideCandidateBarIfEmpty() {
+        if (mAdapter.getItemCount() > 0) {
+            return false;
+        }
+        if (mTrime != null) {
+            mTrime.hideCandidateAreaForEmptyMenu();
+        }
+        return true;
     }
 
     /**

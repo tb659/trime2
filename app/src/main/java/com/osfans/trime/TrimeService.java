@@ -1372,10 +1372,8 @@ public class TrimeService extends InputMethodService {
         if (!isPredicting() || !isDeleteKey(keyCode) || isRealComposing()) {
             return false;
         }
-        setPredictionCandidatesVisible(false);
+        preparePredictionRefreshUi();
         cancelPredictionRefresh();
-        mRime.clearComposition();
-        clearDisplayedComposition();
         sendDownUpKeyEvents(keyCode, mask);
         schedulePredictionRefreshAfterDelete("prediction-delete");
         return true;
@@ -1436,6 +1434,20 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
+     * 获取“应视为连续快删、需要延后恢复预测”的判定窗口。
+     *
+     * <p>主题里的 {@code repeat_click_time} 主要服务于长按重复删除，通常比用户两次正常点删的间隔更宽。
+     * 如果直接拿它判断“是否延后恢复预测”，就会把像“删霖、删昱”这种快速双击也误判为长按连删，
+     * 导致候选先被清掉，但新的 `田` 联想要过一会儿才回来。这里单独收紧窗口，只把极短时间内的删除
+     * 视为真正的连续快删。</p>
+     *
+     * @return 连续快删判定窗口，单位毫秒。
+     */
+    private long getRapidDeleteSuppressionWindow() {
+        return Math.min(getDeleteRepeatClickTime(), 90L);
+    }
+
+    /**
      * 按删除速度安排删后预测刷新。
      *
      * <p>删除后的候选恢复分两条路径：</p>
@@ -1448,12 +1460,15 @@ public class TrimeService extends InputMethodService {
     private void schedulePredictionRefreshAfterDelete(String reason) {
         long now = SystemClock.uptimeMillis();
         long repeatClickTime = getDeleteRepeatClickTime();
-        boolean isRapidDelete = mLastDeleteKeyTime > 0 && now - mLastDeleteKeyTime <= repeatClickTime;
+        long rapidDeleteWindow = getRapidDeleteSuppressionWindow();
+        boolean isRapidDelete = mLastDeleteKeyTime > 0 && now - mLastDeleteKeyTime <= rapidDeleteWindow;
         mLastDeleteKeyTime = now;
-        if (isRapidDelete) {
-            // 连删过程中候选栏不应反复出现，先立即收起，等停手后由延迟任务统一恢复。
-            clearPredictionCandidates();
-        }
+        // 删后重预测属于“旧候选已经过期、需要按最新正文重算”的场景。
+        // 无论是单次删除还是连续删除，都先立刻退出当前预测态，避免用户先看到上一拍候选，
+        // 再在异步刷新后才发现其实已经没有候选，从而产生明显停顿。
+        // 这里不直接切回工具栏，而是保留候选区位置，只清掉旧候选内容，避免新的候选回来时
+        // 整栏先消失再出现，造成强烈割裂感。
+        preparePredictionRefreshUi();
         schedulePredictionRefresh(reason, isRapidDelete ? repeatClickTime : PREDICTION_REFRESH_DELAY_MS);
     }
 
@@ -1897,6 +1912,23 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
+     * 为删后重预测准备 UI：退出旧预测态并清空当前候选内容，但保留候选区位置。
+     *
+     * <p>这个中间态只用于“马上会按最新正文重建一轮预测候选”的场景。它和
+     * {@link #clearPredictionCandidates()} 的区别在于：不会立刻切回工具栏，因此新候选回来时
+     * 可以直接接管原位置，减少整栏闪烁。</p>
+     */
+    private void preparePredictionRefreshUi() {
+        setPredictionCandidatesVisible(false);
+        mRime.clearComposition();
+        clearDisplayedComposition();
+        setCandidatesViewShown(true);
+        if (mRootInputView != null) {
+            mRootInputView.clearCandidatesForPredictionRefresh();
+        }
+    }
+
+    /**
      * 提交文本并清空编码区。
      *
      * @param text 要提交的文本内容。
@@ -2249,10 +2281,15 @@ public class TrimeService extends InputMethodService {
     private final Runnable mStatusRunnable = new Runnable() {
         @Override
         public void run() {
-            // 在执行时再次获取最新的状态，确保 UI 与数据同步
-            boolean isComp = mComposing;
+            // 在执行时再次获取最新的状态，确保 UI 与数据同步。
+            // 对候选区/工具栏来说，“当前是否还有候选”比 composing 标记更可靠：
+            // 删后预测、占位符清理或消息时序抖动时，mComposing 可能会短暂滞后，
+            // 但只要候选已经为空，就不应继续保留空候选栏。
             boolean hasCandidates = Rime.hasMenu();
-            showToolbarView(!isComp && !hasCandidates);
+            // 如果删后重预测任务已经排队但新候选尚未返回，先保持候选区占位，避免候选栏
+            // 先切到工具栏、随后又在新候选回来时切回候选栏，形成明显闪烁。
+            boolean shouldShowToolbar = !hasCandidates && !mPendingPredictionRefresh;
+            showToolbarView(shouldShowToolbar);
             mRootInputView.invalidateComposingKeys();
         }
     };
@@ -2648,7 +2685,7 @@ public class TrimeService extends InputMethodService {
                 .setPositiveButton(android.R.string.ok, (unusedDialog, which) -> {
                     if (deleteSelfCreatedWord(rawInput, item, matchedEntries, canDeleteLearnedWord)) {
                         CustomToast.show(this, "已删除自造词", Toast.LENGTH_SHORT, true);
-                        updateCandidate();
+                        refreshCandidateAfterSelfCreatedWordDeletion();
                     } else {
                         CustomToast.show(this, "删除自造词失败", Toast.LENGTH_SHORT, true);
                     }
@@ -3389,6 +3426,31 @@ public class TrimeService extends InputMethodService {
             return mRime.removeUserPhrase(learnedCode, learnedCode) || deletedAny;
         }
         return deletedAny;
+    }
+
+    /**
+     * 删除自造词后刷新候选栏。
+     *
+     * <p>长按删除走的是确认对话框回调，不一定会触发普通打字时那条候选刷新链。
+     * 这里直接根据当前 Rime 上下文判断是否仍有候选：若已无候选，则收起整个候选栏；
+     * 否则继续走现有的候选刷新逻辑。</p>
+     */
+    private void refreshCandidateAfterSelfCreatedWordDeletion() {
+        if (mRime == null) {
+            setCandidateViewVisible(false);
+            showToolbarView(true);
+            setCandidatesViewShown(false);
+            return;
+        }
+        CandidateItem[] remainingCandidates = mRime.getCandidates(0, 1);
+        if (remainingCandidates == null || remainingCandidates.length == 0) {
+            setCandidateViewVisible(false);
+            setCandidatesViewShown(false);
+            showToolbarView(true);
+            return;
+        }
+        setCandidateViewVisible(true);
+        updateCandidate();
     }
 
     /**
@@ -4488,6 +4550,48 @@ public class TrimeService extends InputMethodService {
      */
     private void showToolbarView(boolean b) {
         mRootInputView.showToolbarView(b);
+    }
+
+    /**
+     * 显示或隐藏整个候选栏容器。
+     *
+     * <p>输入法框架的 {@code setCandidatesViewShown(false)} 不能完全覆盖本项目的自定义候选区，
+     * 因此需要同步控制 RootInputView 中的候选栏容器可见性，避免留下空白占位。</p>
+     *
+     * @param visible true 显示候选栏容器，false 隐藏候选栏容器。
+     */
+    private void setCandidateViewVisible(boolean visible) {
+        if (mRootInputView == null) {
+            return;
+        }
+        mRootInputView.setCandidateViewVisible(visible);
+    }
+
+    /**
+     * 当前存在候选菜单时，恢复候选区显示。
+     *
+     * <p>普通候选刷新链不经过 {@link RootInputView#setCandidates(java.util.ArrayList)}，
+     * 因此需要在 CandidateView/FloatCandidateView 取到非空候选后主动恢复候选区高度。</p>
+     */
+    public void showCandidateAreaForMenu() {
+        showToolbarView(false);
+    }
+
+    /**
+     * 当前候选菜单为空时，彻底收起候选区。
+     *
+     * <p>普通退格后的联想刷新、候选删除等路径，都会经过候选视图自己的 show/update 流程。
+     * 当 Rime 此时没有任何候选返回时，除了关闭框架层候选标记，还要同步退出预测态并收起
+     * 自定义候选区高度，否则界面会留下空白候选栏。</p>
+     */
+    public void hideCandidateAreaForEmptyMenu() {
+        if (isPredicting() || mPredictionCandidatesVisible) {
+            clearPredictionCandidates();
+            showToolbarView(true);
+            return;
+        }
+        setCandidatesViewShown(false);
+        showToolbarView(true);
     }
 
     /**
