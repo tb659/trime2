@@ -6,8 +6,8 @@ lua_unicode_display_filter = require("unicode_display")  --Unicode编码提示
 calculator_translator = require("calculator_translator")  --简易计算器
 exe_processor = require("exe")  -- 网页启动器
 shijian_translator = require("shijian2") -- 高级时间
-local user_predict = require("user_predict") -- 上屏后预测模块
 
+local user_predict = require("user_predict") -- 上屏后预测模块
 -- 显式包装一次，避免 librime-lua 在组件分发表上取不到 func 时出现 upvalue 'f' 为空。
 user_predict_processor = {
   init = function(env)

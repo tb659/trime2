@@ -28,6 +28,12 @@ switches: # 0 默认关，1 默认开
   - name: chaifen
     reset: 0
     states: [拆隐, 拆显]
+  - name: show_raw_input_candidate
+    reset: 0
+    states: [a1隐, a1显]
+  - name: prediction
+    reset: 1
+    states: [联想隐, 联想显]
   - name: emoji_cn #emoji滤镜
     reset: 0
     states: [🈚, 🈶]
@@ -161,6 +167,12 @@ key_binder:
 punctuator:
   import_preset: symbols # 由外部统一文件导入
 
+# translators/history_translator 临时历史
+history:
+  input: z # 触发此翻译器的字串
+  size: 1 # 设置候选记录量，默认: 0 继续(commit_record最大存储量 20）
+  initial_quality: 999 # 权重
+
 # segmentors/affix_segmentor 临时英文
 easy_english:
   dictionary: easy_english
@@ -171,15 +183,16 @@ easy_english:
   enable_sentence: false
   initial_quality: -1
   preedit_format:
+    # 说明
+    # xform   --改写〔不保留原形〕
+    # derive  --衍生〔保留原形〕
+    # abbrev  --简拼〔出字优先级较上两组更低〕
+    # fuzz    --略拼〔此种简拼仅组词，不出单字〕
+    # xlit    --变换〔适合大量一对一变换〕
+    # erase   --刪除
     - "xlit|_| |"
   comment_format: #去掉编码提示前的~号
     - "xform/~/ /"
-
-# translators/history_translator 临时历史
-history:
-  input: z # 触发此翻译器的字串
-  size: 1 # 设置候选记录量，默认: 0 继续(commit_record最大存储量 20）
-  initial_quality: 999 # 权重
 
 # filters/simplifier 简繁(+部分异体)滤镜
 simplification: #⇩四选一
@@ -212,6 +225,32 @@ pinyin:
     - tigress
     # - reverse_lookup
 
+# filters/simplifier emoji表情滤镜
+emoji_cn:
+  opencc_config: emoji.json
+  option_name: emoji_cn
+  tips: all
+
+# filters/reverse_lookup_filter 反查
+reverse_lookup:
+  dictionary: pinyin_simp
+  prefix: "`"
+  tips: "〔拼音〕"
+  preedit_format:
+    # 说明
+    # xform   --改写〔不保留原形〕
+    # derive  --衍生〔保留原形〕
+    # abbrev  --简拼〔出字优先级较上两组更低〕
+    # fuzz    --略拼〔此种简拼仅组词，不出单字〕
+    # xlit    --变换〔适合大量一对一变换〕
+    # erase   --刪除
+    - "xform/([nl])v/$1ü/"
+    - "xform/([nl])ue/$1üe/"
+    - "xform/([jqxy])v/$1u/"
+  comment_format:
+    - "xform/^/ /"
+  # suffix: "'"
+
 # filters/simplifier 拆分滤镜
 chaifen:
   opencc_config: hu_cf.json
@@ -225,22 +264,3 @@ chaifen:
     - tigress
     - reverse_lookup
   tips: all #只给单字加滤镜，改为 char 。 词也显示，改为 all
-
-# filters/simplifier emoji表情滤镜
-emoji_cn:
-  opencc_config: emoji.json
-  option_name: emoji_cn
-  tips: all
-
-# filters/reverse_lookup_filter 反查
-reverse_lookup:
-  dictionary: pinyin_simp
-  prefix: "`"
-  tips: "〔拼音〕"
-  preedit_format:
-    - "xform/([nl])v/$1ü/"
-    - "xform/([nl])ue/$1üe/"
-    - "xform/([jqxy])v/$1u/"
-  comment_format:
-    - "xform/^/ /"
-  # suffix: "'"
