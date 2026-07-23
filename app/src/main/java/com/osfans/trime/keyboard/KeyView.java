@@ -20,6 +20,7 @@ import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.text.TextUtils;
 import android.util.Log;
@@ -1793,7 +1794,8 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
 
             // 5. 启动重复按键任务
             // 如果没有上述特殊处理，则启动重复按键 Runnable，实现长按连续输入
-            postDelayed(mRepeatableRunnable, 200);
+            // 首个重复间隔同样复用主题的 repeat_click_time，避免出现固定 200ms 与后续间隔不一致的问题
+            postDelayed(mRepeatableRunnable, mKeyStyle.getRepeatClickTime());
         }
     };
 
@@ -1868,10 +1870,16 @@ public class KeyView extends FrameLayout implements View.OnClickListener {
             }
 
             // 3. 触发点击事件（执行按键逻辑）
+            // 记录本拍开始时间：有编码时删除会同步走 Rime 处理 + 候选栏重建，onClick 本身可能耗时几十毫秒。
+            long tickStart = SystemClock.uptimeMillis();
             onClick(KeyView.this);
 
-            // 4. 延迟再次执行自身，实现连续重复触发
-            postDelayed(this, mKeyStyle.getRepeatClickTime());
+            // 4. 固定节拍调度：下一拍延迟 = repeat_click_time - 本拍已消耗时间。
+            // 避免出现“间隔 + 处理耗时”导致实际连删速度慢于配置值（有编码时尤其明显）。
+            long elapsed = SystemClock.uptimeMillis() - tickStart;
+            long nextDelay = mKeyStyle.getRepeatClickTime() - elapsed;
+            if (nextDelay < 0) nextDelay = 0;
+            postDelayed(this, nextDelay);
         }
     };
 

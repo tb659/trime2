@@ -101,7 +101,10 @@ import java.util.regex.Pattern;
  * 处理按键事件、文本提交、主题切换等所有输入法相关操作。
  */
 public class TrimeService extends InputMethodService {
-    private static final String PREDICTION_PLACEHOLDER = "tyl";
+    // 预测占位符：必须与 user_predict.lua 中的 PH_CHAR 保持一致。
+    // 取一个足够长、由小写字母组成、不构成任何真实编码的无意义串，配合“精确相等”判断
+    // 彻底避免与用户正常输入相撞（旧值 "tyl" 太短，作为子串频繁误判导致编码区被隐藏）。
+    private static final String PREDICTION_PLACEHOLDER = "zpredictz";
     private static final String RAW_INPUT_CANDIDATE_OPTION = "show_raw_input_candidate";
     private static final String CREATE_WORD_CANDIDATE_LABEL = "添加自造词";
     private static final String CREATE_WORD_MODE_OPTION = "_create_word_mode";
@@ -1767,7 +1770,7 @@ public class TrimeService extends InputMethodService {
     /**
      * 判断预编辑文本是否仅包含预测占位符而无可显示内容。
      * <p>
-     * 当 preedit 或 rawInput 中存在占位符（如"tyl"），但经过
+     * 当 preedit 或 rawInput 恰好是占位符（{@link #PREDICTION_PLACEHOLDER}），但经过
      * {@link #resolveVisibleCompositionText} 解析后没有可显示的文本时返回 true。
      * 用于在 UI 层面决定是否隐藏编码区——仅含占位符的编码区不应向用户展示。
      *
@@ -1900,10 +1903,14 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
-     * 判断字符串是否包含预测占位符。
+     * 判断字符串是否“正好是”预测占位符。
+     *
+     * <p>预测态下 Rime 的 rawInput 恰好等于占位符（见 user_predict.lua 的 input == PH_CHAR 契约），
+     * 因此用精确相等判断即可，既能可靠识别预测态，又不会把正常编码里恰好含占位符字母的串
+     * 误判为占位符——这正是修复旧 bug（contains("tyl") 子串误判隐藏编码区）的关键。</p>
      */
     private static boolean hasPredictionPlaceholder(String s) {
-        return !TextUtils.isEmpty(s) && s.contains(PREDICTION_PLACEHOLDER);
+        return PREDICTION_PLACEHOLDER.equals(s);
     }
 
     private void setPredictionCandidatesVisible(boolean visible) {
@@ -2187,12 +2194,14 @@ public class TrimeService extends InputMethodService {
             if (isCreateWordDialogActive()) {
                 syncCreateWordCodeFromComposition();
             }
+            // 预测候选可见性用“rawInput/preedit 精确等于占位符”判断（占位符是很长且打不出的串，
+            // 与正常编码彻底区分，不会像旧的 contains("tyl") 那样误判）。
             String rawInput = Rime.getRimeRawInput();
             String preedit = composition != null ? composition.getPreedit() : null;
             boolean predictionVisible = hasPredictionPlaceholder(rawInput) || hasPredictionPlaceholder(preedit);
             boolean predictionVisibilityChanged = mPredictionCandidatesVisible != predictionVisible;
             setPredictionCandidatesVisible(predictionVisible);
-            // deploy 后首轮预测有时只出现 composition=tyl=>候选，而 CandidateListMessage
+            // deploy 后首轮预测有时只出现 composition=占位符=>候选，而 CandidateListMessage
             // 没及时送到 Java；进入预测态时主动拉一次候选，避免 UI 错过这一拍。
             if (predictionVisible && predictionVisibilityChanged) {
                 updateCandidate();
@@ -3693,6 +3702,10 @@ public class TrimeService extends InputMethodService {
      * @return true 如果正在展示联想候选，false 否则。
      */
     public boolean isPredicting() {
+        // 预测态下 Rime 的 rawInput 恰好等于占位符（见 user_predict.lua 的 push_input/input==PH_CHAR
+        // 契约），因此用“精确相等”判断即可，且与正常编码彻底区分：占位符是一个很长且不可能被
+        // 打出的无意义串（PREDICTION_PLACEHOLDER），正常虎码编码永远不会等于它。
+        // 不能用子串 contains——那正是旧 bug 根源（"tyl" 作为子串频繁误判并隐藏编码区）。
         RimeProto.Context.Composition composition = mRime.getCompositionCached();
         String preedit = composition != null ? composition.getPreedit() : null;
         return isComposing()

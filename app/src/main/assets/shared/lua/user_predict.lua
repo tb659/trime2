@@ -85,7 +85,10 @@ local CONFIG = {
 }
 -- ======================== 全局状态变量 ========================
 -- 这些变量在三个 Lua 组件（P/T/F）之间共享，用于传递记忆链和预测结果
-local PH_CHAR = "tyl"       -- ASCII 占位符，避免与 schema 现有规则冲突
+-- ASCII 占位符：必须由小写字母组成才能被 speller（虎码 [a-z]、拼音 ['a-z]）接受并触发翻译链。
+-- 取一个足够长且不构成任何真实编码的无意义串，配合 Java 侧“精确相等”判断，彻底避免与用户
+-- 正常输入的子串相撞（旧值 "tyl" 只有 3 个字母，极易作为虎码编码自然出现而被误判为预测态）。
+local PH_CHAR = "zpredictz"
 local HISTORY_MAX = 4        -- 历史记忆链深度；需覆盖连续预测链，供上下文学习与查询
 
 local history = {}           -- 上屏历史文本数组，最多 HISTORY_MAX 个元素
@@ -98,6 +101,7 @@ local pending_cands = nil    -- 缓存的预测候选列表，由 commit_cb 填�
 local get_predictions        -- 前向声明，供预测查询与过滤逻辑复用
 local last_external_request_revision = 0 -- 最近一次消费的外部删后重预测请求版本
 local set_prediction_visible -- 前向声明，供外部重预测入口复用
+local set_is_predicting       -- 前向声明：统一 is_predicting 写入入口
 
 -- ======================== 字头词表（兜底 fallback） ========================
 -- char_words.lua 由 script/generate_char_words.py 从虎码词库生成
@@ -237,12 +241,12 @@ local function activate_external_prediction(env, anchor)
     predict_count = 1
     pending_cands = get_predictions(env, anchor)
     if pending_cands then
-        is_predicting = true
+        set_is_predicting(env, true)
         set_prediction_visible(env, true)
         return true
     end
     predict_count = 0
-    is_predicting = false
+    set_is_predicting(env, false)
     pending_cands = nil
     set_prediction_visible(env, false)
     return false
@@ -255,8 +259,8 @@ local function reset_memory_chain(env, reason)
     last_commit = ""
     last_commit_time = 0
     predict_count = 0
-    is_predicting = false
-    prediction_visible = false
+    set_is_predicting(env, false)
+    set_prediction_visible(env, false)
     pending_cands = nil
     env.need_push = false
 end
@@ -278,6 +282,14 @@ local function push_prediction_placeholder(ctx, env)
     ctx:push_input(PH_CHAR)
     ctx.caret_pos = expected_len
     return true
+end
+
+-- 统一 is_predicting 写入入口（保留 setter 形式以便集中管理，但不再触发任何 Rime 副作用）。
+-- 注意：绝不能在这里调用 context:set_option —— set_option 在组字态会同步触发
+-- RefreshNonConfirmedComposition → update_notifier → 重新翻译，而本 setter 会被
+-- translator/filter/update_cb 调用，从而造成重入递归崩溃。
+set_is_predicting = function(env, value)
+    is_predicting = value
 end
 
 set_prediction_visible = function(env, visible)
@@ -604,7 +616,7 @@ function P.init(env)
 
         -- 预测轮次计数：第一次上屏为预测开始
         if not is_predicting then
-            is_predicting = true
+            set_is_predicting(env, true)
             predict_count = 1
         else
             predict_count = predict_count + 1
@@ -612,7 +624,7 @@ function P.init(env)
 
         -- 达到最大预测次数后停止
         if predict_count > CONFIG.MAX_PREDICTIONS then
-            is_predicting = false
+            set_is_predicting(env, false)
             predict_count = 0
             pending_cands = nil
             return
@@ -772,11 +784,11 @@ function P.init(env)
                 set_prediction_visible(env, true)
                 push_prediction_placeholder(ctx, env)
             else
-                predict_count = 0; is_predicting = false; pending_cands = nil
+                predict_count = 0; set_is_predicting(env, false); pending_cands = nil
                 set_prediction_visible(env, false)
             end
         else
-            predict_count = 0; is_predicting = false; pending_cands = nil
+            predict_count = 0; set_is_predicting(env, false); pending_cands = nil
             set_prediction_visible(env, false)
         end
     end
@@ -805,7 +817,7 @@ function P.init(env)
                 ctx.caret_pos = expected_len
                 return
             elseif pending_cands then
-                is_predicting = true
+                set_is_predicting(env, true)
                 set_prediction_visible(env, true)
             end
         end
@@ -835,7 +847,7 @@ function P.init(env)
                 local clean_text = string.gsub(input, PH_CHAR, "")
                 ctx:clear()
                 predict_count = 0
-                is_predicting = false
+                set_is_predicting(env, false)
                 pending_cands = nil
                 set_prediction_visible(env, false)
                 if clean_text ~= "" then ctx:push_input(clean_text) end
@@ -845,7 +857,7 @@ function P.init(env)
                 if ctx.caret_pos < expected_len then
                     ctx:clear()
                     predict_count = 0
-                    is_predicting = false
+                    set_is_predicting(env, false)
                     pending_cands = nil
                     set_prediction_visible(env, false)
                     return
@@ -982,7 +994,7 @@ function T.func(input, seg, env)
     end
     -- 只有输入为精确占位符时才产出预测候选
     if input == PH_CHAR and pending_cands then
-        is_predicting = true
+        set_is_predicting(env, true)
         set_prediction_visible(env, true)
         local count = 0
         for _, c in ipairs(pending_cands) do
