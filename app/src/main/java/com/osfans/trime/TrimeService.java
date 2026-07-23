@@ -2491,8 +2491,13 @@ public class TrimeService extends InputMethodService {
             onKey(KeyEvent.KEYCODE_ESCAPE, 0);
             mRime.clearComposition();
         }
+        // 切主题前先退出预测态，避免旧的预测可见标记在重建后继续把编码区顶成隐藏。
+        setPredictionCandidatesVisible(false);
         ThemeManager.setTheme(theme);
         mRootInputView.setTheme(theme);
+        // 重建视图会按主题 composition.position（默认 "hide"）把 mHideComposition 重置为 true，
+        // 必须像 setSchema 那样重新应用一次 inline preedit 模式，否则编码区在切换后必定被隐藏。
+        mRootInputView.setInlinePreeditMode(getInlinePreeditMode());
         // setInputView(onCreateInputView());
         // showToolbarView(true);
     }
@@ -2508,8 +2513,13 @@ public class TrimeService extends InputMethodService {
             onKey(KeyEvent.KEYCODE_ESCAPE, 0);
             mRime.clearComposition();
         }
+        // 切样式前先退出预测态，避免旧的预测可见标记在重建后继续把编码区顶成隐藏。
+        setPredictionCandidatesVisible(false);
         ThemeManager.setStyle(theme);
         mRootInputView.setStyle(theme);
+        // 重建视图会按样式 composition.position（默认 "hide"）把 mHideComposition 重置为 true，
+        // 必须像 setSchema 那样重新应用一次 inline preedit 模式，否则编码区在切换后必定被隐藏。
+        mRootInputView.setInlinePreeditMode(getInlinePreeditMode());
         // setInputView(onCreateInputView());
     }
 
