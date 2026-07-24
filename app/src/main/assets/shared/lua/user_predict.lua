@@ -933,10 +933,15 @@ function P.func(key, env)
     end
 
     -- ============ 预测状态下按键处理 ============
-    -- Space/Enter → 仅当存在已选中的预测候选时放行给 selector 处理
-    -- 否则说明输入区只剩占位符本身，绝不能让其原样上屏
+    -- Enter 只负责清掉预测占位符，绝不能让占位符原样上屏。
+    -- Space/;/' 仅当存在已选中的预测候选时放行给 selector 处理。
     if is_predicting then
-        if repr == "Return" or repr == "KP_Enter" or key.keycode == 0x20 then
+        if repr == "Return" or repr == "KP_Enter" then
+            ctx:clear()
+            reset_memory_chain(env, "enter clears prediction")
+            return 1
+        end
+        if key.keycode == 0x20 or repr == "semicolon" or repr == "apostrophe" then
             local comp = ctx.composition
             local has_predict_cand = false
             if comp and not comp:empty() then
@@ -945,10 +950,10 @@ function P.func(key, env)
                 has_predict_cand = cand ~= nil and cand.type == "predict"
             end
             if has_predict_cand then
-                return 2  -- 放行给 express_editor/selector 处理
+                return 2  -- 放行给 key_binder/selector 处理
             end
             ctx:clear()
-            reset_memory_chain(env, "enter/space with no predict candidate")
+            reset_memory_chain(env, "selection key with no predict candidate")
             return 1
         end
         -- 其他键 → 打断预测状态

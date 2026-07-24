@@ -429,12 +429,16 @@ public class TrimeService extends InputMethodService {
             escape();
             orientation = newConfig.orientation;
             mRootInputView.setTheme(Config.getTheme());
+            // 重建视图会把 mHideComposition 重置为主题默认（"hide"→true），必须复位编码区状态，
+            // 否则横屏后编码区会一直隐藏，直到重新选方案才恢复。
+            restoreCompositionStateAfterRebuild();
         }
         // 如果 UI 模式（白天/黑夜）发生变化，则重新设置主题
         if (uiMode != newConfig.uiMode) {
             uiMode = newConfig.uiMode;
             ThemeManager.setTheme(Config.getTheme());
             mRootInputView.setTheme(Config.getTheme());
+            restoreCompositionStateAfterRebuild();
         }
         // 调用 Lua 脚本的 onConfigurationChanged 钩子
         ThemeManager.callFunction("onConfigurationChanged", newConfig);
@@ -2491,15 +2495,26 @@ public class TrimeService extends InputMethodService {
             onKey(KeyEvent.KEYCODE_ESCAPE, 0);
             mRime.clearComposition();
         }
-        // 切主题前先退出预测态，避免旧的预测可见标记在重建后继续把编码区顶成隐藏。
-        setPredictionCandidatesVisible(false);
         ThemeManager.setTheme(theme);
         mRootInputView.setTheme(theme);
-        // 重建视图会按主题 composition.position（默认 "hide"）把 mHideComposition 重置为 true，
-        // 必须像 setSchema 那样重新应用一次 inline preedit 模式，否则编码区在切换后必定被隐藏。
-        mRootInputView.setInlinePreeditMode(getInlinePreeditMode());
+        restoreCompositionStateAfterRebuild();
         // setInputView(onCreateInputView());
         // showToolbarView(true);
+    }
+
+    /**
+     * 在重建输入视图（切主题/样式、横屏、日夜模式切换等）之后，复位编码区显隐相关状态。
+     *
+     * <p>{@code RootInputView.initView()} 会按主题 {@code composition.position}（默认 "hide"）
+     * 把 {@code mHideComposition} 重置为 true，且不会重新读取当前的 inline preedit 模式。
+     * 如果不在重建后补一次 {@link RootInputView#setInlinePreeditMode}，编码区会一直隐藏，
+     * 直到用户重新选方案才恢复。同时清掉可能残留的预测可见标记，避免它独立顶住编码区隐藏。</p>
+     */
+    private void restoreCompositionStateAfterRebuild() {
+        setPredictionCandidatesVisible(false);
+        if (mRootInputView != null) {
+            mRootInputView.setInlinePreeditMode(getInlinePreeditMode());
+        }
     }
 
     /**
@@ -2513,13 +2528,9 @@ public class TrimeService extends InputMethodService {
             onKey(KeyEvent.KEYCODE_ESCAPE, 0);
             mRime.clearComposition();
         }
-        // 切样式前先退出预测态，避免旧的预测可见标记在重建后继续把编码区顶成隐藏。
-        setPredictionCandidatesVisible(false);
         ThemeManager.setStyle(theme);
         mRootInputView.setStyle(theme);
-        // 重建视图会按样式 composition.position（默认 "hide"）把 mHideComposition 重置为 true，
-        // 必须像 setSchema 那样重新应用一次 inline preedit 模式，否则编码区在切换后必定被隐藏。
-        mRootInputView.setInlinePreeditMode(getInlinePreeditMode());
+        restoreCompositionStateAfterRebuild();
         // setInputView(onCreateInputView());
     }
 
