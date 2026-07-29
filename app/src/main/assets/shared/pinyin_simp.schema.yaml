@@ -213,5 +213,5 @@ reverse_lookup:
     - xlit/hspnz/一丨丿丶ㄥ/
   comment_format:
     # - xform/([nl])v/$1ü/
-    - "xform/^/ /"
+    - "xform/^.+$//"
 
