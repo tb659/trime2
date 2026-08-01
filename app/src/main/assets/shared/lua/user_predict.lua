@@ -275,6 +275,10 @@ end
 -- 时序不稳定导致的预测丢失；若当前上下文还不能安全注入，则退回到 update_cb 兜底。
 local function push_prediction_placeholder(ctx, env)
     if not ctx or not pending_cands then return false end
+    if not ctx:get_option("prediction") then
+        env.need_push = false
+        return false
+    end
     local input = ctx.input or ""
     if input ~= "" then return false end
     local expected_len = utf8_len(PH_CHAR) or 1
@@ -789,7 +793,10 @@ function P.init(env)
             end
         else
             predict_count = 0; set_is_predicting(env, false); pending_cands = nil
+            env.need_push = false
             set_prediction_visible(env, false)
+            local inp = ctx.input or ""
+            if inp == PH_CHAR then ctx:clear() end
         end
     end
 
@@ -801,6 +808,11 @@ function P.init(env)
         local input = ctx.input or ""
         local expected_ph = PH_CHAR
         local expected_len = utf8_len(PH_CHAR) or 1
+        if not ctx:get_option("prediction") and s_find(input, PH_CHAR, 1, true) then
+            ctx:clear()
+            reset_memory_chain(env, "prediction off clears placeholder")
+            return
+        end
         if input == PH_CHAR then
             -- 删后重预测优先消费外部锚点；没有外部请求时再按原来的 pending_cands 逻辑显示预测。
             local external_anchor = read_external_prediction_request()
