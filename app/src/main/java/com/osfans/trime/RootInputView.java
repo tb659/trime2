@@ -91,6 +91,8 @@ public class RootInputView extends FrameLayout {
     private int mCompositionMinLength;
     // 当前是否展示候选区高度占位。
     private boolean mCandidateAreaVisible = true;
+    // 系统底部 inset（导航栏），普通模式下计入根布局高度避让系统栏。
+    private int mBottomInset;
 
     /**
      * 构造函数，创建根输入视图并初始化所有子组件。
@@ -355,9 +357,10 @@ public class RootInputView extends FrameLayout {
                         insets.getSystemWindowInsetBottom()
                 );*/
                 if (!Config.isFloatMode() && mRoot != null) {
-                    ViewGroup.LayoutParams lp = mRoot.getLayoutParams();
-                    lp.height = ThemeManager.getHeight() + insets.getSystemWindowInsetBottom();
-                    mRoot.setLayoutParams(lp);
+                    // 缓存底部 inset，根布局高度统一由 applyCandidateAreaVisibility 计算，
+                    // 避免两处高度逻辑互相覆盖导致面板位置漂移（下沉）
+                    mBottomInset = insets.getSystemWindowInsetBottom();
+                    applyCandidateAreaVisibility(mCandidateAreaVisible && !Rime.getRimeOption("_hide_candidate"));
                 }
                 if (insets.getSystemWindowInsetBottom() > 1) {
                     Window win = trime.getWindow().getWindow();
@@ -967,6 +970,7 @@ public class RootInputView extends FrameLayout {
         if (!visible && mShowExtractedCandidatesView) {
             showExtractedCandidatesView(false);
         }
+        mCandidateAreaVisible = visible;
         applyCandidateAreaVisibility(visible && !Rime.getRimeOption("_hide_candidate"));
     }
 
@@ -980,11 +984,15 @@ public class RootInputView extends FrameLayout {
      * @param visible true 保留候选区高度；false 收起候选区高度。
      */
     private void applyCandidateAreaVisibility(boolean visible) {
-        mCandidateAreaVisible = visible;
+        int oldCandidateHeight = mCandidateAreaVisible ? ThemeManager.getCandidateHeight() : 0;
         int candidateHeight = visible ? ThemeManager.getCandidateHeight() : 0;
         int contentHeight = ThemeManager.getKeyboardHeight() + candidateHeight;
         int rootExtraHeight = ThemeManager.getHeight() - ThemeManager.getContentHeight();
         int rootHeight = rootExtraHeight + contentHeight;
+        // 普通模式下根布局贴窗口底边，需加上系统底部 inset 避让导航栏（悬浮模式不避让）
+        if (!Config.isFloatMode()) {
+            rootHeight += mBottomInset;
+        }
 
         if (mCandidateView != null) {
             ViewGroup.LayoutParams candidateLp = mCandidateView.getLayoutParams();
@@ -1018,6 +1026,11 @@ public class RootInputView extends FrameLayout {
         if (mRoot != null) {
             ViewGroup.LayoutParams rootLp = mRoot.getLayoutParams();
             if (rootLp != null) {
+                // 悬浮模式下 mRoot 挂在 Gravity.BOTTOM：高度收缩/恢复会使顶边（键盘位置）整体下移/上移，
+                // 反向补偿 translationY，让候选栏收起与恢复时键盘位置保持稳定
+                if (Config.isFloatMode()) {
+                    mRoot.setTranslationY(mRoot.getTranslationY() + (candidateHeight - oldCandidateHeight));
+                }
                 rootLp.height = rootHeight;
                 mRoot.setLayoutParams(rootLp);
             }

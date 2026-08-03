@@ -3453,7 +3453,7 @@ public class TrimeService extends InputMethodService {
         }
         String learnedCode = resolveLearnedWordDeleteCode(rawInput, item);
         if (!TextUtils.isEmpty(learnedCode) && shouldPreferRawInputForComposition(learnedCode)) {
-            return mRime.removeUserPhrase(learnedCode, learnedCode) || deletedAny;
+            return mRime.removeUserPhrase(learnedCode, item.getText()) || deletedAny;
         }
         return deletedAny;
     }
@@ -3479,8 +3479,14 @@ public class TrimeService extends InputMethodService {
             showToolbarView(true);
             return;
         }
+        // 直接恢复候选栏与框架候选区标记，避免只依赖防抖刷新链时，
+        // 因高亮索引命中提前返回而停留在工具栏/收缩窗口状态。
         setCandidateViewVisible(true);
-        updateCandidate();
+        setCandidatesViewShown(true);
+        showToolbarView(false);
+        // 走无条件重新加载的 update() 链路：show() 在高亮索引命中时会提前返回，
+        // 导致删除生效后候选列表仍停留在旧数据
+        filterCandidate();
     }
 
     /**
@@ -4608,6 +4614,8 @@ public class TrimeService extends InputMethodService {
      * 因此需要在 CandidateView/FloatCandidateView 取到非空候选后主动恢复候选区高度。</p>
      */
     public void showCandidateAreaForMenu() {
+        setCandidateViewVisible(true);
+        setCandidatesViewShown(true);
         showToolbarView(false);
     }
 
