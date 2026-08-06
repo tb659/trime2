@@ -62,6 +62,7 @@ import com.osfans.trime.core.Rime;
 import com.osfans.trime.core.RimeConfig;
 import com.osfans.trime.core.RimeMessage;
 import com.osfans.trime.core.RimeProto;
+import com.osfans.trime.core.SyncMonitor;
 import com.osfans.trime.dialog.DeployDialog;
 import com.osfans.trime.dialog.OptionsDialog;
 import com.osfans.trime.dialog.SchemaGroupDialog;
@@ -130,6 +131,8 @@ public class TrimeService extends InputMethodService {
     private Rime mRime;
     // 主线程 Handler，用于异步任务调度
     private final Handler mHandler = new Handler();
+    // 词库自动同步监视器（监听其他安装的快照更新）
+    private SyncMonitor mSyncMonitor;
     // Rime 消息处理器，接收来自 Rime 引擎的各种通知
     private final Rime.Consumer<RimeMessage<?>> mMessageHandler = this::handleRimeMessage;
     // 选项对话框引用
@@ -318,6 +321,14 @@ public class TrimeService extends InputMethodService {
                 return true;
             }
         });
+        // 启动词库自动同步监视器：检测到其他安装（手机/电脑）的快照更新时
+        // 自动触发 user_dict_sync
+        mSyncMonitor = new SyncMonitor(this, mRime, mHandler);
+        try {
+            mSyncMonitor.start();
+        } catch (Throwable t) {
+            Log.e("SyncMonitor", "start failed", t);
+        }
     }
 
     /**
@@ -327,6 +338,11 @@ public class TrimeService extends InputMethodService {
     public void onDestroy() {
         // 注销剪贴板监听
         unregisterClipEvents();
+        // 停止词库自动同步监视器
+        if (mSyncMonitor != null) {
+            mSyncMonitor.stop();
+            mSyncMonitor = null;
+        }
         // 移除所有待处理的 Handler 消息
         mHandler.removeCallbacksAndMessages(null);
         sInstance = null;
@@ -2846,6 +2862,10 @@ public class TrimeService extends InputMethodService {
                 }
                 rememberManualCreatedWord(code, text);
                 CustomToast.show(this, "已造词：" + text, Toast.LENGTH_SHORT, true);
+                // 造词成功：请求一次自动同步（带防抖），尽快把新词同步到其他端
+                if (mSyncMonitor != null) {
+                    mSyncMonitor.requestSync();
+                }
                 dialog.dismiss();
                 updateCandidate();
             });
