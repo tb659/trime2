@@ -1334,9 +1334,9 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
-     * 在当前编码没有任何候选时，生成“添加自造词”动作项。
+     * 候选不足 10 个时，生成追加在候选列表末尾的“添加自造词”动作项。
      *
-     * <p>这里只在候选区真的空白时显示入口，避免与正常候选竞争位置；
+     * <p>候选完全空白或不足 10 个时显示入口，避免与足够的正常候选竞争位置；
      * 点击后会弹窗，让用户把当前编码和目标词语明确写入 user_dict。</p>
      */
     public static CandidateItem getCreateWordActionCandidate(
@@ -1346,7 +1346,7 @@ public class TrimeService extends InputMethodService {
                 || TextUtils.isEmpty(rawInput)
                 || isPredictingStatic()
                 || isCreateWordDialogShowingStatic()
-                || (visibleItems != null && !visibleItems.isEmpty())) {
+                || (visibleItems != null && visibleItems.size() >= 10)) {
             return null;
         }
         return CandidateItem.createWordAction(rawInput, "编码：" + rawInput);
@@ -2732,6 +2732,8 @@ public class TrimeService extends InputMethodService {
                     if (deleteSelfCreatedWord(rawInput, item, matchedEntries, canDeleteLearnedWord)) {
                         CustomToast.show(this, "已删除自造词", Toast.LENGTH_SHORT, true);
                         refreshCandidateAfterSelfCreatedWordDeletion();
+                        // 删除成功：立即同步词库（后台线程），完成后提示同步结果
+                        syncUserDictAfterMutation("删除自造词已同步", "删除自造词同步失败");
                     } else {
                         CustomToast.show(this, "删除自造词失败", Toast.LENGTH_SHORT, true);
                     }
@@ -2862,10 +2864,8 @@ public class TrimeService extends InputMethodService {
                 }
                 rememberManualCreatedWord(code, text);
                 CustomToast.show(this, "已造词：" + text, Toast.LENGTH_SHORT, true);
-                // 造词成功：请求一次自动同步（带防抖），尽快把新词同步到其他端
-                if (mSyncMonitor != null) {
-                    mSyncMonitor.requestSync();
-                }
+                // 造词成功：立即同步词库（后台线程），完成后提示同步结果
+                syncUserDictAfterMutation("造词成功已同步", "已造词同步失败");
                 dialog.dismiss();
                 updateCandidate();
             });
@@ -3661,6 +3661,8 @@ public class TrimeService extends InputMethodService {
         }
         if (mRime.encodeUserPhrase(phrase)) {
             CustomToast.show(this, "已造词：" + phrase, Toast.LENGTH_SHORT, true);
+            // 造词成功：立即同步词库（后台线程），完成后提示同步结果
+            syncUserDictAfterMutation("造词成功已同步", "已造词同步失败");
         } else {
             CustomToast.show(this, "造词失败：" + phrase, Toast.LENGTH_SHORT, true);
         }
@@ -3719,6 +3721,31 @@ public class TrimeService extends InputMethodService {
      */
     public boolean syncUserData() {
         return mRime.syncUserData();
+    }
+
+    /**
+     * 造词/删词成功后立即同步词库，并提示同步结果。
+     *
+     * <p>在后台线程执行 Rime 同步（不阻塞 UI），完成后回主线程按结果提示
+     * 成功或失败文案；失败时用户可手动再同步。</p>
+     *
+     * @param successMsg 同步成功提示文案。
+     * @param failMsg    同步失败提示文案。
+     */
+    private void syncUserDictAfterMutation(String successMsg, String failMsg) {
+        Thread thread = new Thread(() -> {
+            boolean ok = false;
+            try {
+                ok = mRime.syncUserDataNow();
+            } catch (Throwable t) {
+                Log.e(TAG, "sync after user dict mutation failed", t);
+            }
+            final boolean synced = ok;
+            mHandler.post(() -> CustomToast.show(this,
+                    synced ? successMsg : failMsg,
+                    Toast.LENGTH_SHORT, true));
+        }, "user-dict-sync");
+        thread.start();
     }
 
     public void showStatusDialog(String title) {

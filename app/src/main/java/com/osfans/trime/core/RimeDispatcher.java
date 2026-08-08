@@ -48,6 +48,25 @@ public final class RimeDispatcher {
         }
     }
 
+    /**
+     * 提交耗时任务并等待结果(最多30秒)。
+     *
+     * <p>用于词库同步等可能超过普通提交 2 秒等待上限的操作；
+     * 超时或异常时返回 null，但任务本身仍会在执行器中继续完成。</p>
+     *
+     * @param block 要执行的任务。
+     * @param <T> 返回类型。
+     * @return 任务结果,如果异常则返回 null。
+     */
+    public <T> T submitLong(Callable<T> block) {
+        try {
+            return executor.submit(block).get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     // --- 接口 ---
 
     /**

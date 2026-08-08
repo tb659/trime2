@@ -352,6 +352,18 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
     /**
+     * 同步用户数据（等待更久）。
+     *
+     * <p>词库同步可能超过普通提交的 2 秒等待上限（大词库合并/写入快照），
+     * 造词后立即同步等场景应调用此方法；最多等待 30 秒。</p>
+     *
+     * @return true 表示同步成功。
+     */
+    public boolean syncUserDataNow() {
+        return Boolean.TRUE.equals(dispatcher.submitLong(Rime::syncRimeUserData));
+    }
+
+    /**
      * 处理按键事件。
      *
      * @param value 键值(Rime 键码)。
