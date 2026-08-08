@@ -2730,12 +2730,12 @@ public class TrimeService extends InputMethodService {
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(android.R.string.ok, (unusedDialog, which) -> {
                     if (deleteSelfCreatedWord(rawInput, item, matchedEntries, canDeleteLearnedWord)) {
-                        CustomToast.show(this, "已删除自造词", Toast.LENGTH_SHORT, true);
+                        CustomToast.show(this, "已删词", Toast.LENGTH_SHORT, true);
                         refreshCandidateAfterSelfCreatedWordDeletion();
                         // 删除成功：立即同步词库（后台线程），完成后提示同步结果
-                        syncUserDictAfterMutation("删除自造词已同步", "删除自造词同步失败");
+                        syncUserDictAfterMutation("已删词，正在同步", "同步失败");
                     } else {
-                        CustomToast.show(this, "删除自造词失败", Toast.LENGTH_SHORT, true);
+                        CustomToast.show(this, "删词失败", Toast.LENGTH_SHORT, true);
                     }
                 })
                 .create();
@@ -2865,7 +2865,7 @@ public class TrimeService extends InputMethodService {
                 rememberManualCreatedWord(code, text);
                 CustomToast.show(this, "已造词：" + text, Toast.LENGTH_SHORT, true);
                 // 造词成功：立即同步词库（后台线程），完成后提示同步结果
-                syncUserDictAfterMutation("造词成功已同步", "已造词同步失败");
+                syncUserDictAfterMutation("已造词，正在同步", "已造词，同步失败");
                 dialog.dismiss();
                 updateCandidate();
             });
@@ -3662,7 +3662,7 @@ public class TrimeService extends InputMethodService {
         if (mRime.encodeUserPhrase(phrase)) {
             CustomToast.show(this, "已造词：" + phrase, Toast.LENGTH_SHORT, true);
             // 造词成功：立即同步词库（后台线程），完成后提示同步结果
-            syncUserDictAfterMutation("造词成功已同步", "已造词同步失败");
+            syncUserDictAfterMutation("已造词，正在同步", "已造词，同步失败");
         } else {
             CustomToast.show(this, "造词失败：" + phrase, Toast.LENGTH_SHORT, true);
         }
