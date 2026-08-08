@@ -695,6 +695,8 @@ class Rime {
     return rime->sync_user_data();
   }
 
+  bool isMaintenanceMode() { return rime && rime->is_maintenance_mode(); }
+
  private:
   RimeApi *rime;
   std::shared_ptr<SessionHolder> session_;
@@ -780,6 +782,12 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_osfans_trime_core_Rime_syncRimeUserData(JNIEnv *env,
                                                  jclass /* thiz */) {
   return Rime::Instance().sync();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_osfans_trime_core_Rime_isRimeMaintenance(JNIEnv *env,
+                                                  jclass /* thiz */) {
+  return Rime::Instance().isMaintenanceMode();
 }
 
 // input

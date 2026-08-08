@@ -401,10 +401,8 @@ public class Function {
                 if(option.equals("com.osfans.trime.action.DEPLOY"))
                     new DeployDialog(context).show(context.getToken());
                 else if (option.equals("com.osfans.trime.action.SYNC_USER_DATA")) {
-                    boolean ok = TrimeService.getInstance() != null
-                            && TrimeService.getInstance().syncUserData();
                     if (TrimeService.getInstance() != null) {
-                        TrimeService.getInstance().showStatusDialog(ok ? "同步完成" : "同步失败");
+                        TrimeService.getInstance().syncUserDataWithDeploymentStatus();
                     }
                 }
                 else

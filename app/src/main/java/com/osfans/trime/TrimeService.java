@@ -2732,8 +2732,8 @@ public class TrimeService extends InputMethodService {
                     if (deleteSelfCreatedWord(rawInput, item, matchedEntries, canDeleteLearnedWord)) {
                         CustomToast.show(this, "已删词", Toast.LENGTH_SHORT, true);
                         refreshCandidateAfterSelfCreatedWordDeletion();
-                        // 删除成功：立即同步词库（后台线程），完成后提示同步结果
-                        syncUserDictAfterMutation("已删词，正在同步", "同步失败");
+                        // 删除成功：立即同步词库（后台线程），同步期间常驻提示，完成后隐藏
+                        syncUserDictAfterMutation("已删词并​同步​，正在​部署");
                     } else {
                         CustomToast.show(this, "删词失败", Toast.LENGTH_SHORT, true);
                     }
@@ -2864,8 +2864,8 @@ public class TrimeService extends InputMethodService {
                 }
                 rememberManualCreatedWord(code, text);
                 CustomToast.show(this, "已造词：" + text, Toast.LENGTH_SHORT, true);
-                // 造词成功：立即同步词库（后台线程），完成后提示同步结果
-                syncUserDictAfterMutation("已造词，正在同步", "已造词，同步失败");
+                // 造词成功：立即同步词库（后台线程），同步期间常驻提示，完成后隐藏
+                syncUserDictAfterMutation("已造词并​同步，正在​​部署");
                 dialog.dismiss();
                 updateCandidate();
             });
@@ -3661,8 +3661,8 @@ public class TrimeService extends InputMethodService {
         }
         if (mRime.encodeUserPhrase(phrase)) {
             CustomToast.show(this, "已造词：" + phrase, Toast.LENGTH_SHORT, true);
-            // 造词成功：立即同步词库（后台线程），完成后提示同步结果
-            syncUserDictAfterMutation("已造词，正在同步", "已造词，同步失败");
+            // 造词成功：立即同步词库（后台线程），同步期间常驻提示，完成后隐藏
+            syncUserDictAfterMutation("已造词并​同步​，正在​部署");
         } else {
             CustomToast.show(this, "造词失败：" + phrase, Toast.LENGTH_SHORT, true);
         }
@@ -3724,28 +3724,43 @@ public class TrimeService extends InputMethodService {
     }
 
     /**
-     * 造词/删词成功后立即同步词库，并提示同步结果。
+     * 造词/删词成功后同步词库并重新部署。
      *
-     * <p>在后台线程执行 Rime 同步（不阻塞 UI），完成后回主线程按结果提示
-     * 成功或失败文案；失败时用户可手动再同步。</p>
+     * <p>同步期间在键盘上方常驻显示提示文案；同步（部署）完成后隐藏提示；
+     * 同步失败时提示改为“部署失败，请手动同步”。</p>
      *
-     * @param successMsg 同步成功提示文案。
-     * @param failMsg    同步失败提示文案。
+     * @param successMsg 同步进行中的提示文案（持续显示直至部署完成）。
      */
-    private void syncUserDictAfterMutation(String successMsg, String failMsg) {
+    private void syncUserDictAfterMutation(String successMsg) {
+        CustomToast.showPersistent(this, successMsg, true);
         Thread thread = new Thread(() -> {
             boolean ok = false;
             try {
-                ok = mRime.syncUserDataNow();
+                ok = mRime.syncUserDataAndWaitForDeployment();
             } catch (Throwable t) {
                 Log.e(TAG, "sync after user dict mutation failed", t);
             }
             final boolean synced = ok;
-            mHandler.post(() -> CustomToast.show(this,
-                    synced ? successMsg : failMsg,
-                    Toast.LENGTH_SHORT, true));
+            mHandler.post(() -> {
+                if (synced) {
+                    CustomToast.dismiss();
+                } else {
+                    CustomToast.show(this, "部署失败，请手动同步",
+                            Toast.LENGTH_SHORT, true);
+                }
+            });
         }, "user-dict-sync");
         thread.start();
+    }
+
+    /**
+     * 手动同步（键盘“同步”按钮触发）。
+     *
+     * <p>同步并部署期间常驻显示“同步完成，正在部署”；部署完成后提示消失；
+     * 部署失败时提示“部署失败，请手动同步”。</p>
+     */
+    public void syncUserDataWithDeploymentStatus() {
+        syncUserDictAfterMutation("同步完成，正在部署");
     }
 
     public void showStatusDialog(String title) {

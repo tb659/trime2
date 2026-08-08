@@ -364,6 +364,40 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
     }
 
     /**
+     * 等待维护（部署）线程结束的最长时间（毫秒）。
+     */
+    private static final long MAINTENANCE_WAIT_TIMEOUT_MILLIS = 120_000;
+
+    /**
+     * 同步用户数据并等待部署完成。
+     *
+     * <p>librime 的 {@code sync_user_data} 只排定部署任务便立即返回，
+     * 实际的同步与部署在其后台维护线程中异步执行。此方法在同步返回后
+     * 轮询 {@link #isRimeMaintenance()}，直至部署结束或超时。</p>
+     *
+     * <p><b>必须在后台线程调用</b>（轮询期间会阻塞）。</p>
+     *
+     * @return true 表示同步启动成功且部署已正常结束；超时或同步失败返回 false。
+     */
+    public boolean syncUserDataAndWaitForDeployment() {
+        boolean ok = Boolean.TRUE.equals(dispatcher.submitLong(Rime::syncRimeUserData));
+        long deadline = System.currentTimeMillis() + MAINTENANCE_WAIT_TIMEOUT_MILLIS;
+        while (isRimeMaintenance()) {
+            if (System.currentTimeMillis() > deadline) {
+                Log.w("rime", "waiting for maintenance timed out");
+                return false;
+            }
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return ok;
+    }
+
+    /**
      * 处理按键事件。
      *
      * @param value 键值(Rime 键码)。
@@ -1150,6 +1184,13 @@ public class Rime implements RimeApi, RimeLifecycleOwner {
      * @return true 表示同步成功。
      */
     public static native boolean syncRimeUserData();
+
+    /**
+     * 查询 Rime 维护（部署）线程是否正在运行(原生方法)。
+     *
+     * @return true 表示维护/部署进行中。
+     */
+    public static native boolean isRimeMaintenance();
 
     // ==================== 输入相关原生方法 ====================
 

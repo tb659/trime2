@@ -134,9 +134,79 @@ public class CustomToast {
                 // 如果传入的是具体毫秒数，直接使用
                 delay = duration > 0 ? duration : LENGTH_SHORT_DURATION;
             }
-            
-            // 设置定时任务，在指定延迟后自动关闭提示
-            mainHandler.postDelayed(CustomToast::dismissCurrent, delay);
+
+            // 设置定时任务，在指定延迟后自动关闭提示（只关闭本提示，不影响之后常驻的提示）
+            mainHandler.postDelayed(() -> dismissPopup(popupWindow), delay);
+        });
+    }
+
+    /**
+     * 常驻显示提示，不自动关闭，直到调用 {@link #dismiss()}。
+     * <p>
+     * 用于需要持续提示的耗时操作（如 Rime 同步/部署期间）。调用前会先关闭当前旧提示。
+     *
+     * @param context      上下文环境，用于获取系统服务和加载资源
+     * @param text         要显示的文本内容
+     * @param aboveKeyboard 如果为 true 且上下文支持，则尝试显示在键盘上方；否则显示在屏幕底部
+     */
+    public static void showPersistent(Context context, String text, boolean aboveKeyboard) {
+        // 参数有效性检查：如果上下文或文本为空，则直接返回，避免崩溃
+        if (context == null || text == null) return;
+
+        // 确保所有 UI 操作在主线程中执行
+        mainHandler.post(() -> {
+            // 在显示新提示之前，先关闭当前可能存在的旧提示
+            dismissCurrent();
+
+            // 加载自定义 Toast 布局文件
+            View toastView = LayoutInflater.from(context).inflate(R.layout.toast_custom, null);
+            // 查找文本视图并设置显示内容
+            ImageView iconView = toastView.findViewById(R.id.toast_icon);
+            TextView textView = toastView.findViewById(R.id.toast_text);
+            iconView.setImageResource(R.drawable.kele);
+            textView.setText(text);
+
+            // 创建 PopupWindow 实例
+            // 宽高设置为 WRAP_CONTENT，以便根据内容自动调整大小
+            PopupWindow popupWindow = new PopupWindow(
+                    toastView,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT
+            );
+
+            // 配置 PopupWindow 的行为属性
+            popupWindow.setOutsideTouchable(false); // 点击外部区域不关闭
+            popupWindow.setFocusable(false);        // 不获取焦点，避免干扰输入法或其他控件
+            popupWindow.setTouchable(false);        // 不可触摸，仅作为展示用途
+
+            // 在 Android 5.0 (Lollipop) 及以上版本，设置高程为 0 以移除默认阴影，保持样式简洁
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                popupWindow.setElevation(0);
+            }
+
+            // 对输入法内提示统一显示在屏幕中间，附着在输入法窗口上层，避免被键盘盖住。
+            int gravity = Gravity.CENTER;
+            int yOffset = 0;
+            if (!aboveKeyboard) {
+                gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
+                yOffset = dpToPx(context, 96);
+            }
+            popupWindow.showAtLocation(getContentView(context), gravity, 0, yOffset);
+
+            // 保存当前 PopupWindow 的弱引用，以便后续可以关闭它
+            currentPopupRef = new WeakReference<>(popupWindow);
+            // 不设置自动关闭任务，提示保持显示直至手动 dismiss()
+        });
+    }
+
+    /**
+     * 关闭指定的 PopupWindow 实例（在主线程中执行）。
+     */
+    private static void dismissPopup(PopupWindow popup) {
+        mainHandler.post(() -> {
+            if (popup != null && popup.isShowing()) {
+                popup.dismiss();
+            }
         });
     }
 
