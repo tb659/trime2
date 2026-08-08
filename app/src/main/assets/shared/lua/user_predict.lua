@@ -117,21 +117,31 @@ local function ensure_char_words()
     return _char_words_tbl
 end
 
--- 删后重预测走共享请求文件桥接：Java 会同时写 shared/build/user 三处，这里按脚本所在目录向上回溯多级兜底读取。
+-- 删后重预测走共享请求文件桥接：Windows 端由 WeaselServer 写入 %APPDATA%\Rime\user_predict_request.txt，
+-- 这里优先用 APPDATA 环境变量拼绝对路径；再用脚本目录向上回溯多级兜底（兼容移动端/打包场景）。
 local function get_request_file_paths()
+    local paths = {}
+    local appdata = os.getenv("APPDATA")
+    if appdata then
+        paths[#paths + 1] = appdata .. "\\Rime\\user_predict_request.txt"
+    end
     local src = debug and debug.getinfo and debug.getinfo(1, "S").source or ""
     if s_sub(src, 1, 1) == "@" then src = s_sub(src, 2) end
     local dir = s_match(src, "^(.*[\\/])") or ""
-    if dir == "" then return { "user_predict_request.txt" } end
-    local paths = {
-        dir .. "user_predict_request.txt",
-        dir .. "../user_predict_request.txt",
-        dir .. "../../user_predict_request.txt",
-        dir .. "../../../user_predict_request.txt",
-        dir .. "../../../lua/user_predict_request.txt",
-        dir .. "../lua/user_predict_request.txt",
-        dir .. "../../lua/user_predict_request.txt",
-    }
+    if dir == "" then
+        paths[#paths + 1] = "user_predict_request.txt"
+    else
+        local rel = {
+            dir .. "user_predict_request.txt",
+            dir .. "../user_predict_request.txt",
+            dir .. "../../user_predict_request.txt",
+            dir .. "../../../user_predict_request.txt",
+            dir .. "../../../lua/user_predict_request.txt",
+            dir .. "../lua/user_predict_request.txt",
+            dir .. "../../lua/user_predict_request.txt",
+        }
+        for _, p in ipairs(rel) do paths[#paths + 1] = p end
+    end
     local unique = {}
     local result = {}
     for _, path in ipairs(paths) do
@@ -210,7 +220,8 @@ end
 
 -- 读取并消费一条外部重预测请求；revision 用来忽略旧请求或重复请求。
 local function read_external_prediction_request()
-    for _, path in ipairs(get_request_file_paths()) do
+    local paths = get_request_file_paths()
+    for _, path in ipairs(paths) do
         local file = io.open(path, "r")
         if file then
             local revision_line = file:read("*l")
@@ -312,6 +323,14 @@ local function get_db(env)
     return db
 end
 
+-- 用完即关，释放 userdb LOCK，避免阻塞 user_dict_sync
+-- 先强制 GC：确保 db:query 返回的访问器（持有底层裸指针）已析构，
+-- 否则 close 释放 leveldb::DB 后其析构会造成 use-after-free 崩溃
+local function close_db(db)
+    collectgarbage("collect")
+    if db and db:loaded() then db:close() end
+end
+
 -- 判断是否是 CJK 汉字（包括扩展区 A~I）
 local function is_chinese_char(char)
     local cp = utf8 and utf8.codepoint(char) or 0
@@ -379,6 +398,11 @@ get_predictions = function(env, prev_commit)
     if not prev_commit or prev_commit == "" then return nil end
     local db = get_db(env)
     if not db then return nil end
+    -- 用完即关，释放 userdb LOCK，避免阻塞 user_dict_sync
+    local function finish(v)
+        close_db(db)
+        return v
+    end
     local cands = {}
     local seen = {}
     -- 排除刚上屏的词本身，避免原地重复
@@ -522,9 +546,9 @@ get_predictions = function(env, prev_commit)
 
     if #cands > 0 then
         sort(cands, function(a, b) return a.weight > b.weight end)
-        return cands
+        return finish(cands)
     end
-    return nil
+    return finish(nil)
 end
 
 -- ======================== 删除预测候选 ========================
@@ -547,6 +571,7 @@ local function remove_predict_candidate(env, word)
         local p_key = "P\t" .. table.concat(chars, "", #chars - l + 1, #chars) .. "\t" .. word
         if db.erase then db:erase(p_key) else db:update(p_key, "") end
     end
+    close_db(db)  -- 用完即关，释放 LOCK
 end
 
 -- ======================== 过期数据批量清理 ========================
@@ -577,6 +602,7 @@ local function clean_expired(env)
         if deleted > 0 then
         end
     end
+    close_db(db)  -- 用完即关，释放 LOCK
 end
 
 -- ====================================================================
@@ -594,7 +620,6 @@ local P = {}
 -- 在 Rime 引擎加载 schema 时调用
 function P.init(env)
     load_config(env)
-    local db = get_db(env)
     clean_expired(env)
     reset_runtime_state(env)
     env.need_push = false         -- 是否需要注入占位符
@@ -611,6 +636,8 @@ function P.init(env)
             reset_memory_chain(env, "non-Chinese text")
             return
         end
+        -- 用完即关，释放 userdb LOCK，避免阻塞 user_dict_sync
+        local db = get_db(env)
 
         -- 语境超时检测：两次上屏间隔超过 CONTEXT_TIMEOUT_MS 则重置记忆链
         local current_time = rime_api and rime_api.get_time_ms and rime_api.get_time_ms() or (os_time() * 1000)
@@ -631,6 +658,7 @@ function P.init(env)
             set_is_predicting(env, false)
             predict_count = 0
             pending_cands = nil
+            close_db(db)
             return
         end
 
@@ -748,6 +776,7 @@ function P.init(env)
                             if s_find(k, query_key, 1, true) then is_known_prefix = true; break end
                         end
                     end
+                    da = nil  -- 释放访问器，避免 db close 后其析构 use-after-free
                     if is_known_prefix then break end
                 end
                 if is_known_prefix then
@@ -798,6 +827,7 @@ function P.init(env)
             local inp = ctx.input or ""
             if inp == PH_CHAR then ctx:clear() end
         end
+        close_db(db)  -- 用完即关，释放 LOCK
     end
 
     -- ============ update_notifier 回调 ============
@@ -809,8 +839,8 @@ function P.init(env)
         local expected_ph = PH_CHAR
         local expected_len = utf8_len(PH_CHAR) or 1
         if not ctx:get_option("prediction") and s_find(input, PH_CHAR, 1, true) then
-            ctx:clear()
             reset_memory_chain(env, "prediction off clears placeholder")
+            ctx:clear()
             return
         end
         if input == PH_CHAR then
@@ -848,7 +878,8 @@ function P.init(env)
         -- push_input 会触发 Rime Context::Update()，重新运行翻译器
         -- Translator 看到输入为 ››› 时从 pending_cands 生成预测候选
         -- 这样候选栏在上屏后保持显示 isComposing=true
-        if env.need_push and input == "" then
+        -- pending_cands 兜底：防止删除/打断后 clear 触发 update_cb 时占位符被重新注入
+        if env.need_push and input == "" and pending_cands then
             if push_prediction_placeholder(ctx, env) then return end
         end
 
@@ -888,8 +919,9 @@ function P.init(env)
         local cand = seg:get_candidate_at(idx)
         if cand and cand.type == "predict" then
             remove_predict_candidate(env, cand.text)
-            ctx:clear()
+            -- 先重置状态再清空，避免 clear 触发 update_cb 时占位符被重新注入
             reset_memory_chain(env, "delete predict candidate")
+            ctx:clear()
         end
     end
 
@@ -935,6 +967,7 @@ function P.func(key, env)
                         db:update(k, v)
                     end
                 end
+                close_db(db)  -- 用完即关，释放 LOCK
                 env.last_action_time = current_time
             else
                 -- 超时则清空回滚栈
@@ -949,8 +982,8 @@ function P.func(key, env)
     -- Space/;/' 仅当存在已选中的预测候选时放行给 selector 处理。
     if is_predicting then
         if repr == "Return" or repr == "KP_Enter" then
-            ctx:clear()
             reset_memory_chain(env, "enter clears prediction")
+            ctx:clear()
             return 1
         end
         if key.keycode == 0x20 or repr == "semicolon" or repr == "apostrophe" then
@@ -964,13 +997,13 @@ function P.func(key, env)
             if has_predict_cand then
                 return 2  -- 放行给 key_binder/selector 处理
             end
-            ctx:clear()
             reset_memory_chain(env, "selection key with no predict candidate")
+            ctx:clear()
             return 1
         end
         -- 其他键 → 打断预测状态
-        ctx:clear()
         reset_memory_chain(env, "keypress breaks prediction")
+        ctx:clear()
         return 2
     end
 
@@ -994,7 +1027,6 @@ local T = {}
 
 function T.init(env)
     load_config(env)
-    get_db(env)
 end
 
 -- T.func: 翻译器主函数
